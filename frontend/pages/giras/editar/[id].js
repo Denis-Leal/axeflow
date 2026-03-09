@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
-import { getGira } from '../../../services/api';
+import { getGira, getMe } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import api from '../../../services/api';
 
@@ -22,8 +22,16 @@ export default function EditarGira() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    Promise.all([getGira(id), api.get('/membros')])
-      .then(([giraRes, membrosRes]) => {
+    // Verifica role antes de carregar
+    getMe().then(meRes => {
+      if (!['admin', 'operador'].includes(meRes.data.role)) {
+        router.push('/giras');
+        return;
+      }
+      return Promise.all([getGira(id), api.get('/membros')]);
+    }).then(results => {
+      if (!results) return;
+      const [giraRes, membrosRes] = results;
         const g = giraRes.data;
         // Normalizar campos para o form
         setForm({
@@ -39,8 +47,7 @@ export default function EditarGira() {
           status:              g.status || 'aberta',
         });
         setMembros(membrosRes.data);
-      })
-      .catch(() => router.push('/giras'))
+    }).catch(() => router.push('/giras'))
       .finally(() => setLoading(false));
   }, [id]);
 

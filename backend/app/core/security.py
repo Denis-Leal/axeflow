@@ -48,3 +48,18 @@ def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+def require_role(*roles: str):
+    """
+    Dependency factory — garante que o usuário tem uma das roles exigidas.
+    Uso: user: Usuario = Depends(require_role("admin", "operador"))
+    """
+    def checker(user: Usuario = Depends(get_current_user)) -> Usuario:
+        if user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acesso negado. Necessário: {', '.join(roles)}. Seu perfil: {user.role}",
+            )
+        return user
+    return checker

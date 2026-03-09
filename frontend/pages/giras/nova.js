@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
-import { createGira } from '../../services/api';
+import { createGira, getMe } from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
 import api from '../../services/api';
 
@@ -19,11 +19,20 @@ export default function NovaGira() {
   const [membros, setMembros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [autorizado, setAutorizado] = useState(false);
 
   useEffect(() => {
-    api.get('/membros')
-      .then(res => setMembros(res.data))
-      .catch(() => {});
+    const token = localStorage.getItem('token');
+    if (!token) { router.push('/login'); return; }
+
+    getMe().then(res => {
+      if (!['admin', 'operador'].includes(res.data.role)) {
+        router.push('/giras'); // redireciona sem permissão
+        return;
+      }
+      setAutorizado(true);
+      api.get('/membros').then(r => setMembros(r.data)).catch(() => {});
+    }).catch(() => { router.push('/login'); });
   }, []);
 
   const handleSubmit = async (e) => {
@@ -47,6 +56,8 @@ export default function NovaGira() {
       setLoading(false);
     }
   };
+
+  if (!autorizado) return null;
 
   return (
     <>
