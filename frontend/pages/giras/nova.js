@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import { createGira } from '../../services/api';
-import { handleApiError } from '../services/errorHandler';
+import { handleApiError } from '../../services/errorHandler';
 
 
 export default function NovaGira() {
