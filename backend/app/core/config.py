@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = "re_SqQgBk67_4DdKQmm1qGaNKbXvkeovcSLt"
     EMAIL_FROM: str = "axeflow@resend.dev"
     APP_URL: str = "https://axeflow.vercel.app"
+    
+    # Gmail SMTP (alternativa ao Resend)
+    GMAIL_USER: str = "axeflow777@gmail.com"
+    GMAIL_PASS: str = "znso rino gtvh mzgy"  # senha de app — NÃO USE SUA SENHA NORMAL
+    APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:
         env_file = ".env"

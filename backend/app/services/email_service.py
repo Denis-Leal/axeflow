@@ -1,46 +1,37 @@
 """
 email_service.py — AxeFlow
-Envio de emails transacionais via Resend (resend.com).
-Plano free: 3.000 emails/mês.
+Envio de emails transacionais via Gmail SMTP (senha de app).
 """
 import logging
-import httpx
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-RESEND_API_URL = "https://api.resend.com/emails"
-
 
 def _send(to: str, subject: str, html: str) -> bool:
-    """Envia um email via Resend. Retorna True se enviado com sucesso."""
-    if not settings.RESEND_API_KEY:
-        logger.warning("[Email] RESEND_API_KEY não configurada — email não enviado para %s", to)
+    """Envia um email via Gmail SMTP. Retorna True se enviado com sucesso."""
+    if not settings.GMAIL_USER or not settings.GMAIL_PASS:
+        logger.warning("[Email] GMAIL_USER/GMAIL_PASS não configurados — email não enviado para %s", to)
         return False
 
     try:
-        response = httpx.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": settings.EMAIL_FROM,
-                "to": [to],
-                "subject": subject,
-                "html": html,
-            },
-            timeout=10,
-        )
-        if response.status_code in (200, 201):
-            logger.info("[Email] Enviado para %s — %s", to, subject)
-            return True
-        else:
-            logger.error("[Email] Falha ao enviar para %s: %s %s", to, response.status_code, response.text)
-            return False
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"AxeFlow <{settings.GMAIL_USER}>"
+        msg["To"]      = to
+        msg.attach(MIMEText(html, "html", "utf-8"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(settings.GMAIL_USER, settings.GMAIL_PASS)
+            server.sendmail(settings.GMAIL_USER, to, msg.as_string())
+
+        logger.info("[Email] Enviado para %s — %s", to, subject)
+        return True
     except Exception as e:
-        logger.error("[Email] Erro ao enviar para %s: %s", to, e)
+        logger.error("[Email] Falha ao enviar para %s: %s", to, e)
         return False
 
 
