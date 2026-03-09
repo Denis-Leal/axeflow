@@ -7,6 +7,7 @@ from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
+from app.services.push_service import broadcast_push_notification
 
 def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID):
     gira = db.query(Gira).filter(Gira.id == gira_id, Gira.terreiro_id == terreiro_id).first()
@@ -49,7 +50,6 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     else:
         consulente.primeira_visita = False
 
-    # Verificar duplicidade
     ja_inscrito = db.query(InscricaoGira).filter(
         InscricaoGira.gira_id == gira.id,
         InscricaoGira.consulente_id == consulente.id,
@@ -73,6 +73,14 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     db.add(inscricao)
     db.commit()
     db.refresh(inscricao)
+
+    # 🔔 Push: novo consulente inscrito
+    vagas_restantes = gira.limite_consulentes - (total_ativos + 1)
+    broadcast_push_notification(
+        title="👤 Nova Inscrição",
+        body=f"{data.nome} se inscreveu na {gira.titulo} (vaga {total_ativos + 1}/{gira.limite_consulentes})",
+        url=f"/giras/{gira.id}",
+    )
 
     return InscricaoResponse(
         id=inscricao.id,
@@ -104,6 +112,16 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID):
     gira = db.query(Gira).filter(Gira.id == inscricao.gira_id, Gira.terreiro_id == terreiro_id).first()
     if not gira:
         raise HTTPException(status_code=403, detail="Acesso negado")
+
+    nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
     inscricao.status = StatusInscricaoEnum.cancelado
     db.commit()
+
+    # 🔔 Push: inscrição cancelada
+    broadcast_push_notification(
+        title="❌ Inscrição Cancelada",
+        body=f"{nome} cancelou a inscrição na {gira.titulo}",
+        url=f"/giras/{gira.id}",
+    )
+
     return {"ok": True}

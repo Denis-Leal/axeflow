@@ -3,11 +3,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import Base, engine
 from app.routers import auth_router, gira_router, inscricao_router, public_router, membros_router, push_router
 
-# Import all models to register them
-from app.models import terreiro, usuario, gira, consulente, inscricao
+# Import all models — ordem importa para o create_all registrar tudo
+from app.models.terreiro import Terreiro
+from app.models.usuario import Usuario
+from app.models.gira import Gira
+from app.models.consulente import Consulente
+from app.models.inscricao import InscricaoGira
+from app.models.push_subscription import PushSubscription  # ← garante criação da tabela
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+import logging
+logger = logging.getLogger(__name__)
+
+# Cria todas as tabelas que ainda não existem (seguro — não apaga dados)
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("[DB] Tabelas verificadas/criadas com sucesso")
+except Exception as e:
+    logger.error(f"[DB] Erro ao criar tabelas: {e}")
 
 app = FastAPI(
     title="AxeFlow",
@@ -17,12 +29,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://axeflow.vercel.app",  # sua URL do Vercel
-        "https://axeflow-*.vercel.app", # previews do Vercel
-        "http://localhost:3000",               # desenvolvimento local
-    ],
-    allow_credentials=False,
+    allow_origins=["*"],
+    allow_credentials=False,  # deve ser False quando allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )

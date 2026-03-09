@@ -1,114 +1,138 @@
 """
-pushService.py — AxeFlow
-Gerencia subscriptions e envio de Web Push Notifications via VAPID
+push_service.py — AxeFlow
+Subscriptions persistidas no PostgreSQL (não se perdem com restart do servidor).
 """
 import json
 import logging
-from typing import List, Dict, Any
+from typing import Dict, Any
 from pywebpush import webpush, WebPushException
+from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models.push_subscription import PushSubscription
 
 logger = logging.getLogger(__name__)
 
-# ── Armazenamento em memória ───────────────────────────────────────────────
-# Para produção: salvar no banco de dados (tabela push_subscriptions)
-_subscriptions: List[Dict[str, Any]] = []
+
+# ── Helpers de DB ─────────────────────────────────────────────────────────────
+
+def _get_db() -> Session:
+    return SessionLocal()
 
 
 def add_subscription(subscription: Dict[str, Any]) -> bool:
-    """
-    Salva uma nova subscription (evita duplicatas por endpoint).
-    Retorna True se foi adicionada, False se já existia.
-    """
+    """Salva ou atualiza uma subscription no banco."""
     endpoint = subscription.get("endpoint")
-    if not endpoint:
+    keys     = subscription.get("keys", {})
+    p256dh   = keys.get("p256dh")
+    auth     = keys.get("auth")
+
+    if not endpoint or not p256dh or not auth:
+        logger.warning("[Push] Subscription inválida — campos ausentes")
         return False
 
-    # Remover subscription antiga do mesmo endpoint se existir
-    global _subscriptions
-    _subscriptions = [s for s in _subscriptions if s.get("endpoint") != endpoint]
-    _subscriptions.append(subscription)
-
-    logger.info(f"[Push] Subscription salva. Total: {len(_subscriptions)}")
-    return True
+    db = _get_db()
+    try:
+        existing = db.query(PushSubscription).filter_by(endpoint=endpoint).first()
+        if existing:
+            existing.p256dh = p256dh
+            existing.auth   = auth
+            db.commit()
+            logger.info(f"[Push] Subscription atualizada. Total: {db.query(PushSubscription).count()}")
+            return False  # já existia
+        else:
+            sub = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth)
+            db.add(sub)
+            db.commit()
+            logger.info(f"[Push] Subscription nova salva. Total: {db.query(PushSubscription).count()}")
+            return True
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Push] Erro ao salvar subscription: {e}")
+        return False
+    finally:
+        db.close()
 
 
 def remove_subscription(endpoint: str):
-    """Remove uma subscription pelo endpoint."""
-    global _subscriptions
-    before = len(_subscriptions)
-    _subscriptions = [s for s in _subscriptions if s.get("endpoint") != endpoint]
-    logger.info(f"[Push] Subscription removida. {before} → {len(_subscriptions)}")
+    """Remove subscription expirada do banco."""
+    db = _get_db()
+    try:
+        db.query(PushSubscription).filter_by(endpoint=endpoint).delete()
+        db.commit()
+        logger.info(f"[Push] Subscription removida: {endpoint[:60]}...")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Push] Erro ao remover subscription: {e}")
+    finally:
+        db.close()
 
 
 def get_subscriptions_count() -> int:
-    return len(_subscriptions)
+    db = _get_db()
+    try:
+        return db.query(PushSubscription).count()
+    finally:
+        db.close()
 
 
-def send_push_notification(
-    subscription: Dict[str, Any],
-    title: str,
-    body: str,
-    url: str = "/dashboard",
-    icon: str = "/icons/icon-192.png",
-) -> bool:
-    """
-    Envia uma push notification para uma subscription específica.
-    Retorna True em sucesso, False em falha.
-    """
+# ── Envio ─────────────────────────────────────────────────────────────────────
+
+def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str) -> bool:
     payload = json.dumps({
         "title": title,
-        "body": body,
-        "icon": icon,
-        "data": {"url": url},
+        "body":  body,
+        "icon":  icon,
+        "data":  {"url": url},
     })
-
+    subscription_info = {
+        "endpoint": sub.endpoint,
+        "keys": {
+            "p256dh": sub.p256dh,
+            "auth":   sub.auth,
+        },
+    }
     try:
         webpush(
-            subscription_info=subscription,
+            subscription_info=subscription_info,
             data=payload,
             vapid_private_key=settings.VAPID_PRIVATE_KEY,
-            vapid_claims={
-                "sub": f"mailto:{settings.VAPID_EMAIL}",
-            },
+            vapid_claims={"sub": settings.VAPID_EMAIL},
         )
         return True
     except WebPushException as ex:
-        status_code = ex.response.status_code if ex.response else None
-        logger.warning(f"[Push] Falha ao enviar: {ex} | Status: {status_code}")
-
-        # Se 410 (Gone) ou 404, a subscription expirou — remover
-        if status_code in (404, 410):
-            remove_subscription(subscription.get("endpoint", ""))
+        status = ex.response.status_code if ex.response else None
+        logger.warning(f"[Push] Falha ao enviar: {ex} | Status: {status}")
+        if status in (404, 410):
+            remove_subscription(sub.endpoint)
         return False
     except Exception as ex:
-        logger.error(f"[Push] Erro inesperado: {ex}")
+        logger.error(f"[Push] Erro inesperado ao enviar: {ex}")
         return False
 
 
 def broadcast_push_notification(
     title: str,
-    body: str,
-    url: str = "/dashboard",
-    icon: str = "/icons/icon-192.png",
+    body:  str,
+    url:   str = "/dashboard",
+    icon:  str = "/icons/icon-192.png",
 ) -> Dict[str, int]:
-    """
-    Envia push notification para TODAS as subscriptions salvas.
-    Retorna contagem de sucessos e falhas.
-    """
-    if not _subscriptions:
-        logger.info("[Push] Nenhuma subscription registrada.")
-        return {"enviados": 0, "falhas": 0, "total": 0}
+    """Envia push para todas as subscriptions salvas no banco."""
+    db = _get_db()
+    try:
+        subs = db.query(PushSubscription).all()
+        if not subs:
+            logger.info("[Push] Nenhuma subscription no banco.")
+            return {"enviados": 0, "falhas": 0, "total": 0}
 
-    success = 0
-    failed = 0
+        success, failed = 0, 0
+        for sub in subs:
+            if _send_one(sub, title=title, body=body, url=url, icon=icon):
+                success += 1
+            else:
+                failed += 1
 
-    for sub in list(_subscriptions):  # list() para iterar em cópia
-        ok = send_push_notification(sub, title=title, body=body, url=url, icon=icon)
-        if ok:
-            success += 1
-        else:
-            failed += 1
-
-    logger.info(f"[Push] Broadcast: {success} enviados, {failed} falhas")
-    return {"enviados": success, "falhas": failed, "total": len(_subscriptions)}
+        logger.info(f"[Push] Broadcast: {success} enviados, {failed} falhas de {len(subs)} total")
+        return {"enviados": success, "falhas": failed, "total": len(subs)}
+    finally:
+        db.close()
