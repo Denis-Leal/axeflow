@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     VAPID_EMAIL: str = "mailto:admin@resend.dev"
 
     # Email (Resend — resend.com)
-    RESEND_API_KEY: str = "re_d7fZJ3M8_HGphweD1HozcnTg1ggwrggn8"
-    EMAIL_FROM: str = "onboarding@resend.dev"
+    RESEND_API_KEY: str = "re_SqQgBk67_4DdKQmm1qGaNKbXvkeovcSLt"
+    EMAIL_FROM: str = "axeflow@resend.dev"
     APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:
