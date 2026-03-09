@@ -10,7 +10,7 @@ from app.models import terreiro, usuario, gira, consulente, inscricao
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Terreiro SaaS",
+    title="AxeFlow",
     description="Sistema de gestão de giras para terreiros",
     version="1.0.0"
 )
@@ -32,7 +32,7 @@ app.include_router(push_router.router)
 
 @app.get("/")
 def root():
-    return {"status": "ok", "app": "Terreiro SaaS"}
+    return {"status": "ok", "app": "AxeFlow"}
 
 @app.get("/health")
 def health():

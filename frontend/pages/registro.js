@@ -29,7 +29,7 @@ export default function Registro() {
 
   return (
     <>
-      <Head><title>Novo Terreiro | Terreiro SaaS</title></Head>
+      <Head><title>Novo Terreiro | AxeFlow</title></Head>
       <div className="login-wrapper">
         <div className="login-card" style={{ maxWidth: '520px' }}>
           <div className="login-logo">

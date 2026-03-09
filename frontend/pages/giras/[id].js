@@ -51,7 +51,7 @@ export default function GiraDetalhe() {
 
   return (
     <>
-      <Head><title>{gira.titulo} | Terreiro SaaS</title></Head>
+      <Head><title>{gira.titulo} | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

@@ -37,7 +37,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Head><title>Dashboard | Terreiro SaaS</title></Head>
+      <Head><title>Dashboard | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

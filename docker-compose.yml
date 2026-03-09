@@ -3,17 +3,17 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: terreiro_db
+    container_name: axeflow_db
     environment:
       POSTGRES_USER: terreiro
       POSTGRES_PASSWORD: terreiro123
-      POSTGRES_DB: terreiro_saas
+      POSTGRES_DB: axeflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U terreiro -d terreiro_saas"]
+      test: ["CMD-SHELL", "pg_isready -U terreiro -d axeflow"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,9 +22,9 @@ services:
     build:
       context: ./backend
       dockerfile: ../Dockerfile.backend
-    container_name: terreiro_backend
+    container_name: axeflow_backend
     environment:
-      DATABASE_URL: postgresql://terreiro:terreiro123@postgres:5432/terreiro_saas
+      DATABASE_URL: postgresql://terreiro:terreiro123@postgres:5432/axeflow
       SECRET_KEY: minha-chave-super-secreta-mude-em-producao
     ports:
       - "0.0.0.0:8000:8000"
@@ -39,7 +39,7 @@ services:
     build:
       context: ./frontend
       dockerfile: ../Dockerfile.frontend
-    container_name: terreiro_frontend
+    container_name: axeflow_frontend
     # NEXT_PUBLIC_API_URL não definido aqui intencionalmente.
     # O frontend detecta o host dinamicamente (funciona no PC e no celular via IP).
     # Para produção, defina: NEXT_PUBLIC_API_URL=https://api.seudominio.com

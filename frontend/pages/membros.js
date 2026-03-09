@@ -59,7 +59,7 @@ export default function Membros() {
 
   return (
     <>
-      <Head><title>Membros | Terreiro SaaS</title></Head>
+      <Head><title>Membros | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

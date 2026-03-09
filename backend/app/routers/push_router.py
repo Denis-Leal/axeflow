@@ -1,5 +1,5 @@
 """
-push_router.py — Terreiro SaaS
+push_router.py — AxeFlow
 Endpoints para gerenciar push subscriptions e disparar notificações
 """
 from fastapi import APIRouter, HTTPException, Depends

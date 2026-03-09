@@ -51,7 +51,7 @@ export default function Configuracoes() {
 
   return (
     <>
-      <Head><title>Configurações | Terreiro SaaS</title></Head>
+      <Head><title>Configurações | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

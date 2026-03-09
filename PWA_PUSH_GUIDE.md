@@ -34,7 +34,7 @@ hostname -I | awk '{print $1}'
 3. Faça login normalmente
 
 4. O Chrome vai exibir automaticamente um banner:  
-   **"Adicionar Terreiro SaaS à tela inicial"** → toque em **Adicionar**
+   **"Adicionar AxeFlow à tela inicial"** → toque em **Adicionar**
 
 5. Se o banner não aparecer:
    - Toque nos 3 pontinhos (menu) no canto superior direito

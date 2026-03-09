@@ -1,5 +1,5 @@
 // =====================================================
-// pushService.js — Terreiro SaaS
+// pushService.js — AxeFlow
 // Gerencia registro de SW e push subscriptions
 // =====================================================
 

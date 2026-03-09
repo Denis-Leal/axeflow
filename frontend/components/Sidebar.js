@@ -22,7 +22,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>☽✦☾</div>
-        <h4>Terreiro SaaS</h4>
+        <h4>AxeFlow</h4>
         {user && <small>{user.terreiro_nome}</small>}
       </div>
 

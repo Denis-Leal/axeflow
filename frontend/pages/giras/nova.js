@@ -37,7 +37,7 @@ export default function NovaGira() {
 
   return (
     <>
-      <Head><title>Nova Gira | Terreiro SaaS</title></Head>
+      <Head><title>Nova Gira | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

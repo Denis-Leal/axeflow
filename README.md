@@ -1,4 +1,4 @@
-# ☽✦☾ Terreiro SaaS
+# ☽✦☾ AxeFlow
 
 Sistema de gestão de giras para terreiros de Umbanda e Candomblé.
 
@@ -44,7 +44,7 @@ Acesse:
 ## Estrutura
 
 ```
-terreiro-saas/
+axeflow/
 ├── backend/
 │   └── app/
 │       ├── core/         # config, db, security
@@ -83,7 +83,7 @@ terreiro-saas/
 
 ```env
 # Backend
-DATABASE_URL=postgresql://terreiro:terreiro123@postgres:5432/terreiro_saas
+DATABASE_URL=postgresql://terreiro:terreiro123@postgres:5432/axeflow
 SECRET_KEY=mude-em-producao
 
 # Frontend

@@ -20,7 +20,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <meta name="application-name" content="Terreiro SaaS" />
+        <meta name="application-name" content="AxeFlow" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Terreiro" />

@@ -1,0 +1,28 @@
+databases:
+  - name: axeflow-db
+    databaseName: axeflow
+    user: terreiro
+    plan: free
+
+services:
+  - type: web
+    name: axeflow-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: axeflow-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: VAPID_PRIVATE_KEY
+        value: MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgsxwmmzwI9U13ELFPbXSRKq9Kaz4hxIQ9y9scGnAbwgGhRANCAAT1QdBlpJb8VSKNxgLY9qdSA42b9ckyksFXMCFiwnt8MoC20Q0iXzsUgr0HfmVIk5_i7x9Po7Dyn5c5beE4PLnw
+      - key: VAPID_PUBLIC_KEY
+        value: BPVB0GWklvxVIo3GAtj2p1IDjZv1yTKSwVcwIWLCe3wygLbRDSJfOxSCvQd-ZUiTn-LvH0-jsPKflzlt4Tg8ufA
+      - key: VAPID_EMAIL
+        value: mailto:admin@axeflow.app
+    healthCheckPath: /health

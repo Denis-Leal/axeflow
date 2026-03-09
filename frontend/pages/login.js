@@ -42,12 +42,12 @@ export default function Login() {
 
   return (
     <>
-      <Head><title>Login | Terreiro SaaS</title></Head>
+      <Head><title>Login | AxeFlow</title></Head>
       <div className="login-wrapper">
         <div className="login-card">
           <div className="login-logo">
             <div className="symbol">☽✦☾</div>
-            <h1>Terreiro SaaS</h1>
+            <h1>AxeFlow</h1>
             <p style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
               Sistema de Gestão de Giras
             </p>

@@ -1,5 +1,5 @@
 """
-pushService.py — Terreiro SaaS
+pushService.py — AxeFlow
 Gerencia subscriptions e envio de Web Push Notifications via VAPID
 """
 import json

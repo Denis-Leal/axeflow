@@ -1,9 +1,9 @@
 // =====================================================
-// Service Worker — Terreiro SaaS PWA
+// Service Worker — AxeFlow PWA
 // Gerencia cache offline e push notifications
 // =====================================================
 
-const CACHE_NAME = 'terreiro-saas-v1';
+const CACHE_NAME = 'axeflow-v1';
 const OFFLINE_URL = '/offline';
 
 // Arquivos para cache inicial (shell do app)
@@ -80,7 +80,7 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push recebido:', event);
 
   let data = {
-    title: 'Terreiro SaaS',
+    title: 'AxeFlow',
     body: 'Você tem uma nova notificação.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',

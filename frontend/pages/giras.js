@@ -29,7 +29,7 @@ export default function Giras() {
 
   return (
     <>
-      <Head><title>Giras | Terreiro SaaS</title></Head>
+      <Head><title>Giras | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

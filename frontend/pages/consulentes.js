@@ -54,7 +54,7 @@ export default function Consulentes() {
 
   return (
     <>
-      <Head><title>Consulentes | Terreiro SaaS</title></Head>
+      <Head><title>Consulentes | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">

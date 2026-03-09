@@ -138,7 +138,7 @@ export default function GiraPublica() {
             )}
 
             <div style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--cor-texto-suave)', fontSize: '0.75rem' }}>
-              Terreiro SaaS · Sistema de Gestão de Giras
+              AxeFlow · Sistema de Gestão de Giras
             </div>
           </div>
         </div>
