@@ -27,7 +27,7 @@ export default function NovaGira() {
 
     getMe().then(res => {
       if (!['admin', 'operador'].includes(res.data.role)) {
-        router.push('/giras'); // redireciona sem permissão
+        router.push('/giras?erro=sem-permissao'); // redireciona com mensagem
         return;
       }
       setAutorizado(true);

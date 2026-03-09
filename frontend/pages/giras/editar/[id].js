@@ -23,31 +23,33 @@ export default function EditarGira() {
     if (!token) { router.push('/login'); return; }
 
     // Verifica role antes de carregar
-    getMe().then(meRes => {
-      if (!['admin', 'operador'].includes(meRes.data.role)) {
-        router.push('/giras');
-        return;
-      }
-      return Promise.all([getGira(id), api.get('/membros')]);
-    }).then(results => {
-      if (!results) return;
-      const [giraRes, membrosRes] = results;
+    getMe()
+      .then(meRes => {
+        if (!['admin', 'operador'].includes(meRes.data.role)) {
+          router.push('/giras?erro=sem-permissao');
+          return Promise.reject('sem-permissao');
+        }
+        return Promise.all([getGira(id), api.get('/membros')]);
+      })
+      .then(results => {
+        if (!results) return;
+        const [giraRes, membrosRes] = results;
         const g = giraRes.data;
-        // Normalizar campos para o form
         setForm({
-          titulo:              g.titulo || '',
-          tipo:                g.tipo || '',
-          acesso:              g.acesso || 'publica',
-          data:                g.data || '',
-          horario:             g.horario ? g.horario.slice(0, 5) : '', // HH:MM
-          limite_consulentes:  g.limite_consulentes || 20,
-          abertura_lista:      g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
-          fechamento_lista:    g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
+          titulo:               g.titulo || '',
+          tipo:                 g.tipo || '',
+          acesso:               g.acesso || 'publica',
+          data:                 g.data || '',
+          horario:              g.horario ? g.horario.slice(0, 5) : '',
+          limite_consulentes:   g.limite_consulentes || 20,
+          abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
+          fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
           responsavel_lista_id: g.responsavel_lista_id || '',
-          status:              g.status || 'aberta',
+          status:               g.status || 'aberta',
         });
         setMembros(membrosRes.data);
-    }).catch(() => router.push('/giras'))
+      })
+      .catch(err => { if (err !== 'sem-permissao') router.push('/giras'); })
       .finally(() => setLoading(false));
   }, [id]);
 

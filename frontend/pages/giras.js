@@ -4,23 +4,51 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
-import { listGiras, deleteGira } from '../services/api';
+import { listGiras, deleteGira, getMe } from '../services/api';
 
 export default function Giras() {
   const router = useRouter();
   const [giras, setGiras] = useState([]);
+  const [userRole, setUserRole] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    listGiras().then(r => setGiras(r.data)).catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } }).finally(() => setLoading(false));
-  }, []);
+
+    // Mostra mensagem se veio redirecionado por falta de permissão
+    if (router.query.erro === 'sem-permissao') {
+      setErro('Sem permissão para acessar essa página. Apenas administradores e operadores podem criar ou editar giras.');
+      setTimeout(() => setErro(''), 6000);
+    }
+
+    Promise.all([listGiras(), getMe()])
+      .then(([girasRes, meRes]) => {
+        setGiras(girasRes.data);
+        setUserRole(meRes.data.role);
+      })
+      .catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } })
+      .finally(() => setLoading(false));
+  }, [router.query]);
+
+  const podeGerenciar = ['admin', 'operador'].includes(userRole);
+  const podeExcluir   = userRole === 'admin';
+
+  const [erro, setErro] = useState('');
 
   const handleDelete = async (id) => {
     if (!confirm('Confirmar exclusão desta gira?')) return;
-    await deleteGira(id);
-    setGiras(prev => prev.filter(g => g.id !== id));
+    try {
+      await deleteGira(id);
+      setGiras(prev => prev.filter(g => g.id !== id));
+    } catch (err) {
+      if (err.response?.status === 403) {
+        setErro('Sem permissão para excluir giras. Apenas administradores podem fazer isso.');
+      } else {
+        setErro('Erro ao excluir a gira. Tente novamente.');
+      }
+      setTimeout(() => setErro(''), 5000);
+    }
   };
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
@@ -38,11 +66,22 @@ export default function Giras() {
               <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Giras</h5>
               <small style={{ color: 'var(--cor-texto-suave)' }}>{giras.length} giras cadastradas</small>
             </div>
-            <Link href="/giras/nova" className="btn-gold">
-              <i className="bi bi-plus-lg me-1"></i> Nova Gira
-            </Link>
+            {podeGerenciar && (
+              <Link href="/giras/nova" className="btn-gold">
+                <i className="bi bi-plus-lg me-1"></i> Nova Gira
+              </Link>
+            )}
           </div>
           <div className="page-content">
+            {erro && (
+              <div style={{
+                background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: '10px', padding: '0.85rem 1.2rem', marginBottom: '1rem',
+                color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem'
+              }}>
+                <i className="bi bi-exclamation-triangle-fill"></i> {erro}
+              </div>
+            )}
             <div className="card-custom">
               <div style={{ overflowX: 'auto' }}>
                 <table className="table-custom">
@@ -75,16 +114,22 @@ export default function Giras() {
                             <Link href={`/giras/${g.id}`} className="btn-outline-gold" title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                               <i className="bi bi-list-ul"></i>
                             </Link>
-                            <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold" title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-                              <i className="bi bi-pencil"></i>
-                            </Link>
-                            <a href={`/public/${g.slug_publico}`} target="_blank" className="btn-outline-gold" title="Página pública" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-                              <i className="bi bi-share"></i>
-                            </a>
-                            <button onClick={() => handleDelete(g.id)} title="Excluir"
-                              style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
-                              <i className="bi bi-trash"></i>
-                            </button>
+                            {podeGerenciar && (
+                              <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold" title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                                <i className="bi bi-pencil"></i>
+                              </Link>
+                            )}
+                            {g.slug_publico && (
+                              <a href={`/public/${g.slug_publico}`} target="_blank" className="btn-outline-gold" title="Página pública" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                                <i className="bi bi-share"></i>
+                              </a>
+                            )}
+                            {podeExcluir && (
+                              <button onClick={() => handleDelete(g.id)} title="Excluir"
+                                style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
