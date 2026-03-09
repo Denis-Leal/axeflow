@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Email (Resend — resend.com)
     RESEND_API_KEY: str = "re_d7fZJ3M8_HGphweD1HozcnTg1ggwrggn8"
-    EMAIL_FROM: str = "denis.leal07@gmail.com"
+    EMAIL_FROM: str = "onboarding@resend.dev"
     APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:
