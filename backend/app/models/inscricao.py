@@ -17,7 +17,8 @@ class InscricaoGira(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     gira_id = Column(UUID(as_uuid=True), ForeignKey("giras.id"), nullable=False)
-    consulente_id = Column(UUID(as_uuid=True), ForeignKey("consulentes.id"), nullable=False)
+    consulente_id = Column(UUID(as_uuid=True), ForeignKey("consulentes.id"), nullable=True)  # NULL para giras fechadas
+    membro_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)          # usado em giras fechadas
     posicao = Column(Integer, nullable=False)
     status = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado)
     created_at = Column(DateTime, default=datetime.utcnow)

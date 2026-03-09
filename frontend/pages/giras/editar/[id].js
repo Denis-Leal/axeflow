@@ -29,6 +29,7 @@ export default function EditarGira() {
         setForm({
           titulo:              g.titulo || '',
           tipo:                g.tipo || '',
+          acesso:              g.acesso || 'publica',
           data:                g.data || '',
           horario:             g.horario ? g.horario.slice(0, 5) : '', // HH:MM
           limite_consulentes:  g.limite_consulentes || 20,
@@ -102,6 +103,28 @@ export default function EditarGira() {
                   <div className="row g-3">
 
                     <div className="col-12">
+                      <label className="form-label-custom">Tipo de Gira</label>
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        {[
+                          { value: 'publica', emoji: '🌐', label: 'Aberta ao público' },
+                          { value: 'fechada', emoji: '🔒', label: 'Fechada (membros)' },
+                        ].map(opt => (
+                          <button key={opt.value} type="button"
+                            onClick={() => set('acesso', opt.value)}
+                            style={{
+                              flex: 1, padding: '0.65rem', borderRadius: '8px', cursor: 'pointer',
+                              background: form.acesso === opt.value ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
+                              border: `1.5px solid ${form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
+                              color: form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-texto)',
+                              fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                            }}>
+                            {opt.emoji} {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="col-12">
                       <label className="form-label-custom">Título *</label>
                       <input className="form-control-custom" value={form.titulo} required
                         onChange={e => set('titulo', e.target.value)} placeholder="Ex: Gira de Oxum" />
@@ -152,17 +175,19 @@ export default function EditarGira() {
                       </select>
                     </div>
 
+                    {form.acesso !== 'fechada' && (<>
                     <div className="col-md-6">
                       <label className="form-label-custom">Abertura da lista *</label>
-                      <input type="datetime-local" className="form-control-custom" value={form.abertura_lista} required
-                        onChange={e => set('abertura_lista', e.target.value)} />
+                      <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}
+                        onChange={e => set('abertura_lista', e.target.value)} required={form.acesso !== 'fechada'} />
                     </div>
 
                     <div className="col-md-6">
                       <label className="form-label-custom">Fechamento da lista *</label>
-                      <input type="datetime-local" className="form-control-custom" value={form.fechamento_lista} required
-                        onChange={e => set('fechamento_lista', e.target.value)} />
+                      <input type="datetime-local" className="form-control-custom" value={form.fechamento_lista}
+                        onChange={e => set('fechamento_lista', e.target.value)} required={form.acesso !== 'fechada'} />
                     </div>
+                    </>)}
 
                     <div className="col-12" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                       <button type="submit" className="btn-gold" disabled={saving}

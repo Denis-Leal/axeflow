@@ -6,12 +6,14 @@ import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import NotificationButton from '../components/NotificationButton';
 import { listGiras, getMe } from '../services/api';
+import api from '../services/api';
 
 export default function Dashboard() {
   const router = useRouter();
   const [giras, setGiras] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [minhasPresencas, setMinhasPresencas] = useState({}); // giraId -> status
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -20,6 +22,24 @@ export default function Dashboard() {
       .then(([girasRes, userRes]) => {
         setGiras(girasRes.data);
         setUser(userRes.data);
+        // Carregar presença do usuário em todas as giras fechadas
+        const fechadas = girasRes.data.filter(g => g.acesso === 'fechada' && g.status !== 'concluida');
+        return Promise.all(
+          fechadas.map(g =>
+            api.get(`/membros/giras/${g.id}/presenca-membros`)
+              .then(r => ({ giraId: g.id, membros: r.data, userId: userRes.data.id }))
+              .catch(() => null)
+          )
+        );
+      })
+      .then(results => {
+        if (!results) return;
+        const presencas = {};
+        results.filter(Boolean).forEach(({ giraId, membros, userId }) => {
+          const eu = membros.find(m => m.membro_id === userId);
+          presencas[giraId] = eu?.status || 'pendente';
+        });
+        setMinhasPresencas(presencas);
       })
       .catch(() => router.push('/login'))
       .finally(() => setLoading(false));
@@ -92,6 +112,59 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Card: Giras fechadas — confirmar presença */}
+            {(() => {
+              const fechadasPendentes = giras.filter(g =>
+                g.acesso === 'fechada' &&
+                g.status !== 'concluida' &&
+                (minhasPresencas[g.id] === 'pendente' || minhasPresencas[g.id] === 'confirmado')
+              );
+              if (fechadasPendentes.length === 0) return null;
+              return (
+                <div className="card-custom mb-4">
+                  <div className="card-header">
+                    <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
+                      🔒 Giras Fechadas — Confirme sua presença
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {fechadasPendentes.map(g => {
+                      const meuStatus = minhasPresencas[g.id] || 'pendente';
+                      const jaConfirmei = meuStatus === 'confirmado';
+                      return (
+                        <div key={g.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '0.65rem 0.75rem', borderRadius: '8px', flexWrap: 'wrap', gap: '0.5rem',
+                          background: jaConfirmei ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.2)' : 'var(--cor-borda)'}`,
+                        }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{g.titulo}</span>
+                            <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
+                              {new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {g.horario?.slice(0,5)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const r = await api.post(`/membros/giras/${g.id}/confirmar-presenca`);
+                              setMinhasPresencas(prev => ({ ...prev, [g.id]: r.data.status }));
+                            }}
+                            style={{
+                              padding: '0.35rem 1rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem',
+                              background: jaConfirmei ? 'rgba(16,185,129,0.15)' : 'rgba(212,175,55,0.12)',
+                              border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.4)' : 'rgba(212,175,55,0.3)'}`,
+                              color: jaConfirmei ? '#10b981' : 'var(--cor-acento)',
+                            }}>
+                            {jaConfirmei ? '✓ Confirmado — cancelar?' : '+ Confirmar presença'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {proximaGira && (
               <div className="card-custom mb-4">

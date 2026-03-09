@@ -30,22 +30,28 @@ def list_giras(db: Session, terreiro_id: UUID):
     return result
 
 def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
-    slug = generate_gira_slug(data.titulo, data.data)
-    existing = db.query(Gira).filter(Gira.slug_publico == slug).first()
-    if existing:
-        slug = f"{slug}-{str(user.terreiro_id)[:8]}"
+    is_publica = data.acesso != "fechada"
+
+    # Slug apenas para giras públicas
+    slug = None
+    if is_publica:
+        slug = generate_gira_slug(data.titulo, data.data)
+        existing = db.query(Gira).filter(Gira.slug_publico == slug).first()
+        if existing:
+            slug = f"{slug}-{str(user.terreiro_id)[:8]}"
 
     gira = Gira(
         terreiro_id=user.terreiro_id,
         titulo=data.titulo,
         tipo=data.tipo,
+        acesso=data.acesso,
         data=data.data,
         horario=data.horario,
         limite_consulentes=data.limite_consulentes,
-        abertura_lista=data.abertura_lista,
-        fechamento_lista=data.fechamento_lista,
+        abertura_lista=data.abertura_lista if is_publica else None,
+        fechamento_lista=data.fechamento_lista if is_publica else None,
         responsavel_lista_id=data.responsavel_lista_id,
-        slug_publico=slug
+        slug_publico=slug,
     )
     db.add(gira)
     db.commit()
@@ -54,14 +60,14 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     # 🔔 Push: nova gira criada
     data_fmt = gira.data.strftime("%d/%m/%Y")
     horario_fmt = gira.horario.strftime("%H:%M")
+    acesso_label = "pública" if is_publica else "fechada (membros)"
     broadcast_push_notification(
         title="✦ Nova Gira Criada",
-        body=f"{gira.titulo} — {data_fmt} às {horario_fmt}",
+        body=f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
         url=f"/giras/{gira.id}",
     )
 
-    r = _enrich(gira, db, 0)
-    return r
+    return _enrich(gira, db, 0)
 
 def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     gira = db.query(Gira).filter(Gira.id == gira_id, Gira.terreiro_id == terreiro_id).first()

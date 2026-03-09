@@ -251,3 +251,158 @@ def get_perfil_consulente(
         # Linha do tempo
         "historico":       historico,
     }
+
+
+# ── Lista de presença de gira fechada ─────────────────────────────────────────
+@router.get("/giras/{gira_id}/presenca-membros")
+def get_presenca_membros(
+    gira_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Para giras fechadas: retorna todos os membros ativos do terreiro
+    com seu status de presença nessa gira (compareceu / faltou / pendente).
+    """
+    from app.models.gira import Gira as GiraModel
+
+    gira = db.query(GiraModel).filter(
+        GiraModel.id == gira_id,
+        GiraModel.terreiro_id == user.terreiro_id
+    ).first()
+    if not gira:
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+    if getattr(gira, 'acesso', 'publica') != 'fechada':
+        raise HTTPException(status_code=400, detail="Esta gira é pública — use a lista de inscrições")
+
+    membros = db.query(Usuario).filter(
+        Usuario.terreiro_id == user.terreiro_id,
+        Usuario.ativo == True,
+    ).all()
+
+    result = []
+    for m in membros:
+        # Verificar se já há registro de presença para este membro nesta gira
+        insc = db.query(InscricaoGira).filter(
+            InscricaoGira.gira_id == gira_id,
+            InscricaoGira.consulente_id == None,  # giras fechadas usam campo extra
+        ).first()
+
+        # Buscar via campo membro_id que vamos adicionar na inscrição
+        from sqlalchemy import and_
+        presenca = db.query(InscricaoGira).filter(
+            and_(
+                InscricaoGira.gira_id == gira_id,
+                InscricaoGira.membro_id == m.id,
+            )
+        ).first()
+
+        result.append({
+            "membro_id":   str(m.id),
+            "nome":        m.nome,
+            "role":        m.role,
+            "status":      presenca.status if presenca else "pendente",
+            "presenca_id": str(presenca.id) if presenca else None,
+        })
+
+    return result
+
+
+@router.post("/giras/{gira_id}/presenca-membros/{membro_id}")
+def marcar_presenca_membro(
+    gira_id: UUID,
+    membro_id: UUID,
+    data: dict,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Marca ou atualiza presença de um membro em gira fechada."""
+    from app.models.gira import Gira as GiraModel
+    from sqlalchemy import and_
+
+    gira = db.query(GiraModel).filter(
+        GiraModel.id == gira_id,
+        GiraModel.terreiro_id == user.terreiro_id
+    ).first()
+    if not gira:
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+
+    status = data.get("status")
+    if status not in ("compareceu", "faltou", "pendente"):
+        raise HTTPException(status_code=400, detail="Status inválido")
+
+    presenca = db.query(InscricaoGira).filter(
+        and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == membro_id)
+    ).first()
+
+    if status == "pendente":
+        if presenca:
+            db.delete(presenca)
+            db.commit()
+        return {"ok": True, "status": "pendente"}
+
+    if presenca:
+        presenca.status = status
+    else:
+        # Buscar próxima posição
+        max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
+        presenca = InscricaoGira(
+            gira_id=gira_id,
+            membro_id=membro_id,
+            consulente_id=None,
+            posicao=max_pos + 1,
+            status=status,
+        )
+        db.add(presenca)
+
+    db.commit()
+    return {"ok": True, "status": status}
+
+
+# ── Auto-confirmação de presença pelo próprio membro ──────────────────────────
+@router.post("/giras/{gira_id}/confirmar-presenca")
+def confirmar_presenca_propria(
+    gira_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    O próprio membro logado confirma que vai comparecer à gira fechada.
+    Status: 'confirmado' (intenção) — admin pode depois mudar para compareceu/faltou.
+    """
+    from app.models.gira import Gira as GiraModel
+    from sqlalchemy import and_
+
+    gira = db.query(GiraModel).filter(
+        GiraModel.id == gira_id,
+        GiraModel.terreiro_id == user.terreiro_id
+    ).first()
+    if not gira:
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+    if getattr(gira, 'acesso', 'publica') != 'fechada':
+        raise HTTPException(status_code=400, detail="Esta gira é pública")
+
+    presenca = db.query(InscricaoGira).filter(
+        and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == user.id)
+    ).first()
+
+    if presenca:
+        # Toggle: se já confirmou, cancela
+        if presenca.status == "confirmado":
+            db.delete(presenca)
+            db.commit()
+            return {"ok": True, "status": "pendente", "acao": "cancelado"}
+        # Se admin já marcou compareceu/faltou, não deixa o membro reverter
+        return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
+
+    max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
+    presenca = InscricaoGira(
+        gira_id=gira_id,
+        membro_id=user.id,
+        consulente_id=None,
+        posicao=max_pos + 1,
+        status="confirmado",
+    )
+    db.add(presenca)
+    db.commit()
+    return {"ok": True, "status": "confirmado", "acao": "confirmado"}

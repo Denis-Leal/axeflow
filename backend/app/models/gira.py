@@ -11,6 +11,10 @@ class StatusGiraEnum(str, enum.Enum):
     fechada = "fechada"
     concluida = "concluida"
 
+class AcessoGiraEnum(str, enum.Enum):
+    publica = "publica"    # consulentes externos podem se inscrever
+    fechada = "fechada"    # somente membros do terreiro
+
 class Gira(Base):
     __tablename__ = "giras"
 
@@ -25,7 +29,8 @@ class Gira(Base):
     fechamento_lista = Column(DateTime, nullable=False)
     responsavel_lista_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
     status = Column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
-    slug_publico = Column(String(255), unique=True, nullable=False)
+    acesso = Column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
+    slug_publico = Column(String(255), unique=True, nullable=True)  # NULL para giras fechadas
     created_at = Column(DateTime, default=datetime.utcnow)
 
     terreiro = relationship("Terreiro", back_populates="giras")

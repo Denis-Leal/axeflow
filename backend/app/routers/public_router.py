@@ -19,6 +19,10 @@ def get_gira_publica(slug: str, db: Session = Depends(get_db)):
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
+    # Gira fechada não tem página pública
+    if getattr(gira, 'acesso', 'publica') == 'fechada':
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+
     agora = datetime.utcnow()
     total_inscritos = db.query(InscricaoGira).filter(
         InscricaoGira.gira_id == gira.id,

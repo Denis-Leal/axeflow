@@ -109,3 +109,5 @@ export default function Giras() {
     </>
   );
 }
+
+// NOTE: ver também /giras/[id].js para detalhes e presença

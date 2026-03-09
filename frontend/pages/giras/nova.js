@@ -11,7 +11,7 @@ import api from '../../services/api';
 export default function NovaGira() {
   const router = useRouter();
   const [form, setForm] = useState({
-    titulo: '', tipo: '', data: '', horario: '',
+    titulo: '', tipo: '', acesso: 'publica', data: '', horario: '',
     limite_consulentes: 20,
     abertura_lista: '', fechamento_lista: '',
     responsavel_lista_id: '',
@@ -36,6 +36,8 @@ export default function NovaGira() {
         limite_consulentes: parseInt(form.limite_consulentes),
         horario: form.horario + ':00',
         responsavel_lista_id: form.responsavel_lista_id || null,
+        abertura_lista: form.acesso === 'fechada' ? null : form.abertura_lista || null,
+        fechamento_lista: form.acesso === 'fechada' ? null : form.fechamento_lista || null,
       };
       const res = await createGira(payload);
       router.push(`/giras/${res.data.id}`);
@@ -75,6 +77,30 @@ export default function NovaGira() {
                 )}
 
                 <form onSubmit={handleSubmit}>
+                  {/* Tipo de acesso — primeira decisão */}
+                  <div className="mb-4">
+                    <label className="form-label-custom">Tipo de Gira *</label>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      {[
+                        { value: 'publica', emoji: '🌐', label: 'Aberta ao público', desc: 'Consulentes externos podem se inscrever pelo link' },
+                        { value: 'fechada', emoji: '🔒', label: 'Fechada (membros)', desc: 'Somente membros do terreiro participam' },
+                      ].map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => setForm({ ...form, acesso: opt.value })}
+                          style={{
+                            flex: 1, padding: '0.85rem', borderRadius: '10px', cursor: 'pointer',
+                            background: form.acesso === opt.value ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
+                            textAlign: 'left', transition: 'all 0.15s',
+                          }}>
+                          <div style={{ fontSize: '1.1rem', marginBottom: '3px' }}>{opt.emoji}</div>
+                          <div style={{ color: form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-texto)', fontWeight: 600, fontSize: '0.85rem' }}>{opt.label}</div>
+                          <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.72rem', marginTop: '2px' }}>{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Título e Tipo */}
                   <div className="row g-3 mb-3">
                     <div className="col-8">
@@ -141,7 +167,8 @@ export default function NovaGira() {
                     <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Lista de Inscrições</span>
                   </div>
 
-                  {/* Abertura e Fechamento */}
+                  {/* Abertura e Fechamento — apenas giras públicas */}
+                  {form.acesso === 'publica' && (
                   <div className="row g-3 mb-4">
                     <div className="col-6">
                       <label className="form-label-custom">Abertura da Lista *</label>
@@ -154,6 +181,7 @@ export default function NovaGira() {
                         onChange={e => setForm({ ...form, fechamento_lista: e.target.value })} required />
                     </div>
                   </div>
+                  )}
 
                   <button type="submit" className="btn-gold" disabled={loading} style={{ padding: '0.6rem 2rem' }}>
                     {loading
