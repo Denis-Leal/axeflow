@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from uuid import UUID
 from app.core.database import get_db
-from app.core.security import get_current_user, hash_password
+from app.core.security import get_current_user, hash_password, require_role
 from app.core.config import settings
 from app.models.usuario import Usuario
 from app.models.terreiro import Terreiro
@@ -38,9 +38,7 @@ def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depend
     ]
 
 @router.post("")
-def create_membro(data: MembroCreate, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    if user.role not in ["admin", "operador"]:
-        raise HTTPException(status_code=403, detail="Sem permissão")
+def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):
     existing = db.query(Usuario).filter(Usuario.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -85,7 +83,47 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(get_current_user),
     }
 
 
-# ── Consulentes ────────────────────────────────────────────────────────────────
+@router.put("/{membro_id}")
+def update_membro(
+    membro_id: UUID,
+    data: dict,
+    user: Usuario = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    membro = db.query(Usuario).filter(
+        Usuario.id == membro_id,
+        Usuario.terreiro_id == user.terreiro_id
+    ).first()
+    if not membro:
+        raise HTTPException(status_code=404, detail="Membro não encontrado")
+
+    # Admin não pode desativar a si mesmo
+    if str(membro.id) == str(user.id) and data.get("ativo") is False:
+        raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta")
+
+    if "nome" in data:
+        membro.nome = data["nome"]
+    if "telefone" in data:
+        membro.telefone = data["telefone"]
+    if "role" in data and data["role"] in ["admin", "operador", "membro"]:
+        membro.role = data["role"]
+    if "ativo" in data:
+        membro.ativo = bool(data["ativo"])
+    if "senha" in data and data["senha"]:
+        membro.senha_hash = hash_password(data["senha"])
+
+    db.commit()
+    db.refresh(membro)
+    return {
+        "id": str(membro.id),
+        "nome": membro.nome,
+        "email": membro.email,
+        "telefone": membro.telefone,
+        "role": membro.role,
+        "ativo": membro.ativo,
+    }
+
+
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from sqlalchemy import func
@@ -313,7 +351,7 @@ def marcar_presenca_membro(
     gira_id: UUID,
     membro_id: UUID,
     data: dict,
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db)
 ):
     """Marca ou atualiza presença de um membro em gira fechada."""

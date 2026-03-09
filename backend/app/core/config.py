@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     APP_URL: str = "https://axeflow.vercel.app"
     
     # Brevo (sendinblue) — 300 emails/dia grátis
-    BREVO_API_KEY: str = "xsmtpsib-25443af7112ff71610137eb60253cc393c5c2df53c13811d05536e3b0fae8cc5-5LLSYU7ZMm5aNNEk"
+    BREVO_API_KEY: str = "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"
     APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:

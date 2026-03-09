@@ -14,9 +14,13 @@ export default function Membros() {
   const [membros, setMembros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [membroEditando, setMembroEditando] = useState(null);
   const [form, setForm] = useState({ nome: '', email: '', senha: '', telefone: '', role: 'membro' });
+  const [editForm, setEditForm] = useState({ nome: '', telefone: '', role: 'membro', ativo: true, senha: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editError, setEditError] = useState('');
   const [me, setMe] = useState(null);
 
   useEffect(() => {
@@ -27,7 +31,6 @@ export default function Membros() {
       return api.get(`/membros`);
     }).then(r => setMembros(r.data))
       .catch(() => {
-        // endpoint de membros será criado; por ora usa só o próprio user
         api.get('/auth/me').then(r => setMembros([r.data]));
       })
       .finally(() => setLoading(false));
@@ -38,15 +41,38 @@ export default function Membros() {
     setSaving(true);
     setError('');
     try {
-      // Convida membro para o mesmo terreiro
       await api.post('/membros', form);
       setShowModal(false);
       setForm({ nome: '', email: '', senha: '', telefone: '', role: 'membro' });
-      // Recarrega lista
       const r = await api.get('/membros');
       setMembros(r.data);
     } catch (err) {
       setError(handleApiError(err, 'Membros'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const abrirEditar = (m) => {
+    setMembroEditando(m);
+    setEditForm({ nome: m.nome, telefone: m.telefone || '', role: m.role, ativo: m.ativo !== false, senha: '' });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleEditar = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setEditError('');
+    try {
+      const payload = { ...editForm };
+      if (!payload.senha) delete payload.senha; // só envia senha se preenchida
+      await api.put(`/membros/${membroEditando.id}`, payload);
+      setShowEditModal(false);
+      const r = await api.get('/membros');
+      setMembros(r.data);
+    } catch (err) {
+      setEditError(handleApiError(err, 'Membros'));
     } finally {
       setSaving(false);
     }
@@ -87,6 +113,7 @@ export default function Membros() {
                       <th>Telefone</th>
                       <th>Perfil</th>
                       <th>Status</th>
+                      {me?.role === 'admin' && <th>Ações</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -122,6 +149,18 @@ export default function Membros() {
                             {m.ativo !== false ? 'Ativo' : 'Inativo'}
                           </span>
                         </td>
+                        {me?.role === 'admin' && (
+                          <td>
+                            <button
+                              onClick={() => abrirEditar(m)}
+                              className="btn-outline-gold"
+                              title="Editar membro"
+                              style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}
+                            >
+                              <i className="bi bi-pencil"></i>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     {membros.length === 0 && (
@@ -192,6 +231,81 @@ export default function Membros() {
           </div>
         </div>
       )}
+      {/* Modal Editar Membro */}
+      {showEditModal && membroEditando && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="card-custom" style={{ width: '100%', maxWidth: '460px', margin: '1rem' }}>
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <span style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)' }}>✦ Editar Membro</span>
+              <button onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', color: 'var(--cor-texto-suave)', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+            </div>
+            <div className="p-4">
+              {editError && <div className="alert-custom alert-danger-custom mb-3">{editError}</div>}
+              <form onSubmit={handleEditar}>
+                <div className="mb-3">
+                  <label className="form-label-custom">Nome</label>
+                  <input className="form-control-custom" value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} required />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label-custom">Email</label>
+                  <input className="form-control-custom" value={membroEditando.email} disabled style={{ opacity: 0.5 }} />
+                  <small style={{ color: 'var(--cor-texto-suave)', fontSize: '0.75rem' }}>O email não pode ser alterado</small>
+                </div>
+                <div className="row g-3 mb-3">
+                  <div className="col-6">
+                    <label className="form-label-custom">Telefone</label>
+                    <input className="form-control-custom" value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: e.target.value })} />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label-custom">Perfil</label>
+                    <select className="form-control-custom" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+                      <option value="membro">Membro</option>
+                      <option value="operador">Operador</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label-custom">Nova senha <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400 }}>(deixe em branco para manter)</span></label>
+                  <input type="password" className="form-control-custom" value={editForm.senha} onChange={e => setEditForm({ ...editForm, senha: e.target.value })} minLength={6} placeholder="••••••" />
+                </div>
+                <div className="mb-4">
+                  <label className="form-label-custom">Status</label>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                    {[{ val: true, label: '✓ Ativo', cor: '#10b981' }, { val: false, label: '✗ Inativo', cor: '#ef4444' }].map(opt => (
+                      <button key={String(opt.val)} type="button" onClick={() => setEditForm({ ...editForm, ativo: opt.val })}
+                        style={{
+                          flex: 1, padding: '0.5rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                          border: `1px solid ${editForm.ativo === opt.val ? opt.cor : 'var(--cor-borda)'}`,
+                          background: editForm.ativo === opt.val ? `rgba(${opt.val ? '16,185,129' : '239,68,68'},0.15)` : 'transparent',
+                          color: editForm.ativo === opt.val ? opt.cor : 'var(--cor-texto-suave)',
+                        }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {me?.id === membroEditando.id && (
+                    <small style={{ color: '#f59e0b', fontSize: '0.75rem', marginTop: '0.4rem', display: 'block' }}>
+                      ⚠️ Você não pode desativar sua própria conta
+                    </small>
+                  )}
+                </div>
+                <div className="d-flex gap-2">
+                  <button type="button" className="btn-outline-gold" onClick={() => setShowEditModal(false)} style={{ flex: 1 }}>Cancelar</button>
+                  <button type="submit" className="btn-gold" disabled={saving} style={{ flex: 1 }}>
+                    {saving ? <span className="spinner-border spinner-border-sm me-1"></span> : null}
+                    Salvar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </>
   );
