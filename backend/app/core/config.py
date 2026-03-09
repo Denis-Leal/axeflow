@@ -9,11 +9,11 @@ class Settings(BaseSettings):
 
     VAPID_PRIVATE_KEY: str = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgsxwmmzwI9U13ELFPbXSRKq9Kaz4hxIQ9y9scGnAbwgGhRANCAAT1QdBlpJb8VSKNxgLY9qdSA42b9ckyksFXMCFiwnt8MoC20Q0iXzsUgr0HfmVIk5_i7x9Po7Dyn5c5beE4PLnw"
     VAPID_PUBLIC_KEY: str = "BPVB0GWklvxVIo3GAtj2p1IDjZv1yTKSwVcwIWLCe3wygLbRDSJfOxSCvQd-ZUiTn-LvH0-jsPKflzlt4Tg8ufA"
-    VAPID_EMAIL: str = "mailto:admin@resend.dev"
+    VAPID_EMAIL: str = "mailto:admin@axeflow.app"
 
     # Email (Resend — resend.com)
     RESEND_API_KEY: str = ""
-    EMAIL_FROM: str = "AxeFlow <axeflow@resend.dev>"
+    EMAIL_FROM: str = "AxeFlow <noreply@axeflow.app>"
     APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:
