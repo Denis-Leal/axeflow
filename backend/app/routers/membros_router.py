@@ -133,3 +133,121 @@ def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = De
             dados[cid]["comparecimentos"] += 1
 
     return list(dados.values())
+
+
+# ── Perfil CRM do consulente ───────────────────────────────────────────────────
+from app.models.gira import Gira as GiraModel
+
+@router.get("/consulentes/{consulente_id}/perfil")
+def get_perfil_consulente(
+    consulente_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Perfil CRM completo de um consulente:
+    histórico cronológico, padrões de visita, score e linha do tempo.
+    """
+    from app.services.presenca_service import calcular_score
+    from datetime import date
+
+    consulente = db.query(Consulente).filter(Consulente.id == consulente_id).first()
+    if not consulente:
+        raise HTTPException(status_code=404, detail="Consulente não encontrado")
+
+    # Apenas giras deste terreiro
+    gira_ids = [g.id for g in db.query(GiraModel.id).filter(GiraModel.terreiro_id == user.terreiro_id).all()]
+
+    inscricoes = (
+        db.query(InscricaoGira)
+        .filter(
+            InscricaoGira.consulente_id == consulente_id,
+            InscricaoGira.gira_id.in_(gira_ids),
+        )
+        .all()
+    )
+
+    if not inscricoes:
+        raise HTTPException(status_code=404, detail="Consulente não encontrado neste terreiro")
+
+    # Montar histórico cronológico
+    historico = []
+    for i in inscricoes:
+        gira = db.query(GiraModel).filter(GiraModel.id == i.gira_id).first()
+        if not gira:
+            continue
+        historico.append({
+            "gira_id":    str(gira.id),
+            "gira_titulo": gira.titulo,
+            "gira_tipo":  gira.tipo,
+            "data":       gira.data.isoformat(),
+            "status":     i.status,
+            "posicao":    i.posicao,
+            "inscrito_em": i.created_at.isoformat(),
+        })
+
+    # Ordenar cronológico (mais recente primeiro)
+    historico.sort(key=lambda x: x["data"], reverse=True)
+
+    # Métricas
+    nao_cancelados  = [h for h in historico if h["status"] != "cancelado"]
+    comparecimentos = [h for h in historico if h["status"] == "compareceu"]
+    faltas          = [h for h in historico if h["status"] == "faltou"]
+    cancelamentos   = [h for h in historico if h["status"] == "cancelado"]
+
+    datas_compareceu = sorted([h["data"] for h in comparecimentos])
+    ultima_visita    = datas_compareceu[-1] if datas_compareceu else None
+    primeira_data    = datas_compareceu[0]  if datas_compareceu else None
+
+    # Dias desde a última visita
+    dias_ausente = None
+    if ultima_visita:
+        delta = date.today() - date.fromisoformat(ultima_visita)
+        dias_ausente = delta.days
+
+    # Tipos de gira que mais frequentou
+    tipos = {}
+    for h in comparecimentos:
+        t = h["gira_tipo"] or "Não especificado"
+        tipos[t] = tipos.get(t, 0) + 1
+    tipos_favoritos = sorted(tipos.items(), key=lambda x: x[1], reverse=True)
+
+    # Score de presença
+    score = calcular_score(len(nao_cancelados), len(comparecimentos), len(faltas))
+
+    # Status de retorno
+    if dias_ausente is None:
+        status_retorno = "nunca_compareceu"
+    elif dias_ausente <= 60:
+        status_retorno = "ativo"
+    elif dias_ausente <= 180:
+        status_retorno = "morno"
+    else:
+        status_retorno = "inativo"
+
+    return {
+        "id":            str(consulente.id),
+        "nome":          consulente.nome,
+        "telefone":      consulente.telefone,
+        "primeira_visita": consulente.primeira_visita,
+        "cadastrado_em": consulente.created_at.isoformat(),
+
+        # Métricas
+        "total_inscricoes":  len(nao_cancelados),
+        "comparecimentos":   len(comparecimentos),
+        "faltas":            len(faltas),
+        "cancelamentos":     len(cancelamentos),
+        "score":             score,
+
+        # Temporalidade
+        "primeira_data":   primeira_data,
+        "ultima_visita":   ultima_visita,
+        "dias_ausente":    dias_ausente,
+        "status_retorno":  status_retorno,  # ativo | morno | inativo | nunca_compareceu
+
+        # Preferências
+        "tipos_favoritos": tipos_favoritos,
+
+        # Linha do tempo
+        "historico":       historico,
+    }

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
+import Link from 'next/link';
 import api from '../services/api';
 
 const COR_SCORE = {
@@ -147,7 +148,9 @@ export default function Consulentes() {
                         <tr key={c.id} style={{ background: c.alerta ? 'rgba(249,115,22,0.04)' : 'transparent' }}>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <strong>{c.nome}</strong>
+                              <Link href={`/consulentes/${c.id}`} style={{ color:'var(--cor-texto)', textDecoration:'none', fontWeight:600 }}>
+                              {c.nome}
+                            </Link>
                               {c.alerta && (
                                 <span title="3+ faltas com taxa abaixo de 50%"
                                   style={{ fontSize: '0.68rem', color: '#f97316',
