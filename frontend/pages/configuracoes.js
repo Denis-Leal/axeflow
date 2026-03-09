@@ -17,7 +17,7 @@ export default function Configuracoes() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    api.get('/auth/me').then(r => setUser(r.data)).catch(() => router.push('/login')).finally(() => setLoading(false));
+    api.get('/auth/me').then(r => setUser(r.data)).catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } }).finally(() => setLoading(false));
   }, []);
 
   const handleSenha = async (e) => {

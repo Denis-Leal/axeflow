@@ -14,7 +14,7 @@ export default function Giras() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    listGiras().then(r => setGiras(r.data)).catch(() => router.push('/login')).finally(() => setLoading(false));
+    listGiras().then(r => setGiras(r.data)).catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } }).finally(() => setLoading(false));
   }, []);
 
   const handleDelete = async (id) => {

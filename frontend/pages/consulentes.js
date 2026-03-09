@@ -41,7 +41,7 @@ export default function Consulentes() {
     if (!token) { router.push('/login'); return; }
     api.get('/consulentes/ranking')
       .then(res => setConsulentes(res.data))
-      .catch(() => router.push('/login'))
+      .catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } })
       .finally(() => setLoading(false));
   }, []);
 

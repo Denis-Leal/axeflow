@@ -24,8 +24,17 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Não redireciona se já estamos na página de login ou registro
+      const pagina = window.location.pathname;
+      if (pagina !== '/login' && pagina !== '/registro') {
+        // Espera um tick para não cortar requisições paralelas legítimas
+        // (ex: dashboard fazendo listGiras + getMe ao mesmo tempo)
+        setTimeout(() => {
+          // Só redireciona se o token ainda foi removido (não houve refresh entre)
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }, 100);
+      }
     }
     return Promise.reject(err);
   }

@@ -18,31 +18,44 @@ export default function Dashboard() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
+
+    // Carregar dados principais primeiro
     Promise.all([listGiras(), getMe()])
       .then(([girasRes, userRes]) => {
         setGiras(girasRes.data);
         setUser(userRes.data);
-        // Carregar presença do usuário em todas as giras fechadas
+        setLoading(false);
+
+        // Carregar presenças de giras fechadas em segundo plano
+        // Erros aqui NÃO devem afetar o carregamento do dashboard
         const fechadas = girasRes.data.filter(g => g.acesso === 'fechada' && g.status !== 'concluida');
-        return Promise.all(
+        if (fechadas.length === 0) return;
+
+        Promise.all(
           fechadas.map(g =>
             api.get(`/membros/giras/${g.id}/presenca-membros`)
               .then(r => ({ giraId: g.id, membros: r.data, userId: userRes.data.id }))
-              .catch(() => null)
+              .catch(() => null) // silencia erros individuais
           )
-        );
+        ).then(results => {
+          const presencas = {};
+          results.filter(Boolean).forEach(({ giraId, membros, userId }) => {
+            const eu = membros.find(m => m.membro_id === userId);
+            presencas[giraId] = eu?.status || 'pendente';
+          });
+          setMinhasPresencas(presencas);
+        }).catch(() => {}); // nunca deixa explodir
       })
-      .then(results => {
-        if (!results) return;
-        const presencas = {};
-        results.filter(Boolean).forEach(({ giraId, membros, userId }) => {
-          const eu = membros.find(m => m.membro_id === userId);
-          presencas[giraId] = eu?.status || 'pendente';
-        });
-        setMinhasPresencas(presencas);
-      })
-      .catch(() => router.push('/login'))
-      .finally(() => setLoading(false));
+      .catch(err => {
+        // Só redireciona se for realmente 401 no login principal
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+        } else {
+          // Qualquer outro erro (503 cold start, rede) — mostra dashboard vazio
+          setLoading(false);
+        }
+      });
   }, []);
 
   const proximaGira = giras.find(g => g.status === 'aberta' || new Date(g.data) >= new Date());
