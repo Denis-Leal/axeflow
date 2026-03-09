@@ -189,7 +189,7 @@ export default function Dashboard() {
                 </div>
                 <div className="p-3 d-flex justify-content-between align-items-center">
                   <div>
-                    <h5 style={{ margin: 0, fontFamily: 'Cinzel' }}>{proximaGira.titulo}</h5>
+                    <h5 style={{ margin: 0, fontFamily: 'Cinzel', color: 'var(--cor-texto)' }}>{proximaGira.titulo}</h5>
                     <small style={{ color: 'var(--cor-texto-suave)' }}>
                       <i className="bi bi-calendar3 me-1"></i>
                       {new Date(proximaGira.data + 'T00:00:00').toLocaleDateString('pt-BR')} às {proximaGira.horario}
