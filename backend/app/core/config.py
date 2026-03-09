@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     GMAIL_USER: str = "axeflow777@gmail.com"
     GMAIL_PASS: str = "znso rino gtvh mzgy"  # senha de app — NÃO USE SUA SENHA NORMAL
     APP_URL: str = "https://axeflow.vercel.app"
+    
+    # Brevo (sendinblue) — 300 emails/dia grátis
+    BREVO_API_KEY: str = "xsmtpsib-25443af7112ff71610137eb60253cc393c5c2df53c13811d05536e3b0fae8cc5-5LLSYU7ZMm5aNNEk"
+    APP_URL: str = "https://axeflow.vercel.app"
 
     class Config:
         env_file = ".env"

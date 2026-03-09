@@ -1,37 +1,46 @@
 """
 email_service.py — AxeFlow
-Envio de emails transacionais via Gmail SMTP (senha de app).
+Envio de emails transacionais via Brevo (brevo.com).
+Plano free: 300 emails/dia, sem domínio próprio necessário.
 """
 import logging
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 def _send(to: str, subject: str, html: str) -> bool:
-    """Envia um email via Gmail SMTP. Retorna True se enviado com sucesso."""
-    if not settings.GMAIL_USER or not settings.GMAIL_PASS:
-        logger.warning("[Email] GMAIL_USER/GMAIL_PASS não configurados — email não enviado para %s", to)
+    """Envia um email via Brevo API. Retorna True se enviado com sucesso."""
+    if not settings.BREVO_API_KEY:
+        logger.warning("[Email] BREVO_API_KEY não configurada — email não enviado para %s", to)
         return False
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"AxeFlow <{settings.GMAIL_USER}>"
-        msg["To"]      = to
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(settings.GMAIL_USER, settings.GMAIL_PASS)
-            server.sendmail(settings.GMAIL_USER, to, msg.as_string())
-
-        logger.info("[Email] Enviado para %s — %s", to, subject)
-        return True
+        response = httpx.post(
+            BREVO_API_URL,
+            headers={
+                "api-key": settings.BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "sender":     {"name": "AxeFlow", "email": settings.GMAIL_USER or "denis.leal07@gmail.com"},
+                "to":         [{"email": to}],
+                "subject":    subject,
+                "htmlContent": html,
+            },
+            timeout=10,
+        )
+        if response.status_code in (200, 201):
+            logger.info("[Email] Enviado para %s — %s", to, subject)
+            return True
+        else:
+            logger.error("[Email] Falha ao enviar para %s: %s %s", to, response.status_code, response.text)
+            return False
     except Exception as e:
-        logger.error("[Email] Falha ao enviar para %s: %s", to, e)
+        logger.error("[Email] Erro ao enviar para %s: %s", to, e)
         return False
 
 
