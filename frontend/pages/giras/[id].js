@@ -314,8 +314,7 @@ export default function GiraDetalhe() {
             )}
 
             {/* Card da lista de consulentes — apenas para giras PÚBLICAS */}
-            {gira.acesso === 'fechada' ? null :
-              {/* Header com filtros e ordenação */}
+            {gira.acesso !== 'fechada' && <div className="card-custom">
               <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
                   ✦ Lista de Consulentes
@@ -459,8 +458,7 @@ export default function GiraDetalhe() {
                   );
                 })}
               </div>
-            </div>
-            } {/* fim gira.acesso !== 'fechada' */}
+            </div>}
           </div>
         </div>
       </div>
