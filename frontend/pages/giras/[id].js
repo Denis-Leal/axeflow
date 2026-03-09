@@ -131,6 +131,10 @@ export default function GiraDetalhe() {
             </div>
             <div className="d-flex gap-2 align-items-center flex-wrap">
               <span className={`badge-status badge-${gira.status}`}>{gira.status}</span>
+              <Link href={`/giras/editar/${id}`} className="btn-outline-gold"
+                style={{ fontSize: '0.85rem', textDecoration: 'none' }}>
+                <i className="bi bi-pencil me-1"></i> Editar
+              </Link>
               <button onClick={copyLink} className="btn-outline-gold" style={{ fontSize: '0.85rem' }}>
                 <i className="bi bi-share me-1"></i> Compartilhar
               </button>

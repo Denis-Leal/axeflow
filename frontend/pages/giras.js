@@ -75,6 +75,9 @@ export default function Giras() {
                             <Link href={`/giras/${g.id}`} className="btn-outline-gold" title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                               <i className="bi bi-list-ul"></i>
                             </Link>
+                            <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold" title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                              <i className="bi bi-pencil"></i>
+                            </Link>
                             <a href={`/public/${g.slug_publico}`} target="_blank" className="btn-outline-gold" title="Página pública" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                               <i className="bi bi-share"></i>
                             </a>
