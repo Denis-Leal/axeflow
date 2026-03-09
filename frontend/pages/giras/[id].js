@@ -279,7 +279,7 @@ export default function GiraDetalhe() {
                         background: statusCor.bg, border: `1px solid ${statusCor.border}`,
                       }}>
                         <div>
-                          <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{m.nome}</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{m.nome}</span>
                           <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--cor-texto-suave)', textTransform: 'capitalize' }}>{m.role}</span>
                           <span style={{ marginLeft: '0.75rem', fontSize: '0.72rem', color: statusCor.text, fontWeight: 600 }}>{statusCor.label}</span>
                         </div>

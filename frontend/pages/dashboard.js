@@ -153,7 +153,7 @@ export default function Dashboard() {
                           border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.2)' : 'var(--cor-borda)'}`,
                         }}>
                           <div>
-                            <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{g.titulo}</span>
+                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{g.titulo}</span>
                             <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
                               {new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {g.horario?.slice(0,5)}
                             </span>
