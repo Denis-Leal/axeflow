@@ -5,9 +5,14 @@ from typing import Optional
 from uuid import UUID
 from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
+from app.core.config import settings
 from app.models.usuario import Usuario
+from app.models.terreiro import Terreiro
 from app.schemas.auth_schema import UsuarioResponse
+from app.services.email_service import send_convite_membro
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/membros", tags=["membros"])
 
 class MembroCreate(BaseModel):
@@ -39,6 +44,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(get_current_user),
     existing = db.query(Usuario).filter(Usuario.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
+
     novo = Usuario(
         terreiro_id=user.terreiro_id,
         nome=data.nome,
@@ -50,7 +56,33 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(get_current_user),
     db.add(novo)
     db.commit()
     db.refresh(novo)
-    return {"id": str(novo.id), "nome": novo.nome, "email": novo.email, "role": novo.role}
+
+    # Buscar nome do terreiro para o email
+    terreiro = db.query(Terreiro).filter(Terreiro.id == user.terreiro_id).first()
+    terreiro_nome = terreiro.nome if terreiro else "seu terreiro"
+
+    # Enviar email de convite (assíncrono — não bloqueia a resposta)
+    try:
+        enviado = send_convite_membro(
+            nome=data.nome,
+            email=data.email,
+            senha_provisoria=data.senha,
+            terreiro_nome=terreiro_nome,
+            convidado_por=user.nome,
+            app_url=settings.APP_URL,
+        )
+        if not enviado:
+            logger.warning("[Membros] Email de convite não enviado para %s (RESEND_API_KEY configurada?)", data.email)
+    except Exception as e:
+        logger.error("[Membros] Erro ao enviar email de convite: %s", e)
+
+    return {
+        "id": str(novo.id),
+        "nome": novo.nome,
+        "email": novo.email,
+        "role": novo.role,
+        "email_convite_enviado": bool(settings.RESEND_API_KEY),
+    }
 
 
 # ── Consulentes ────────────────────────────────────────────────────────────────
