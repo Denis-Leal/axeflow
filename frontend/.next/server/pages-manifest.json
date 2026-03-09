@@ -1,0 +1,11 @@
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js",
+  "/dashboard": "pages/dashboard.js",
+  "/": "pages/index.js",
+  "/giras": "pages/giras.js",
+  "/configuracoes": "pages/configuracoes.js",
+  "/consulentes": "pages/consulentes.js",
+  "/giras/nova": "pages/giras/nova.js"
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1e1040"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#3d1f6e" stroke-width="2"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#3d1f6e" stroke-width="1"/>
+  <!-- Crescente lua -->
+  <path d="M 180 256 A 80 80 0 1 1 180 255.9 A 55 55 0 1 0 180 256 Z" fill="#d4af37"/>
+  <!-- Estrela central -->
+  <polygon points="256,180 265,230 315,230 275,260 290,310 256,283 222,310 237,260 197,230 247,230" fill="#d4af37" opacity="0.9"/>
+  <!-- Crescente direito -->
+  <path d="M 332 256 A 80 80 0 1 0 332 255.9 A 55 55 0 1 1 332 256 Z" fill="#d4af37" opacity="0.7"/>
+</svg>
