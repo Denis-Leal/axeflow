@@ -8,6 +8,16 @@ from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse
 from app.utils.slug import generate_gira_slug
 from app.services.push_service import broadcast_push_notification
 
+
+def _enrich(gira: Gira, db: Session, total_inscritos: int = 0) -> GiraResponse:
+    """Converte Gira em GiraResponse enriquecido com nome do responsável."""
+    r = GiraResponse.model_validate(gira)
+    r.total_inscritos = total_inscritos
+    if gira.responsavel_lista_id:
+        resp = db.query(Usuario).filter(Usuario.id == gira.responsavel_lista_id).first()
+        r.responsavel_lista_nome = resp.nome if resp else None
+    return r
+
 def list_giras(db: Session, terreiro_id: UUID):
     giras = db.query(Gira).filter(Gira.terreiro_id == terreiro_id).order_by(Gira.data.desc()).all()
     result = []
@@ -16,9 +26,7 @@ def list_giras(db: Session, terreiro_id: UUID):
             InscricaoGira.gira_id == g.id,
             InscricaoGira.status != "cancelado"
         ).count()
-        r = GiraResponse.model_validate(g)
-        r.total_inscritos = total
-        result.append(r)
+        result.append(_enrich(g, db, total))
     return result
 
 def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
@@ -52,8 +60,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
         url=f"/giras/{gira.id}",
     )
 
-    r = GiraResponse.model_validate(gira)
-    r.total_inscritos = 0
+    r = _enrich(gira, db, 0)
     return r
 
 def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
@@ -64,9 +71,7 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
         InscricaoGira.gira_id == gira.id,
         InscricaoGira.status != "cancelado"
     ).count()
-    r = GiraResponse.model_validate(gira)
-    r.total_inscritos = total
-    return r
+    return _enrich(gira, db, total)
 
 def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID) -> GiraResponse:
     gira = db.query(Gira).filter(Gira.id == gira_id, Gira.terreiro_id == terreiro_id).first()
@@ -91,7 +96,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
             titulo, corpo = msgs[novo_status]
             broadcast_push_notification(title=titulo, body=corpo, url=f"/giras/{gira.id}")
 
-    return GiraResponse.model_validate(gira)
+    return _enrich(gira, db)
 
 def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
     gira = db.query(Gira).filter(Gira.id == gira_id, Gira.terreiro_id == terreiro_id).first()

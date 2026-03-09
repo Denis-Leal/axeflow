@@ -61,6 +61,12 @@ export default function GiraDetalhe() {
               <small style={{ color: 'var(--cor-texto-suave)' }}>
                 <i className="bi bi-calendar3 me-1"></i>
                 {new Date(gira.data + 'T00:00:00').toLocaleDateString('pt-BR')} às {gira.horario}
+                {gira.responsavel_lista_nome && (
+                  <span style={{ marginLeft: '1rem' }}>
+                    <i className="bi bi-person-check me-1"></i>
+                    Resp.: <strong style={{ color: 'var(--cor-acento)' }}>{gira.responsavel_lista_nome}</strong>
+                  </span>
+                )}
               </small>
             </div>
             <div className="d-flex gap-2 align-items-center">

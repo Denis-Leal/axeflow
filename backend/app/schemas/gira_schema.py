@@ -36,6 +36,8 @@ class GiraResponse(BaseModel):
     status: str
     slug_publico: str
     terreiro_id: UUID
+    responsavel_lista_id: Optional[UUID] = None
+    responsavel_lista_nome: Optional[str] = None
     total_inscritos: Optional[int] = 0
     created_at: datetime
 

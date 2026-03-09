@@ -1,21 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
+import BottomNav from '../../components/BottomNav';
 import { createGira } from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
-
+import api from '../../services/api';
 
 export default function NovaGira() {
   const router = useRouter();
   const [form, setForm] = useState({
     titulo: '', tipo: '', data: '', horario: '',
     limite_consulentes: 20,
-    abertura_lista: '', fechamento_lista: ''
+    abertura_lista: '', fechamento_lista: '',
+    responsavel_lista_id: '',
   });
+  const [membros, setMembros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/membros')
+      .then(res => setMembros(res.data))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,6 +35,7 @@ export default function NovaGira() {
         ...form,
         limite_consulentes: parseInt(form.limite_consulentes),
         horario: form.horario + ':00',
+        responsavel_lista_id: form.responsavel_lista_id || null,
       };
       const res = await createGira(payload);
       router.push(`/giras/${res.data.id}`);
@@ -51,14 +61,21 @@ export default function NovaGira() {
               ← Voltar
             </Link>
           </div>
+
           <div className="page-content">
             <div className="card-custom" style={{ maxWidth: '700px' }}>
               <div className="card-header">
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>✦ Detalhes da Gira</span>
               </div>
               <div className="p-4">
-                {error && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
+                {error && (
+                  <div className="alert-custom alert-danger-custom mb-3">
+                    <i className="bi bi-exclamation-circle me-2"></i>{error}
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
+                  {/* Título e Tipo */}
                   <div className="row g-3 mb-3">
                     <div className="col-8">
                       <label className="form-label-custom">Título *</label>
@@ -74,6 +91,7 @@ export default function NovaGira() {
                     </div>
                   </div>
 
+                  {/* Data, Horário e Vagas */}
                   <div className="row g-3 mb-3">
                     <div className="col-4">
                       <label className="form-label-custom">Data *</label>
@@ -88,14 +106,42 @@ export default function NovaGira() {
                     <div className="col-4">
                       <label className="form-label-custom">Limite de Vagas *</label>
                       <input type="number" className="form-control-custom" value={form.limite_consulentes}
-                        onChange={e => setForm({ ...form, limite_consulentes: e.target.value })} required min={1} />
+                        onChange={e => setForm({ ...form, limite_consulentes: e.target.value })}
+                        required min={1} />
                     </div>
+                  </div>
+
+                  {/* Responsável pela lista */}
+                  <div className="mb-3">
+                    <label className="form-label-custom">
+                      Responsável pela Lista
+                      <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.8rem' }}>
+                        (opcional)
+                      </span>
+                    </label>
+                    <select
+                      className="form-control-custom"
+                      value={form.responsavel_lista_id}
+                      onChange={e => setForm({ ...form, responsavel_lista_id: e.target.value })}
+                      style={{ appearance: 'auto' }}
+                    >
+                      <option value="">— Nenhum responsável definido —</option>
+                      {membros.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome} ({m.role})
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>
+                      Membro responsável por gerenciar as inscrições desta gira
+                    </small>
                   </div>
 
                   <div className="divider-ornamental">
                     <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Lista de Inscrições</span>
                   </div>
 
+                  {/* Abertura e Fechamento */}
                   <div className="row g-3 mb-4">
                     <div className="col-6">
                       <label className="form-label-custom">Abertura da Lista *</label>
@@ -110,7 +156,10 @@ export default function NovaGira() {
                   </div>
 
                   <button type="submit" className="btn-gold" disabled={loading} style={{ padding: '0.6rem 2rem' }}>
-                    {loading ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-stars me-2"></i>}
+                    {loading
+                      ? <span className="spinner-border spinner-border-sm me-2"></span>
+                      : <i className="bi bi-stars me-2"></i>
+                    }
                     Criar Gira
                   </button>
                 </form>
@@ -119,6 +168,7 @@ export default function NovaGira() {
           </div>
         </div>
       </div>
+      <BottomNav />
     </>
   );
 }
