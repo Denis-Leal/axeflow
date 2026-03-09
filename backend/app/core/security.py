@@ -55,7 +55,28 @@ def require_role(*roles: str):
     Dependency factory — garante que o usuário tem uma das roles exigidas.
     Uso: user: Usuario = Depends(require_role("admin", "operador"))
     """
-    def checker(user: Usuario = Depends(get_current_user)) -> Usuario:
+    def checker(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: Session = Depends(get_db)
+    ):
+        from app.models.usuario import Usuario
+        credentials_exception = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        try:
+            payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            user_id: str = payload.get("sub")
+            if user_id is None:
+                raise credentials_exception
+        except JWTError:
+            raise credentials_exception
+
+        user = db.query(Usuario).filter(Usuario.id == user_id, Usuario.ativo == True).first()
+        if user is None:
+            raise credentials_exception
+
         if user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

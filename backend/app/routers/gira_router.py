@@ -21,14 +21,27 @@ def get_gira(gira_id: UUID, user: Usuario = Depends(get_current_user), db: Sessi
 
 # Apenas admin e operador podem criar e editar
 @router.post("", response_model=GiraResponse)
-def create_gira(data: GiraCreate, user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):
+def create_gira(
+    data: GiraCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_role("admin", "operador"))
+):
     return gira_service.create_gira(db, data, user)
 
 @router.put("/{gira_id}", response_model=GiraResponse)
-def update_gira(gira_id: UUID, data: GiraUpdate, user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):
+def update_gira(
+    gira_id: UUID,
+    data: GiraUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_role("admin", "operador"))
+):
     return gira_service.update_gira(db, gira_id, data, user.terreiro_id)
 
 # Apenas admin pode deletar
 @router.delete("/{gira_id}")
-def delete_gira(gira_id: UUID, user: Usuario = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def delete_gira(
+    gira_id: UUID,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_role("admin"))
+):
     return gira_service.delete_gira(db, gira_id, user.terreiro_id)

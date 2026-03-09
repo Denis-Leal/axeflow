@@ -16,24 +16,26 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def has_table(name):
+def tabela_existe(nome: str) -> bool:
+    from sqlalchemy import inspect
     bind = op.get_bind()
-    return bind.execute(sa.text(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :t)"
-    ), {"t": name}).scalar()
+    return inspect(bind).has_table(nome)
 
 
-def has_column(table, column):
+def coluna_existe(tabela: str, coluna: str) -> bool:
+    from sqlalchemy import inspect, text
     bind = op.get_bind()
-    return bind.execute(sa.text(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = :t AND column_name = :c)"
-    ), {"t": table, "c": column}).scalar()
+    result = bind.execute(text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = :t AND column_name = :c"
+    ), {"t": tabela, "c": coluna})
+    return result.fetchone() is not None
 
 
 def upgrade() -> None:
 
     # ── terreiros ──────────────────────────────────────────────────────────────
-    if not has_table("terreiros"):
+    if not tabela_existe("terreiros"):
         op.create_table(
             "terreiros",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -44,7 +46,7 @@ def upgrade() -> None:
         )
 
     # ── usuarios ───────────────────────────────────────────────────────────────
-    if not has_table("usuarios"):
+    if not tabela_existe("usuarios"):
         op.create_table(
             "usuarios",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -60,7 +62,7 @@ def upgrade() -> None:
         )
 
     # ── consulentes ────────────────────────────────────────────────────────────
-    if not has_table("consulentes"):
+    if not tabela_existe("consulentes"):
         op.create_table(
             "consulentes",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -71,7 +73,7 @@ def upgrade() -> None:
         )
 
     # ── giras ──────────────────────────────────────────────────────────────────
-    if not has_table("giras"):
+    if not tabela_existe("giras"):
         op.create_table(
             "giras",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -92,20 +94,28 @@ def upgrade() -> None:
             sa.Column("created_at", sa.DateTime),
         )
     else:
-        if not has_column("giras", "acesso"):
+        # Tabela já existe — adicionar colunas novas se não existirem
+        if not coluna_existe("giras", "acesso"):
             op.add_column("giras",
                 sa.Column("acesso", sa.String(20), nullable=False, server_default="publica"))
-        op.execute(sa.text("ALTER TABLE giras ALTER COLUMN slug_publico DROP NOT NULL"))
-        op.execute(sa.text("ALTER TABLE giras ALTER COLUMN abertura_lista DROP NOT NULL"))
-        op.execute(sa.text("ALTER TABLE giras ALTER COLUMN fechamento_lista DROP NOT NULL"))
+
+        if coluna_existe("giras", "slug_publico"):
+            # Tornar nullable (giras fechadas não têm slug)
+            op.alter_column("giras", "slug_publico", nullable=True)
+
+        if coluna_existe("giras", "abertura_lista"):
+            op.alter_column("giras", "abertura_lista", nullable=True)
+
+        if coluna_existe("giras", "fechamento_lista"):
+            op.alter_column("giras", "fechamento_lista", nullable=True)
 
     # ── inscricoes_gira ────────────────────────────────────────────────────────
-    if not has_table("inscricoes_gira"):
+    if not tabela_existe("inscricoes_gira"):
         op.create_table(
             "inscricoes_gira",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
             sa.Column("gira_id", postgresql.UUID(as_uuid=True),
-                      sa.ForeignKey("giras.id", ondelete="CASCADE"), nullable=False),
+                      sa.ForeignKey("giras.id"), nullable=False),
             sa.Column("consulente_id", postgresql.UUID(as_uuid=True),
                       sa.ForeignKey("consulentes.id"), nullable=True),
             sa.Column("membro_id", postgresql.UUID(as_uuid=True),
@@ -115,14 +125,16 @@ def upgrade() -> None:
             sa.Column("created_at", sa.DateTime),
         )
     else:
-        if not has_column("inscricoes_gira", "membro_id"):
+        if not coluna_existe("inscricoes_gira", "membro_id"):
             op.add_column("inscricoes_gira",
                 sa.Column("membro_id", postgresql.UUID(as_uuid=True),
                           sa.ForeignKey("usuarios.id"), nullable=True))
-        op.execute(sa.text("ALTER TABLE inscricoes_gira ALTER COLUMN consulente_id DROP NOT NULL"))
+
+        if coluna_existe("inscricoes_gira", "consulente_id"):
+            op.alter_column("inscricoes_gira", "consulente_id", nullable=True)
 
     # ── push_subscriptions ─────────────────────────────────────────────────────
-    if not has_table("push_subscriptions"):
+    if not tabela_existe("push_subscriptions"):
         op.create_table(
             "push_subscriptions",
             sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -136,7 +148,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if has_column("inscricoes_gira", "membro_id"):
+    # Downgrade apenas remove as colunas adicionadas
+    if coluna_existe("inscricoes_gira", "membro_id"):
         op.drop_column("inscricoes_gira", "membro_id")
-    if has_column("giras", "acesso"):
+    if coluna_existe("giras", "acesso"):
         op.drop_column("giras", "acesso")
