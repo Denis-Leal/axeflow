@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { getGiraPublica, inscreverPublico } from '../../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 export default function GiraPublica() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function GiraPublica() {
       const res = await inscreverPublico(slug, form);
       setResultado(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao realizar inscrição');
+      setError(handleApiError(err, 'InscricaoPublica'));
     } finally {
       setSubmitting(false);
     }

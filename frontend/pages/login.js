@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { login } from '../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 export default function Login() {
   const router = useRouter();
@@ -9,32 +10,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [errorDetail, setErrorDetail] = useState('');
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setErrorDetail('');
-    const apiUrl = '/api (proxy Next.js → backend:8000)';
     try {
-      console.log('[Login] API URL:', apiUrl);
       const res = await login(form.email, form.senha);
       localStorage.setItem('token', res.data.access_token);
       router.push('/dashboard');
     } catch (err) {
-      console.error('[Login] Erro:', err);
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      const msg = err?.message;
-      setError(data?.detail || msg || 'Erro ao fazer login');
-      setErrorDetail(JSON.stringify({
-        apiUrl,
-        status,
-        data,
-        message: msg,
-        type: err?.code || (err?.response ? 'HTTP_ERROR' : 'NETWORK_ERROR'),
-      }, null, 2));
+      setError(handleApiError(err, 'Login'));
     } finally {
       setLoading(false);
     }
@@ -57,21 +42,6 @@ export default function Login() {
             <div className="alert-custom alert-danger-custom">
               <i className="bi bi-exclamation-circle me-2"></i>{error}
             </div>
-          )}
-
-          {errorDetail && (
-            <pre style={{
-              background: 'rgba(0,0,0,0.4)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: '8px',
-              padding: '0.75rem',
-              fontSize: '0.7rem',
-              color: '#fca5a5',
-              overflowX: 'auto',
-              marginBottom: '1rem',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-            }}>{errorDetail}</pre>
           )}
 
           <form onSubmit={handleSubmit}>
@@ -98,8 +68,10 @@ export default function Login() {
               />
             </div>
             <button type="submit" className="btn-gold w-100" disabled={loading} style={{ padding: '0.75rem' }}>
-              {loading ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-box-arrow-in-right me-2"></i>}
-              Entrar
+              {loading
+                ? <><span className="spinner-border spinner-border-sm me-2"></span>Entrando...</>
+                : <><i className="bi bi-box-arrow-in-right me-2"></i>Entrar</>
+              }
             </button>
           </form>
 

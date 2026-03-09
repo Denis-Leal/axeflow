@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import { createGira } from '../../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 
 export default function NovaGira() {
@@ -29,7 +30,7 @@ export default function NovaGira() {
       const res = await createGira(payload);
       router.push(`/giras/${res.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao criar gira');
+      setError(handleApiError(err, 'CriarGira'));
     } finally {
       setLoading(false);
     }

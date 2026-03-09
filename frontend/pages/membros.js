@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import api from '../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 const ROLES = { admin: 'Admin', operador: 'Operador', membro: 'Membro' };
 const ROLE_COLORS = { admin: '#d4af37', operador: '#a78bfa', membro: '#60a5fa' };
@@ -45,7 +46,7 @@ export default function Membros() {
       const r = await api.get('/membros');
       setMembros(r.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao convidar membro');
+      setError(handleApiError(err, 'Membros'));
     } finally {
       setSaving(false);
     }

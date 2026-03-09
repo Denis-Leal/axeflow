@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { register } from '../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 export default function Registro() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function Registro() {
       await register(form);
       router.push('/login?cadastro=ok');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao cadastrar');
+      setError(handleApiError(err, 'Registro'));
     } finally {
       setLoading(false);
     }
