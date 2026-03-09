@@ -26,7 +26,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://axeflow.vercel.app",  # sua URL do Vercel
+        "https://axeflow-*.vercel.app", # previews do Vercel
+        "http://localhost:3000",               # desenvolvimento local
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
