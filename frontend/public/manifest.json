@@ -1,6 +1,6 @@
 {
   "name": "AxeFlow",
-  "short_name": "Terreiro",
+  "short_name": "AxeFlow",
   "description": "Sistema de gestão de giras para terreiros",
   "start_url": "/dashboard",
   "display": "standalone",
