@@ -14,13 +14,9 @@ from app.models.push_subscription import PushSubscription
 
 import logging
 logger = logging.getLogger(__name__)
+# Migrations são gerenciadas pelo Alembic (rodado no Procfile antes do servidor subir)
+# Não usar create_all aqui — evita conflitos com o schema controlado pelo Alembic
 
-# Cria tabelas que ainda não existem (seguro — não apaga dados)
-try:
-    Base.metadata.create_all(bind=engine)
-    logger.info("[DB] Tabelas verificadas/criadas com sucesso")
-except Exception as e:
-    logger.error(f"[DB] Erro ao criar tabelas: {e}")
 
 app = FastAPI(
     title="AxeFlow",
