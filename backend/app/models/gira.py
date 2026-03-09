@@ -35,4 +35,4 @@ class Gira(Base):
 
     terreiro = relationship("Terreiro", back_populates="giras")
     responsavel_lista = relationship("Usuario", back_populates="giras_responsavel")
-    inscricoes = relationship("InscricaoGira", back_populates="gira")
+    inscricoes = relationship("InscricaoGira", back_populates="gira", cascade="all, delete-orphan")

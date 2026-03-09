@@ -23,5 +23,5 @@ class InscricaoGira(Base):
     status = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    gira = relationship("Gira", back_populates="inscricoes")
+    gira = relationship("Gira", back_populates="inscricoes", passive_deletes=True)
     consulente = relationship("Consulente", back_populates="inscricoes")
