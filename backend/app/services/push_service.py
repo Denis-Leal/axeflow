@@ -83,6 +83,7 @@ def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str)
         "title": title,
         "body":  body,
         "icon":  icon,
+        "badge": "/icons/notification-icon.png",
         "data":  {"url": url},
     })
     subscription_info = {

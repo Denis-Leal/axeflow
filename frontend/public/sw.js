@@ -83,7 +83,7 @@ self.addEventListener('push', (event) => {
     title: 'AxeFlow',
     body: 'Você tem uma nova notificação.',
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    badge: '/icons/notification-icon.png',
     data: { url: '/dashboard' },
   };
 
@@ -100,7 +100,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body,
     icon: data.icon || '/icons/icon-192.png',
-    badge: data.badge || '/icons/icon-192.png',
+    badge: data.badge || '/icons/notification-icon.png',
     vibrate: [200, 100, 200],
     data: data.data || { url: '/dashboard' },
     actions: [
