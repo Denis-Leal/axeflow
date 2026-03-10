@@ -4,8 +4,5 @@
   "/_document": "pages/_document.js",
   "/dashboard": "pages/dashboard.js",
   "/": "pages/index.js",
-  "/giras": "pages/giras.js",
-  "/configuracoes": "pages/configuracoes.js",
-  "/consulentes": "pages/consulentes.js",
-  "/giras/nova": "pages/giras/nova.js"
+  "/login": "pages/login.js"
 }
