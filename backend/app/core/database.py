@@ -7,6 +7,8 @@ engine = create_engine(settings.database_url_fixed)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# todas tabalas no schema do SaaS
+Base.metadata.schema = settings.database_schema
 def get_db():
     db = SessionLocal()
     try:

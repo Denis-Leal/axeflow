@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import Base, engine
 from app.routers import auth_router, gira_router, inscricao_router, public_router, membros_router, push_router, audit_router
+from app.core.config import settings
 
 # Registrar todos os models para o create_all criar as tabelas
 from app.models.terreiro import Terreiro
