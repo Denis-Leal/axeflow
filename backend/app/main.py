@@ -50,4 +50,24 @@ def root():
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
-    return {"status": "healthy"}
+    from app.core.database import engine
+    from sqlalchemy import text as sql_text
+
+    checks = {}
+
+    # Banco de dados
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"error: {str(e)[:80]}"
+
+    # Email (Brevo)
+    checks["email"] = "ok" if settings.BREVO_API_KEY else "not configured"
+
+    # Push (VAPID)
+    checks["push"] = "ok" if settings.VAPID_PRIVATE_KEY else "not configured"
+
+    status = "healthy" if checks["database"] == "ok" else "degraded"
+    return {"status": status, "checks": checks}

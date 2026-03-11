@@ -14,9 +14,13 @@ class InscricaoResponse(BaseModel):
     created_at: datetime
     consulente_nome: Optional[str] = None
     consulente_telefone: Optional[str] = None
+    observacoes: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 class PresencaUpdate(BaseModel):
     status: str  # compareceu | faltou
+
+class ObservacaoUpdate(BaseModel):
+    observacoes: str

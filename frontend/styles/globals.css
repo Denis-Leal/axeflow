@@ -248,10 +248,11 @@ h1, h2, h3, .font-display {
 .badge-aberta { background: rgba(16, 185, 129, 0.2); color: #10b981; }
 .badge-fechada { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 .badge-concluida { background: rgba(107, 33, 168, 0.3); color: #a78bfa; }
-.badge-confirmado { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-.badge-compareceu { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.badge-faltou { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-.badge-cancelado { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+.badge-confirmado   { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.badge-lista_espera { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.badge-compareceu   { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.badge-faltou       { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.badge-cancelado    { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
 
 /* Forms */
 .form-control-custom {

@@ -81,10 +81,14 @@ export default function GiraDetalhe() {
     setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
   };
 
-  const handleCancelar = async (inscricaoId) => {
-    if (!confirm('Remover esta inscrição?')) return;
-    await cancelarInscricao(inscricaoId);
-    setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status: 'cancelado' } : i));
+  const handleCancelar = async (inscricaoId, nomeConsulente) => {
+    if (!confirm(`Remover a inscrição de ${nomeConsulente || 'este consulente'}?\n\nEsta ação não pode ser desfeita.`)) return;
+    try {
+      await cancelarInscricao(inscricaoId);
+      setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status: 'cancelado' } : i));
+    } catch (err) {
+      alert('Erro ao cancelar inscrição. Tente novamente.');
+    }
   };
 
   const handlePresencaMembro = async (membroId, status) => {
@@ -94,10 +98,13 @@ export default function GiraDetalhe() {
     ));
   };
 
+  const [linkCopiado, setLinkCopiado] = useState(false);
   const copyLink = () => {
     const link = `${window.location.origin}/public/${gira.slug_publico}`;
-    navigator.clipboard.writeText(link);
-    alert('Link copiado!');
+    navigator.clipboard.writeText(link).then(() => {
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2500);
+    });
   };
 
   const ativas = inscricoes.filter(i => i.status !== 'cancelado');
@@ -164,7 +171,8 @@ export default function GiraDetalhe() {
               </Link>
               {gira.acesso !== 'fechada' && (
               <button onClick={copyLink} className="btn-outline-gold" style={{ fontSize: '0.85rem' }}>
-                <i className="bi bi-share me-1"></i> Compartilhar
+                <i className={`bi ${linkCopiado ? 'bi-check-lg' : 'bi-clipboard'} me-1`}></i>
+                {linkCopiado ? 'Copiado!' : 'Copiar link'}
               </button>
               )}
               <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none', fontSize: '0.9rem' }}>← Voltar</Link>
@@ -396,7 +404,11 @@ export default function GiraDetalhe() {
                             )}
                           </td>
                           <td>
-                            <span className={`badge-status badge-${i.status}`}>{i.status}</span>
+                            <span className={`badge-status badge-${i.status}`}>{
+                              { confirmado: 'Confirmado', lista_espera: 'Lista de espera',
+                                compareceu: 'Compareceu', faltou: 'Faltou', cancelado: 'Cancelado'
+                              }[i.status] || i.status
+                            }</span>
                           </td>
                           <td className="d-none d-md-table-cell" style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem' }}>
                             {new Date(i.created_at).toLocaleString('pt-BR')}
@@ -414,7 +426,7 @@ export default function GiraDetalhe() {
                                     color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
                                   <i className="bi bi-x-lg"></i>
                                 </button>
-                                <button onClick={() => handleCancelar(i.id)} title="Remover"
+                                <button onClick={() => handleCancelar(i.id, i.consulente_nome)} title="Remover"
                                   style={{ background: 'transparent', border: '1px solid var(--cor-borda)',
                                     color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
                                   <i className="bi bi-trash"></i>

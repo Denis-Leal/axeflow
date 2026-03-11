@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.schemas.inscricao_schema import PresencaUpdate
+from app.schemas.inscricao_schema import PresencaUpdate, ObservacaoUpdate
 from app.services import inscricao_service
 from app.services.presenca_service import get_scores_para_gira, get_ranking_consulentes
 from app.models.usuario import Usuario
+from app.models.inscricao import InscricaoGira
 
 router = APIRouter(tags=["inscricoes"])
 
@@ -24,7 +25,7 @@ def list_inscricoes(gira_id: UUID, user: Usuario = Depends(get_current_user), db
         # O score está keyed por consulente_id (str UUID)
         score = None
         # Localizar o consulente_id via inscricao
-        from app.models.inscricao import InscricaoGira
+        from app.models.gira import Gira as _Gira
         insc = db.query(InscricaoGira).filter(InscricaoGira.id == i.id).first()
         if insc:
             score = scores.get(str(insc.consulente_id))
@@ -37,6 +38,22 @@ def list_inscricoes(gira_id: UUID, user: Usuario = Depends(get_current_user), db
 @router.patch("/inscricao/{inscricao_id}/presenca")
 def update_presenca(inscricao_id: UUID, data: PresencaUpdate, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     return inscricao_service.update_presenca(db, inscricao_id, data, user.terreiro_id)
+
+
+@router.patch("/inscricao/{inscricao_id}/observacoes")
+def update_observacoes(inscricao_id: UUID, data: ObservacaoUpdate, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Salva observações livres sobre uma inscrição (ex: 'veio com acompanhante', 'urgente')."""
+    from fastapi import HTTPException
+    insc = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
+    if not insc:
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+    from app.models.gira import Gira
+    gira = db.query(Gira).filter(Gira.id == insc.gira_id, Gira.terreiro_id == user.terreiro_id).first()
+    if not gira:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    insc.observacoes = data.observacoes
+    db.commit()
+    return {"ok": True}
 
 
 @router.delete("/inscricao/{inscricao_id}")

@@ -1,8 +1,11 @@
 import os
-import re
+import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+
+# Garante que o diretório backend/ está no path para importar app.*
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Importa todos os models para o Alembic detectar as tabelas
 from app.core.database import Base

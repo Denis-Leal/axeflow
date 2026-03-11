@@ -170,23 +170,47 @@ export default function GiraPublica() {
             {/* Estado: inscrito com sucesso */}
             {resultado ? (
               <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>✦</div>
-                <div style={{ fontSize: '1rem', color: 'var(--cor-texto)', fontWeight: 600 }}>
-                  Inscrição confirmada!
-                </div>
-                <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                  {resultado.consulente_nome}, você está na posição
-                </div>
-                <div style={{
-                  color: 'var(--cor-acento)', fontFamily: 'Cinzel',
-                  fontSize: '4rem', fontWeight: 700, lineHeight: 1,
-                  margin: '0.5rem 0',
-                }}>
-                  #{resultado.posicao}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
-                  Anote sua posição — nos vemos na gira!
-                </div>
+                {resultado.status === 'lista_espera' ? (
+                  <>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>⏳</div>
+                    <div style={{ fontSize: '1rem', color: '#f59e0b', fontWeight: 600 }}>
+                      Você entrou na lista de espera!
+                    </div>
+                    <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                      {resultado.consulente_nome}, as vagas estão esgotadas, mas você está na fila:
+                    </div>
+                    <div style={{
+                      color: '#f59e0b', fontFamily: 'Cinzel',
+                      fontSize: '4rem', fontWeight: 700, lineHeight: 1,
+                      margin: '0.5rem 0',
+                    }}>
+                      #{resultado.posicao}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
+                      Se alguém cancelar, você será promovido automaticamente.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>✦</div>
+                    <div style={{ fontSize: '1rem', color: 'var(--cor-texto)', fontWeight: 600 }}>
+                      Inscrição confirmada!
+                    </div>
+                    <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                      {resultado.consulente_nome}, você está na posição
+                    </div>
+                    <div style={{
+                      color: 'var(--cor-acento)', fontFamily: 'Cinzel',
+                      fontSize: '4rem', fontWeight: 700, lineHeight: 1,
+                      margin: '0.5rem 0',
+                    }}>
+                      #{resultado.posicao}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
+                      Anote sua posição — nos vemos na gira!
+                    </div>
+                  </>
+                )}
               </div>
 
             /* Estado: lista ainda não abriu */
