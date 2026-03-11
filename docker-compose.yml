@@ -1,6 +1,8 @@
 version: '3.9'
 
 services:
+
+  # ── Banco de dados ─────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: axeflow_db
@@ -16,40 +18,47 @@ services:
       test: ["CMD-SHELL", "pg_isready -U terreiro -d axeflow"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10   # aumentado: migrations demoram um pouco mais
 
+  # ── Backend (FastAPI) ──────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: ../Dockerfile.backend
     container_name: axeflow_backend
+    env_file:
+      - .env.local       # variáveis de ambiente para desenvolvimento local
     environment:
+      # Sobrescreve DATABASE_URL do .env.local para usar o host do Docker
       DATABASE_URL: postgresql://terreiro:terreiro123@postgres:5432/axeflow
-      SECRET_KEY: minha-chave-super-secreta-mude-em-producao
     ports:
       - "0.0.0.0:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
+      # Hot reload: código do host reflete no container em tempo real
       - ./backend:/app
     restart: unless-stopped
 
+  # ── Frontend (Next.js) ─────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: ../Dockerfile.frontend
     container_name: axeflow_frontend
-    # NEXT_PUBLIC_API_URL não definido aqui intencionalmente.
-    # O frontend detecta o host dinamicamente (funciona no PC e no celular via IP).
-    # Para produção, defina: NEXT_PUBLIC_API_URL=https://api.seudominio.com
+    environment:
+      # Deixa em branco para o frontend detectar o host dinamicamente.
+      # Isso permite acessar tanto via localhost quanto pelo IP da rede (celular).
+      NEXT_PUBLIC_API_URL: ""
     ports:
       - "0.0.0.0:3000:3000"
     depends_on:
       - backend
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - /app/node_modules   # preserva node_modules do container (não sobrescreve com o do host)
+      - /app/.next          # preserva .next compilado
     restart: unless-stopped
 
 volumes:

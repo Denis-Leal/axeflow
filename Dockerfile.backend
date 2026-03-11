@@ -2,11 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Instalar dependências primeiro (cache de layer)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ ./app/
+# Copiar código da aplicação
+COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Roda migrations do Alembic antes de subir o servidor.
+# Se o banco ainda não estiver pronto, o depends_on + healthcheck do postgres garante a ordem.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
