@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.core.database import get_db
-from app.models.gira import Gira
+from app.models.gira import Gira, StatusGiraEnum
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from app.schemas.inscricao_schema import InscricaoPublicaRequest
 from app.services import inscricao_service
@@ -55,6 +55,7 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
         gira.abertura_lista is not None
         and gira.fechamento_lista is not None
         and gira.abertura_lista <= agora <= gira.fechamento_lista
+        and gira.status == StatusGiraEnum.aberta
     )
 
     return {

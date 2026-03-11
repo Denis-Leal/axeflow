@@ -13,7 +13,7 @@ from sqlalchemy import and_
 from fastapi import HTTPException
 from uuid import UUID
 from datetime import datetime
-from app.models.gira import Gira
+from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
@@ -52,6 +52,7 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID):
 
 
 def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
+    print("Iniciando inscrição pública para slug:", slug)
     """
     Inscreve consulente em gira pública via link público.
 
@@ -73,6 +74,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     if agora > gira.fechamento_lista:
         raise HTTPException(status_code=400, detail="Lista encerrada")
 
+    print(gira.status, gira.abertura_lista, gira.fechamento_lista)
     # Validar e normalizar telefone (E.164 sem '+')
     if not validate_phone(data.telefone):
         raise HTTPException(status_code=400, detail="Telefone inválido")

@@ -11,7 +11,7 @@ def login(db: Session, data: LoginRequest) -> TokenResponse:
     user = db.query(Usuario).filter(Usuario.email == data.email, Usuario.ativo == True).first()
     if not user or not verify_password(data.senha, user.senha_hash):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email ou senha incorretos"
         )
     token = create_access_token(

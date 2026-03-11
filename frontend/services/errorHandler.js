@@ -58,3 +58,8 @@ export function showError(containerId, error) {
     el.style.display = 'block';
   }
 }
+
+export function handleApiError(error, context = '') {
+  const msg = getErrorMessage(error);
+  return context ? `${context}: ${msg}` : msg;
+}

@@ -79,11 +79,8 @@ def upgrade() -> None:
     if not coluna_existe("inscricoes_gira", "updated_at"):
         op.add_column("inscricoes_gira", sa.Column("updated_at", sa.DateTime, nullable=True))
 
-    # ── Status lista_espera: adiciona valor ao enum existente ─────────────────
-    # PostgreSQL exige ALTER TYPE para adicionar valor ao enum
-    op.execute(
-        "ALTER TYPE statusinscricaoenum ADD VALUE IF NOT EXISTS 'lista_espera'"
-    )
+    # Nota: a coluna status em inscricoes_gira é VARCHAR(50) — não um ENUM PostgreSQL.
+    # O valor 'lista_espera' já é aceito sem nenhuma alteração de schema.
 
     # ── Índices de performance ────────────────────────────────────────────────
     if not indice_existe("ix_giras_terreiro_data"):

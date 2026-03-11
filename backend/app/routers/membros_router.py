@@ -10,6 +10,14 @@ from app.models.usuario import Usuario
 from app.models.terreiro import Terreiro
 from app.schemas.auth_schema import UsuarioResponse
 from app.services.email_service import send_convite_membro
+from app.models.gira import Gira as GiraModel
+from sqlalchemy import and_
+from app.models.consulente import Consulente
+from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from sqlalchemy import func
+from app.models.gira import Gira
+from app.services.presenca_service import calcular_score
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -123,18 +131,12 @@ def update_membro(
         "ativo": membro.ativo,
     }
 
-
-from app.models.consulente import Consulente
-from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
-from sqlalchemy import func
-
 @router.get("/consulentes-lista")
 def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Retorna todos os consulentes que já se inscreveram em giras deste terreiro,
     incluindo primeira_visita, total de inscrições e comparecimentos.
     """
-    from app.models.gira import Gira
 
     # IDs das giras deste terreiro
     gira_ids = [g.id for g in db.query(Gira.id).filter(Gira.terreiro_id == user.terreiro_id).all()]
@@ -174,7 +176,6 @@ def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = De
 
 
 # ── Perfil CRM do consulente ───────────────────────────────────────────────────
-from app.models.gira import Gira as GiraModel
 
 @router.get("/consulentes/{consulente_id}/perfil")
 def get_perfil_consulente(
@@ -186,8 +187,7 @@ def get_perfil_consulente(
     Perfil CRM completo de um consulente:
     histórico cronológico, padrões de visita, score e linha do tempo.
     """
-    from app.services.presenca_service import calcular_score
-    from datetime import date
+
 
     consulente = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not consulente:
@@ -302,7 +302,6 @@ def get_presenca_membros(
     Para giras fechadas: retorna todos os membros ativos do terreiro
     com seu status de presença nessa gira (compareceu / faltou / pendente).
     """
-    from app.models.gira import Gira as GiraModel
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -327,7 +326,6 @@ def get_presenca_membros(
         ).first()
 
         # Buscar via campo membro_id que vamos adicionar na inscrição
-        from sqlalchemy import and_
         presenca = db.query(InscricaoGira).filter(
             and_(
                 InscricaoGira.gira_id == gira_id,
@@ -355,8 +353,6 @@ def marcar_presenca_membro(
     db: Session = Depends(get_db)
 ):
     """Marca ou atualiza presença de um membro em gira fechada."""
-    from app.models.gira import Gira as GiraModel
-    from sqlalchemy import and_
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -408,8 +404,6 @@ def confirmar_presenca_propria(
     O próprio membro logado confirma que vai comparecer à gira fechada.
     Status: 'confirmado' (intenção) — admin pode depois mudar para compareceu/faltou.
     """
-    from app.models.gira import Gira as GiraModel
-    from sqlalchemy import and_
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,

@@ -103,6 +103,7 @@ export default function GiraPublica() {
   const pct = gira ? Math.min(100, ((gira.limite_consulentes - gira.vagas_disponiveis) / gira.limite_consulentes) * 100) : 0;
   const listaFutura = gira && new Date() < new Date(gira.abertura_lista);
   const listaEncerrada = gira && new Date() > new Date(gira.fechamento_lista);
+  const listaFechada = gira && gira.status !== 'aberta';
 
   return (
     <>
@@ -216,6 +217,21 @@ export default function GiraPublica() {
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
                   As inscrições para esta gira foram fechadas
+                </div>
+              </div>
+
+              /* Estado: lista fechada */
+            ) : listaFechada ? (
+              <div style={{
+                background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.2)',
+                borderRadius: '10px', padding: '1.25rem', textAlign: 'center',
+              }}>
+                <i className="bi bi-lock" style={{ color: '#94a3b8', fontSize: '1.5rem' }}></i>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginTop: '0.5rem' }}>
+                  Lista fechada
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                  A gira já foi encerrada pelo organizador e não aceita mais inscrições
                 </div>
               </div>
 

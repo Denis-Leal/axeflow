@@ -58,8 +58,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules   # preserva node_modules do container (não sobrescreve com o do host)
-      - /app/.next          # preserva .next compilado
+      - next_build:/app/.next          # preserva .next compilado
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  next_build:

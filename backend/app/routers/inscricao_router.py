@@ -7,6 +7,11 @@ from app.schemas.inscricao_schema import PresencaUpdate
 from app.services import inscricao_service
 from app.services.presenca_service import get_scores_para_gira, get_ranking_consulentes
 from app.models.usuario import Usuario
+from app.models.inscricao import InscricaoGira
+from app.models.consulente import Consulente
+from app.models.gira import Gira
+from app.services.presenca_service import get_score_consulente
+from fastapi import HTTPException
 
 router = APIRouter(tags=["inscricoes"])
 
@@ -24,7 +29,6 @@ def list_inscricoes(gira_id: UUID, user: Usuario = Depends(get_current_user), db
         # O score está keyed por consulente_id (str UUID)
         score = None
         # Localizar o consulente_id via inscricao
-        from app.models.inscricao import InscricaoGira
         insc = db.query(InscricaoGira).filter(InscricaoGira.id == i.id).first()
         if insc:
             score = scores.get(str(insc.consulente_id))
@@ -56,13 +60,9 @@ def perfil_consulente(consulente_id: UUID, user: Usuario = Depends(get_current_u
     Perfil completo do consulente — CRM espiritual.
     Retorna histórico completo de visitas, frequência, padrões e score.
     """
-    from app.models.consulente import Consulente
-    from app.models.gira import Gira
-    from app.services.presenca_service import get_score_consulente
 
     c = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not c:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
 
     # Apenas giras deste terreiro
