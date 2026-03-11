@@ -144,6 +144,7 @@ def upgrade() -> None:
             sa.Column("p256dh", sa.Text, nullable=False),
             sa.Column("auth", sa.Text, nullable=False),
             sa.Column("created_at", sa.DateTime),
+            sa.Column("updated_at", sa.DateTime, onupdate=sa.func.now()),
         )
 
 
