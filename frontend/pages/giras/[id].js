@@ -81,11 +81,7 @@ export default function GiraDetalhe() {
     setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
   };
 
-  const handleCancelar = async (inscricaoId) => {
-    if (!confirm('Remover esta inscrição?')) return;
-    await cancelarInscricao(inscricaoId);
-    setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status: 'cancelado' } : i));
-  };
+
 
   const handlePresencaMembro = async (membroId, status) => {
     await api.post(`/membros/giras/${id}/presenca-membros/${membroId}`, { status });
@@ -94,10 +90,31 @@ export default function GiraDetalhe() {
     ));
   };
 
-  const copyLink = () => {
+  const [linkCopiado, setLinkCopiado] = useState(false);
+
+  // ── Melhoria 14: botão copiar com feedback visual (sem alert bloqueante)
+  const copyLink = async () => {
     const link = `${window.location.origin}/public/${gira.slug_publico}`;
-    navigator.clipboard.writeText(link);
-    alert('Link copiado!');
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2500); // reset após 2.5s
+    } catch {
+      // Fallback para browsers sem suporte à Clipboard API
+      window.prompt('Copie o link abaixo:', link);
+    }
+  };
+
+  // ── Melhoria 15: confirmação antes de cancelar inscrição
+  const handleCancelar = async (inscricaoId, nomeConsulente) => {
+    const confirmar = window.confirm(
+      `Tem certeza que deseja cancelar a inscrição de "${nomeConsulente}"?\n\nEsta ação não pode ser desfeita.`
+    );
+    if (!confirmar) return;
+    await cancelarInscricao(inscricaoId);
+    setInscricoes(prev => prev.map(i =>
+      i.id === inscricaoId ? { ...i, status: 'cancelado' } : i
+    ));
   };
 
   const ativas = inscricoes.filter(i => i.status !== 'cancelado');
@@ -163,9 +180,21 @@ export default function GiraDetalhe() {
                 <i className="bi bi-pencil me-1"></i> Editar
               </Link>
               {gira.acesso !== 'fechada' && (
-              <button onClick={copyLink} className="btn-outline-gold" style={{ fontSize: '0.85rem' }}>
-                <i className="bi bi-share me-1"></i> Compartilhar
-              </button>
+                <button
+                  onClick={copyLink}
+                  className="btn-outline-gold"
+                  style={{
+                    fontSize: '0.85rem',
+                    transition: 'all 0.2s',
+                    background: linkCopiado ? 'rgba(16,185,129,0.15)' : undefined,
+                    borderColor: linkCopiado ? '#10b981' : undefined,
+                    color: linkCopiado ? '#10b981' : undefined,
+                  }}
+                  title="Copiar link de inscrição para compartilhar no WhatsApp"
+                >
+                  <i className={`bi ${linkCopiado ? 'bi-check-lg' : 'bi-clipboard'} me-1`}></i>
+                  {linkCopiado ? 'Link copiado!' : 'Copiar link'}
+                </button>
               )}
               <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none', fontSize: '0.9rem' }}>← Voltar</Link>
             </div>
@@ -414,7 +443,7 @@ export default function GiraDetalhe() {
                                     color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
                                   <i className="bi bi-x-lg"></i>
                                 </button>
-                                <button onClick={() => handleCancelar(i.id)} title="Remover"
+                                <button onClick={() => handleCancelar(i.id, i.consulente_nome || 'este consulente')} title="Cancelar inscrição"
                                   style={{ background: 'transparent', border: '1px solid var(--cor-borda)',
                                     color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
                                   <i className="bi bi-trash"></i>
