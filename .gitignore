@@ -1,0 +1,56 @@
+# ── Variáveis de ambiente (NUNCA commitar) ────────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── Alembic ───────────────────────────────────────────────────────────────────
+# NÃO ignorar migrations/ — elas devem ser commitadas
+# Ignorar apenas cache
+backend/migrations/__pycache__/
+backend/migrations/versions/__pycache__/
+
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+*.tsbuildinfo
+.npm
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Não ignorar Dockerfile — deve ser commitado
+# Ignorar apenas volumes locais se existirem
+postgres_data/
+
+# ── IDEs e editores ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Testes e cobertura ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
