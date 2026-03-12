@@ -40,8 +40,8 @@ class Gira(Base):
     abertura_lista       = Column(DateTime, nullable=True)
     fechamento_lista     = Column(DateTime, nullable=True)
     responsavel_lista_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
-    status               = Column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
-    acesso               = Column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
+    status               = Column(String(20), default=StatusGiraEnum.aberta.value, nullable=False)
+    acesso               = Column(String(20), default=AcessoGiraEnum.publica.value, nullable=False)
     # Slug único gerado automaticamente para giras públicas; NULL para fechadas
     slug_publico         = Column(String(255), unique=True, nullable=True)
     created_at           = Column(DateTime, default=datetime.utcnow)
