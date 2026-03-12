@@ -13,6 +13,7 @@ export default function NovaGira() {
   const [form, setForm] = useState({
     titulo: '', tipo: '', acesso: 'publica', data: '', horario: '',
     limite_consulentes: 20,
+    limite_membros: 0,
     abertura_lista: '', fechamento_lista: '',
     responsavel_lista_id: '',
   });
@@ -31,7 +32,7 @@ export default function NovaGira() {
         return;
       }
       setAutorizado(true);
-      api.get('/membros').then(r => setMembros(r.data)).catch(() => {});
+      api.get('/membros').then(r => {setMembros(r.data);setForm(prev => ({...prev,limite_membros: r.data.length}));}).catch(() => {});
     }).catch(() => { router.push('/login'); });
   }, []);
 
@@ -140,15 +141,29 @@ export default function NovaGira() {
                       <input type="time" className="form-control-custom" value={form.horario}
                         onChange={e => setForm({ ...form, horario: e.target.value })} required />
                     </div>
-                    <div className="col-4">
-                      <label className="form-label-custom">Limite de Vagas *</label>
-                      <input type="number" className="form-control-custom" value={form.limite_consulentes}
-                        onChange={e => setForm({ ...form, limite_consulentes: e.target.value })}
-                        required min={1} />
-                    </div>
+                    {form.acesso === 'publica' && (
+                      <div className="col-4">
+                        <label className="form-label-custom">Limite de Vagas *</label>
+
+                        <input type="number" className="form-control-custom" value={form.limite_consulentes}
+                          onChange={e => setForm({ ...form, limite_consulentes: e.target.value })}
+                          required min={1} />
+                      </div>                      
+                    )}
+                    {form.acesso === 'fechada' && (
+                      <div className="col-4">
+                        <label className="form-label-custom">Limite de Membros *</label>
+                        <input type="number" className="form-control-custom" value={form.limite_membros}
+                          onChange={e => setForm({ ...form, limite_membros: e.target.value })}
+                          required min={1} />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Responsável pela lista */}
+                  {/* Abertura e Fechamento — apenas giras públicas */}
+                  {form.acesso === 'publica' && (
+                  <div className="row g-3 mb-4">
+                    {/* Responsável pela lista */}
                   <div className="mb-3">
                     <label className="form-label-custom">
                       Responsável pela Lista
@@ -174,13 +189,9 @@ export default function NovaGira() {
                     </small>
                   </div>
 
-                  <div className="divider-ornamental">
-                    <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Lista de Inscrições</span>
-                  </div>
-
-                  {/* Abertura e Fechamento — apenas giras públicas */}
-                  {form.acesso === 'publica' && (
-                  <div className="row g-3 mb-4">
+                    <div className="divider-ornamental">
+                      <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Lista de Inscrições</span>
+                    </div>
                     <div className="col-6">
                       <label className="form-label-custom">Abertura da Lista *</label>
                       <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}

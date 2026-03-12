@@ -58,7 +58,8 @@ export default function Dashboard() {
       });
   }, []);
 
-  const proximaGira = giras.find(g => g.status === 'aberta' || new Date(g.data) >= new Date());
+  // const proximaGira = giras.find(g => g.status === 'aberta' || new Date(g.data) >= new Date());
+  const proximasGiras = giras.filter(g => g.status === 'aberta' || (new Date(g.data) >= new Date()));
   const totalConsulentes = giras.reduce((acc, g) => acc + (g.total_inscritos || 0), 0);
   const girasAbertas = giras.filter(g => g.status === 'aberta').length;
 
@@ -179,11 +180,12 @@ export default function Dashboard() {
               );
             })()}
 
-            {proximaGira && (
+            {proximasGiras.length > 0 && (
+              proximasGiras.map(proximaGira => (
               <div className="card-custom mb-4">
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-                    ✦ Próxima Gira
+                    ✦ Próxima Gira - {proximaGira.acesso === 'publica' ? 'Pública' : 'Fechada'}
                   </span>
                   <span className={`badge-status badge-${proximaGira.status}`}>{proximaGira.status}</span>
                 </div>
@@ -197,17 +199,24 @@ export default function Dashboard() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontSize: '1.5rem' }}>
-                      {proximaGira.total_inscritos}/{proximaGira.limite_consulentes}
+                      {proximaGira.acesso === 'publica' ? 
+                      `${proximaGira.total_inscritos}/${proximaGira.limite_consulentes}` 
+                      : 
+                      `${proximaGira.total_inscritos}/${proximaGira.limite_membros}`}
                     </div>
                     <small style={{ color: 'var(--cor-texto-suave)' }}>vagas ocupadas</small>
                   </div>
                 </div>
                 <div style={{ padding: '0 1rem 1rem' }}>
                   <div className="vagas-bar">
-                    <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_consulentes) * 100)}%` }}></div>
+                    {proximaGira.acesso === 'publica' ?
+                     <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_consulentes) * 100)}%` }}></div>
+                     :
+                    <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_membros) * 100)}%` }}></div>}
                   </div>
                 </div>
               </div>
+              ))
             )}
 
             <div className="card-custom">

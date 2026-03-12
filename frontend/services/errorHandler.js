@@ -1,78 +1,65 @@
 /**
  * errorHandler.js — AxeFlow
- *
- * Separa a experiência do usuário do log técnico:
- * - Usuário vê mensagem clara e amigável
- * - Dev vê log completo no console + auditoria enviada ao backend
+ * Traduz erros de rede e HTTP em mensagens amigáveis em português.
+ * Usado por todos os serviços que fazem chamadas à API.
  */
 
-const IS_DEV = process.env.NODE_ENV === 'development';
-
-const HTTP_MESSAGES = {
-  400: 'Os dados enviados são inválidos. Verifique e tente novamente.',
-  401: 'Email ou senha incorretos.',
-  403: 'Você não tem permissão para realizar essa ação.',
-  404: 'O recurso solicitado não foi encontrado.',
-  409: 'Esse registro já existe.',
-  422: 'Os dados enviados são inválidos. Verifique e tente novamente.',
-  429: 'Muitas tentativas. Aguarde um momento e tente novamente.',
-  500: 'Erro interno no servidor. Nossa equipe foi notificada.',
-  502: 'Serviço temporariamente indisponível. Tente novamente em instantes.',
-  503: 'O servidor está iniciando. Aguarde alguns segundos e tente novamente.',
-  504: 'O servidor demorou para responder. Tente novamente.',
-};
-
-const NETWORK_MESSAGES = {
-  ERR_NETWORK:      'Não foi possível conectar ao servidor. Verifique sua internet.',
-  ERR_CANCELED:     'A requisição foi cancelada.',
-  ECONNABORTED:     'A conexão expirou. Tente novamente.',
-  ERR_BAD_RESPONSE: 'Resposta inesperada do servidor. Tente novamente em instantes.',
-};
-
-export function handleApiError(err, context = 'Desconhecido') {
-  const status = err?.response?.status;
-  const code   = err?.code;
-  const detail = err?.response?.data?.detail;
-  const url    = err?.config?.url || '';
-  const method = err?.config?.method?.toUpperCase() || '';
-
-  // Log técnico no console
-  if (IS_DEV) {
-    console.group(`🔴 [AxeFlow Error] ${context}`);
-    console.error('Status:', status);
-    console.error('Code:', code);
-    console.error('URL:', `${method} ${url}`);
-    console.error('Response data:', err?.response?.data);
-    console.error('Full error:', err);
-    console.groupEnd();
-  } else {
-    console.error(`[AxeFlow][${context}] status=${status} code=${code} url=${method} ${url}`);
+/**
+ * Extrai mensagem legível de qualquer tipo de erro (Axios, fetch, genérico).
+ * @param {unknown} error - Erro capturado no catch
+ * @returns {string} Mensagem amigável para exibir ao usuário
+ */
+export function getErrorMessage(error) {
+  // Sem conexão com a internet
+  if (!navigator.onLine) {
+    return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
   }
 
-  // Envia auditoria ao backend (fire and forget)
-  sendAuditLog({
-    context, status, code, url, method, detail,
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-    timestamp: new Date().toISOString(),
-  });
+  // Erro do Axios ou fetch com resposta do servidor
+  if (error?.response) {
+    const status = error.response.status;
+    const detail = error.response.data?.detail;
 
-  // Mensagem amigável — nunca mostra HTML ou stack trace ao usuário
-  if (detail && typeof detail === 'string' && detail.length < 120 && !detail.includes('<')) {
-    return detail;
+    // Mensagens específicas por código HTTP
+    switch (status) {
+      case 400: return detail || 'Dados inválidos. Verifique as informações e tente novamente.';
+      case 401: return 'Sessão expirada. Faça login novamente.';
+      case 403: return 'Você não tem permissão para realizar esta ação.';
+      case 404: return detail || 'Recurso não encontrado.';
+      case 409: return detail || 'Conflito: o recurso já existe.';
+      case 422: return 'Dados inválidos. Verifique os campos obrigatórios.';
+      case 429: return 'Muitas tentativas. Aguarde um momento e tente novamente.';
+      case 500: return 'Erro interno do servidor. Tente novamente em instantes.';
+      case 502:
+      case 503:
+      case 504: return 'Servidor temporariamente indisponível. Tente novamente em alguns segundos.';
+      default:  return detail || `Erro inesperado (código ${status}).`;
+    }
   }
-  if (status && HTTP_MESSAGES[status]) return HTTP_MESSAGES[status];
-  if (code && NETWORK_MESSAGES[code]) return NETWORK_MESSAGES[code];
-  return 'Algo deu errado. Tente novamente ou contate o suporte.';
+
+  // Timeout ou servidor inacessível (sem resposta)
+  if (error?.request || error?.code === 'ECONNABORTED') {
+    return 'Servidor indisponível. Verifique sua conexão ou tente novamente em instantes.';
+  }
+
+  // Erro genérico de JS
+  return error?.message || 'Ocorreu um erro inesperado. Tente novamente.';
 }
 
-async function sendAuditLog(data) {
-  try {
-    await fetch('/api/audit/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  } catch {
-    // silencioso
+/**
+ * Exibe mensagem de erro em elemento da DOM.
+ * @param {string} containerId - ID do elemento onde exibir o erro
+ * @param {unknown} error - Erro capturado
+ */
+export function showError(containerId, error) {
+  const el = document.getElementById(containerId);
+  if (el) {
+    el.textContent = getErrorMessage(error);
+    el.style.display = 'block';
   }
+}
+
+export function handleApiError(error, context = '') {
+  const msg = getErrorMessage(error);
+  return context ? `${context}: ${msg}` : msg;
 }

@@ -118,7 +118,13 @@ def broadcast_push_notification(
     url:   str = "/dashboard",
     icon:  str = "/icons/icon-192.png",
 ) -> Dict[str, int]:
-    """Envia push para todas as subscriptions salvas no banco."""
+    """Envia push para todas as subscriptions salvas no banco.
+    Em desenvolvimento local (VAPID não configurado), apenas loga e retorna."""
+    # Guard: sem chave VAPID, skip silencioso (evita crash em dev local)
+    if not settings.VAPID_PRIVATE_KEY:
+        logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado em dev.")
+        return {"enviados": 0, "falhas": 0, "total": 0}
+
     db = _get_db()
     try:
         subs = db.query(PushSubscription).all()
