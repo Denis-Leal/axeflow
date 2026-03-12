@@ -10,6 +10,7 @@ class GiraCreate(BaseModel):
     data: date
     horario: time
     limite_consulentes: int
+    limite_membros: Optional[int] = None  # apenas para giras fechadas
     abertura_lista: Optional[datetime] = None   # não obrigatório para giras fechadas
     fechamento_lista: Optional[datetime] = None
     responsavel_lista_id: Optional[UUID] = None
@@ -21,6 +22,7 @@ class GiraUpdate(BaseModel):
     data: Optional[date] = None
     horario: Optional[time] = None
     limite_consulentes: Optional[int] = None
+    limite_membros: Optional[int] = None
     abertura_lista: Optional[datetime] = None
     fechamento_lista: Optional[datetime] = None
     status: Optional[str] = None
@@ -34,6 +36,7 @@ class GiraResponse(BaseModel):
     data: date
     horario: time
     limite_consulentes: int
+    limite_membros: Optional[int] = None
     abertura_lista: Optional[datetime] = None
     fechamento_lista: Optional[datetime] = None
     status: str

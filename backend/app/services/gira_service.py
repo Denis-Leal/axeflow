@@ -64,6 +64,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
         data=data.data,
         horario=data.horario,
         limite_consulentes=data.limite_consulentes,
+        limite_membros=data.limite_membros if not is_publica else None,
         abertura_lista=data.abertura_lista if is_publica else None,
         fechamento_lista=data.fechamento_lista if is_publica else None,
         responsavel_lista_id=data.responsavel_lista_id,
