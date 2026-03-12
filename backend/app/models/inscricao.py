@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, DateTime, ForeignKey, Enum, Text,
-    UniqueConstraint, Index, String
+    UniqueConstraint, Index
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -39,7 +39,7 @@ class InscricaoGira(Base):
     # Preenchido em giras fechadas
     membro_id      = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
     posicao        = Column(Integer, nullable=False)
-    status         = Column(String(20), default=StatusInscricaoEnum.confirmado.value, nullable=False)
+    status         = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado)
     # Campo livre para anotações da gira (ex: "veio com acompanhante", "urgente")
     observacoes    = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)

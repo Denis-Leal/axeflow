@@ -27,7 +27,7 @@ class Usuario(Base):
     telefone    = Column(String(20))
     email       = Column(String(255), unique=True, nullable=False)
     senha_hash  = Column(String(255), nullable=False)
-    role        = Column(String(20), default=RoleEnum.membro.value, nullable=False)
+    role        = Column(Enum(RoleEnum), default=RoleEnum.membro)
     ativo       = Column(Boolean, default=True)
     created_at  = Column(DateTime, default=datetime.utcnow)
     updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

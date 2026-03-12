@@ -70,7 +70,10 @@ def upgrade() -> None:
         "limite_consulentes",
         existing_type=sa.INTEGER(),
         nullable=True
-    )   
+    )
+    op.execute(
+        "ALTER TYPE statusinscricaoenum ADD VALUE IF NOT EXISTS 'lista_espera'"
+    )
 
     # ── Usuarios: updated_at ──────────────────────────────────────────────────
     if not coluna_existe("usuarios", "updated_at"):
