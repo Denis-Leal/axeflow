@@ -30,7 +30,6 @@ def upgrade() -> None:
     
     op.drop_constraint('fk_inscricoes_gira_gira_id', 'inscricoes_gira', type_='foreignkey')
     op.create_foreign_key(None, 'inscricoes_gira', 'giras', ['gira_id'], ['id'])
-    op.add_column('push_subscriptions', sa.Column('updated_at', sa.DateTime(), nullable=True))
     op.create_index(op.f('ix_push_subscriptions_endpoint'), 'push_subscriptions', ['endpoint'], unique=True)
     op.drop_constraint('push_subscriptions_terreiro_id_fkey', 'push_subscriptions', type_='foreignkey')
     op.drop_column('push_subscriptions', 'terreiro_id')
