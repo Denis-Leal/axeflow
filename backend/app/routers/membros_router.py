@@ -47,7 +47,7 @@ def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depend
 
 @router.post("")
 def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):
-    existing = db.query(Usuario).filter(Usuario.email == data.email).first()
+    existing = db.query(Usuario).filter(Usuario.email == data.email, Usuario.terreiro_id == user.terreiro_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
