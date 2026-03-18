@@ -44,8 +44,8 @@ def upgrade():
     # ⚠️ 3. (OPCIONAL) Popular dados aqui se necessário
 
     # 4. Tornar NOT NULL (SÓ se você garantir dados)
-    op.alter_column('push_subscriptions', 'user_id', nullable=False)
-    op.alter_column('push_subscriptions', 'terreiro_id', nullable=False)
+    op.alter_column('push_subscriptions', 'user_id', nullable=True)  # ou False se tiver dados
+    op.alter_column('push_subscriptions', 'terreiro_id', nullable=True)  # ou False se tiver dados
 
 
 def downgrade():
