@@ -60,12 +60,30 @@ export default function EditarGira() {
     setError('');
     try {
       const payload = {
-        ...form,
-        limite_consulentes: parseInt(form.limite_consulentes),
-        limite_membros: parseInt(form.limite_membros) || null,
+        titulo: form.titulo,
+        tipo: form.tipo,
+        acesso: form.acesso,
+        data: form.data,
         horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
-        responsavel_lista_id: form.responsavel_lista_id || null,
+        status: form.status,
       };
+      if (form.acesso === 'fechada') {
+        payload.limite_membros = parseInt(form.limite_membros);
+
+        // 🔥 zera campos inválidos explicitamente
+        payload.abertura_lista = null;
+        payload.fechamento_lista = null;
+        payload.responsavel_lista_id = null;
+        payload.limite_consulentes = null;
+
+      } else {
+        payload.limite_consulentes = parseInt(form.limite_consulentes);
+        payload.limite_membros = null;
+
+        payload.abertura_lista = form.abertura_lista || null;
+        payload.fechamento_lista = form.fechamento_lista || null;
+        payload.responsavel_lista_id = form.responsavel_lista_id || null;
+      }
       await api.put(`/giras/${id}`, payload);
       router.push(`/giras/${id}`);
     } catch (err) {

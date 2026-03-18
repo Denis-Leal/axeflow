@@ -115,8 +115,26 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     campos_alterados = data.model_dump(exclude_unset=True)
+    # aplica alterações
     for field, value in campos_alterados.items():
         setattr(gira, field, value)
+
+    # 🔥 valida estado final
+    if gira.acesso == "fechada":
+        if gira.limite_membros is None:
+            raise HTTPException(400, "Gira fechada precisa de limite_membros")
+
+        # limpa campos inválidos
+        gira.limite_consulentes = None
+        gira.abertura_lista = None
+        gira.fechamento_lista = None
+        gira.responsavel_lista_id = None
+
+    elif gira.acesso == "publica":
+        if gira.limite_consulentes is None:
+            raise HTTPException(400, "Gira pública precisa de limite_consulentes")
+
+        gira.limite_membros = None
     db.commit()
     db.refresh(gira)
 
