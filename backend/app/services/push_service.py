@@ -6,10 +6,12 @@ import json
 import logging
 from typing import Dict, Any
 from pywebpush import webpush, WebPushException
+from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.push_subscription import PushSubscription
+from app.models.usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +22,14 @@ def _get_db() -> Session:
     return SessionLocal()
 
 
-def add_subscription(subscription: Dict[str, Any]) -> bool:
+def add_subscription(subscription: Dict[str, Any], user_id: UUID, terreiro_id: UUID) -> bool:
     """Salva ou atualiza uma subscription no banco."""
     endpoint = subscription.get("endpoint")
     keys     = subscription.get("keys", {})
     p256dh   = keys.get("p256dh")
     auth     = keys.get("auth")
+    user_id  = user_id
+    terreiro_id = terreiro_id
 
     if not endpoint or not p256dh or not auth:
         logger.warning("[Push] Subscription inválida — campos ausentes")
@@ -37,11 +41,13 @@ def add_subscription(subscription: Dict[str, Any]) -> bool:
         if existing:
             existing.p256dh = p256dh
             existing.auth   = auth
+            existing.user_id = user_id
+            existing.terreiro_id = terreiro_id
             db.commit()
             logger.info(f"[Push] Subscription atualizada. Total: {db.query(PushSubscription).count()}")
             return False  # já existia
         else:
-            sub = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth)
+            sub = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, user_id=user_id, terreiro_id=terreiro_id)
             db.add(sub)
             db.commit()
             logger.info(f"[Push] Subscription nova salva. Total: {db.query(PushSubscription).count()}")
@@ -112,34 +118,40 @@ def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str)
         return False
 
 
-def broadcast_push_notification(
+def send_push_to_terreiro(
+    terreiro_id,
     title: str,
-    body:  str,
-    url:   str = "/dashboard",
-    icon:  str = "/icons/icon-192.png",
+    body: str,
+    url: str = "/dashboard",
+    icon: str = "/icons/icon-192.png",
 ) -> Dict[str, int]:
-    """Envia push para todas as subscriptions salvas no banco.
-    Em desenvolvimento local (VAPID não configurado), apenas loga e retorna."""
-    # Guard: sem chave VAPID, skip silencioso (evita crash em dev local)
+
     if not settings.VAPID_PRIVATE_KEY:
-        logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado em dev.")
+        logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado.")
         return {"enviados": 0, "falhas": 0, "total": 0}
 
     db = _get_db()
     try:
-        subs = db.query(PushSubscription).all()
+        subs = (
+            db.query(PushSubscription)
+            .filter(PushSubscription.terreiro_id == terreiro_id)
+            .all()
+        )
+
         if not subs:
-            logger.info("[Push] Nenhuma subscription no banco.")
+            logger.info(f"[Push] Nenhuma subscription para terreiro {terreiro_id}")
             return {"enviados": 0, "falhas": 0, "total": 0}
 
         success, failed = 0, 0
+
         for sub in subs:
             if _send_one(sub, title=title, body=body, url=url, icon=icon):
                 success += 1
             else:
                 failed += 1
 
-        logger.info(f"[Push] Broadcast: {success} enviados, {failed} falhas de {len(subs)} total")
+        logger.info(f"[Push] Terreiro {terreiro_id}: {success} enviados, {failed} falhas de {len(subs)}")
         return {"enviados": success, "falhas": failed, "total": len(subs)}
+
     finally:
         db.close()

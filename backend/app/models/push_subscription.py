@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Text
+from sqlalchemy import Column, ForeignKey, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
@@ -13,3 +13,6 @@ class PushSubscription(Base):
     auth       = Column(Text, nullable=False)   # segredo de autenticação
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    terreiro_id = Column(UUID, ForeignKey("terreiros.id"), nullable=False)

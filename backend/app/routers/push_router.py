@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from app.services.push_service import (
     add_subscription,
-    broadcast_push_notification,
+    send_push_to_terreiro,
     get_subscriptions_count,
 )
 
@@ -63,7 +63,7 @@ def send_test_push(data: PushTestRequest = PushTestRequest()):
             detail="Nenhuma subscription registrada. Ative as notificações no app primeiro.",
         )
 
-    result = broadcast_push_notification(
+    result = send_push_to_terreiro(
         title=data.title,
         body=data.body,
         url=data.url,
