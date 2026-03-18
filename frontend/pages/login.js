@@ -1,22 +1,50 @@
+// =====================================================
+// login.js — AxeFlow
+// Página de autenticação do usuário.
+//
+// CORREÇÃO MULTI-TENANT (push notifications):
+//   Após o login bem-sucedido, além do token JWT,
+//   salvamos o terreiro_id do usuário no localStorage.
+//   O _app.js usa esse valor para validar se uma
+//   notificação push pertence ao terreiro logado antes
+//   de navegar para a URL específica da gira.
+// =====================================================
+
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { login } from '../services/api';
+import { login, getMe } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 
 export default function Login() {
   const router = useRouter();
-  const [form, setForm] = useState({ email: '', senha: '' });
+  const [form, setForm]       = useState({ email: '', senha: '' });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
+      // 1. Autentica e salva o token JWT
       const res = await login(form.email, form.senha);
       localStorage.setItem('token', res.data.access_token);
+
+      // 2. Busca dados do usuário para obter o terreiro_id
+      //    Necessário para validar notificações push multi-tenant no _app.js
+      try {
+        const meRes = await getMe();
+        if (meRes.data?.terreiro_id) {
+          localStorage.setItem('terreiro_id', meRes.data.terreiro_id);
+        }
+      } catch {
+        // Falha silenciosa: a falta do terreiro_id apenas desativa
+        // a navegação específica nas notificações push (vai para /giras)
+        console.warn('[Login] Não foi possível obter terreiro_id — push redirect será genérico.');
+      }
+
       router.push('/dashboard');
     } catch (err) {
       setError(handleApiError(err, 'Login'));
@@ -67,7 +95,12 @@ export default function Login() {
                 required
               />
             </div>
-            <button type="submit" className="btn-gold w-100" disabled={loading} style={{ padding: '0.75rem' }}>
+            <button
+              type="submit"
+              className="btn-gold w-100"
+              disabled={loading}
+              style={{ padding: '0.75rem' }}
+            >
               {loading
                 ? <><span className="spinner-border spinner-border-sm me-2"></span>Entrando...</>
                 : <><i className="bi bi-box-arrow-in-right me-2"></i>Entrar</>
@@ -79,7 +112,16 @@ export default function Login() {
             <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>ou</span>
           </div>
 
-          <a href="/registro" style={{ display: 'block', textAlign: 'center', color: 'var(--cor-acento)', fontSize: '0.9rem', textDecoration: 'none' }}>
+          <a
+            href="/registro"
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              color: 'var(--cor-acento)',
+              fontSize: '0.9rem',
+              textDecoration: 'none',
+            }}
+          >
             Criar novo terreiro
           </a>
         </div>

@@ -1,69 +1,100 @@
 """
 push_router.py — AxeFlow
-Endpoints para gerenciar push subscriptions e disparar notificações
+Endpoints para gerenciar push subscriptions e disparar notificações.
 """
 from fastapi import APIRouter, HTTPException, Depends
+from app.core.security import get_current_user
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from app.services.push_service import (
     add_subscription,
-    broadcast_push_notification,
+    remove_subscription,
+    send_push_to_terreiro,
     get_subscriptions_count,
 )
 
 router = APIRouter(prefix="/push", tags=["push"])
 
 
-# ── Schemas ────────────────────────────────────────────────────────────────
+# ── Schemas ────────────────────────────────────────────────────────────────────
 
 class PushSubscribeRequest(BaseModel):
     subscription: Dict[str, Any]  # objeto PushSubscription serializado do browser
 
 
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str  # endpoint da subscription a ser removida
+
+
 class PushTestRequest(BaseModel):
     title: Optional[str] = "Nova gira disponível"
-    body: Optional[str] = "A lista para a gira foi aberta."
-    url: Optional[str] = "/dashboard"
+    body:  Optional[str] = "A lista para a gira foi aberta."
+    url:   Optional[str] = "/giras"
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.post("/subscribe")
-def subscribe(data: PushSubscribeRequest):
+def subscribe(data: PushSubscribeRequest, user=Depends(get_current_user)):
     """
     Recebe e salva uma push subscription vinda do browser.
-    Chamado automaticamente após o usuário conceder permissão.
+    Associa ao usuário logado e ao seu terreiro — isolamento multi-tenant.
     """
     sub = data.subscription
 
     if not sub.get("endpoint"):
         raise HTTPException(status_code=400, detail="Subscription inválida: endpoint ausente")
 
-    added = add_subscription(sub)
-    total = get_subscriptions_count()
+    added = add_subscription(
+        subscription=sub,
+        user_id=user.id,
+        terreiro_id=user.terreiro_id,
+    )
+    total = get_subscriptions_count(terreiro_id=user.terreiro_id)
 
     return {
         "ok": True,
         "nova": added,
         "total_subscriptions": total,
-        "message": "Subscription registrada com sucesso" if added else "Subscription já registrada (atualizada)",
+        "message": "Subscription registrada" if added else "Subscription atualizada",
     }
 
 
+@router.delete("/unsubscribe")
+def unsubscribe(data: PushUnsubscribeRequest, user=Depends(get_current_user)):
+    """
+    Remove a push subscription do banco ao fazer logout.
+
+    Chamado pelo frontend (logout.js) antes de limpar o localStorage.
+    Garante que, após trocar de conta no mesmo dispositivo, o novo login
+    não herde a subscription do usuário anterior.
+
+    O endpoint valida que a subscription pertence ao terreiro do usuário
+    logado antes de remover — evita remoção indevida de subscriptions alheias.
+    """
+    if not data.endpoint:
+        raise HTTPException(status_code=400, detail="endpoint ausente")
+
+    remove_subscription(endpoint=data.endpoint, terreiro_id=user.terreiro_id)
+
+    return {"ok": True, "message": "Subscription removida"}
+
+
 @router.post("/test")
-def send_test_push(data: PushTestRequest = PushTestRequest()):
+def send_test_push(data: PushTestRequest = PushTestRequest(), user=Depends(get_current_user)):
     """
-    Dispara uma notificação de teste para todos os inscritos.
-    Útil para testar via curl ou interface admin.
+    Dispara notificação de teste apenas para o terreiro do usuário logado.
+    Útil para validar que o push está funcionando.
     """
-    total = get_subscriptions_count()
+    total = get_subscriptions_count(terreiro_id=user.terreiro_id)
     if total == 0:
         raise HTTPException(
             status_code=404,
-            detail="Nenhuma subscription registrada. Ative as notificações no app primeiro.",
+            detail="Nenhuma subscription registrada para este terreiro. Ative as notificações no app.",
         )
 
-    result = broadcast_push_notification(
+    result = send_push_to_terreiro(
+        terreiro_id=user.terreiro_id,
         title=data.title,
         body=data.body,
         url=data.url,
@@ -72,13 +103,13 @@ def send_test_push(data: PushTestRequest = PushTestRequest()):
     return {
         "ok": True,
         "resultado": result,
-        "message": f"{result['enviados']} notificação(ões) enviada(s) com sucesso",
+        "message": f"{result['enviados']} notificação(ões) enviada(s)",
     }
 
 
 @router.get("/status")
-def push_status():
-    """Retorna quantas subscriptions estão registradas no momento."""
+def push_status(user=Depends(get_current_user)):
+    """Retorna quantas subscriptions estão ativas para o terreiro do usuário."""
     return {
-        "subscriptions_ativas": get_subscriptions_count(),
+        "subscriptions_ativas": get_subscriptions_count(terreiro_id=user.terreiro_id),
     }

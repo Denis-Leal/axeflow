@@ -1,11 +1,23 @@
+// =====================================================
+// Sidebar.js — AxeFlow
+// Barra lateral de navegação (desktop).
+//
+// CORREÇÃO: handleLogout agora usa o helper centralizado
+//   de logout (services/logout.js), que remove a push
+//   subscription do browser e do backend antes de limpar
+//   o localStorage e redirecionar para /login.
+// =====================================================
+
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { getMe } from '../services/api';
+import { logout } from '../services/logout';
 
 export default function Sidebar() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     getMe().then(r => setUser(r.data)).catch(() => {});
@@ -13,9 +25,12 @@ export default function Sidebar() {
 
   const isActive = (path) => router.pathname.startsWith(path) ? 'active' : '';
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
+  const handleLogout = async () => {
+    // Evita duplo clique durante o processo de logout
+    if (loggingOut) return;
+    setLoggingOut(true);
+    // Remove push subscription + limpa localStorage + redireciona
+    await logout(router);
   };
 
   return (
@@ -54,8 +69,16 @@ export default function Sidebar() {
             <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>{user.email}</div>
           </div>
         )}
-        <button onClick={handleLogout} className="btn-outline-gold w-100" style={{ fontSize: '0.85rem' }}>
-          <i className="bi bi-box-arrow-right me-1"></i> Sair
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="btn-outline-gold w-100"
+          style={{ fontSize: '0.85rem' }}
+        >
+          {loggingOut
+            ? <><span className="spinner-border spinner-border-sm me-1"></span>Saindo...</>
+            : <><i className="bi bi-box-arrow-right me-1"></i>Sair</>
+          }
         </button>
       </div>
     </aside>

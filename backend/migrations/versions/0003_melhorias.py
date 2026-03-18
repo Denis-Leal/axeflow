@@ -54,12 +54,26 @@ def constraint_existe(nome: str) -> bool:
 
 def upgrade() -> None:
 
-    # ── Giras: soft delete + updated_at ───────────────────────────────────────
+    # ── Giras: soft delete + updated_at + limite_membros ───────────────────────────────────────
     if not coluna_existe("giras", "deleted_at"):
         op.add_column("giras", sa.Column("deleted_at", sa.DateTime, nullable=True))
 
     if not coluna_existe("giras", "updated_at"):
         op.add_column("giras", sa.Column("updated_at", sa.DateTime, nullable=True))
+        
+    if not coluna_existe("giras", "limite_membros"):
+        op.add_column("giras", sa.Column("limite_membros", sa.Integer, nullable=True))
+        
+    # permitir null em limite_consulentes
+    op.alter_column(
+        "giras",
+        "limite_consulentes",
+        existing_type=sa.INTEGER(),
+        nullable=True
+    )
+    op.execute(
+        "ALTER TYPE statusinscricaoenum ADD VALUE IF NOT EXISTS 'lista_espera'"
+    )
 
     # ── Usuarios: updated_at ──────────────────────────────────────────────────
     if not coluna_existe("usuarios", "updated_at"):
@@ -138,6 +152,7 @@ def downgrade() -> None:
         ("usuarios", "updated_at"),
         ("giras", "updated_at"),
         ("giras", "deleted_at"),
+        ("giras", "limite_membros"),
     ]:
         if coluna_existe(tabela, coluna):
             op.drop_column(tabela, coluna)

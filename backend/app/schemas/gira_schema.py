@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime, date, time
@@ -27,6 +27,19 @@ class GiraUpdate(BaseModel):
     fechamento_lista: Optional[datetime] = None
     status: Optional[str] = None
     responsavel_lista_id: Optional[UUID] = None
+    
+    @model_validator(mode="after")
+    def validar_consistencia(self):
+        # só valida se acesso está sendo alterado
+        if self.acesso == "fechada":
+            if self.limite_membros is None:
+                raise ValueError("Gira fechada precisa de limite_membros")
+
+        if self.acesso == "publica":
+            if self.limite_consulentes is None:
+                raise ValueError("Gira pública precisa de limite_consulentes")
+
+        return self
 
 class GiraResponse(BaseModel):
     id: UUID

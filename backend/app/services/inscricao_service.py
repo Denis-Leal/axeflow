@@ -13,12 +13,12 @@ from sqlalchemy import and_
 from fastapi import HTTPException
 from uuid import UUID
 from datetime import datetime
-from app.models.gira import Gira, StatusGiraEnum
+from app.models.gira import Gira
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
-from app.services.push_service import broadcast_push_notification
+from app.services.push_service import send_push_to_terreiro
 
 
 def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID):
@@ -52,7 +52,6 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID):
 
 
 def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
-    print("Iniciando inscrição pública para slug:", slug)
     """
     Inscreve consulente em gira pública via link público.
 
@@ -74,7 +73,6 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     if agora > gira.fechamento_lista:
         raise HTTPException(status_code=400, detail="Lista encerrada")
 
-    print(gira.status, gira.abertura_lista, gira.fechamento_lista)
     # Validar e normalizar telefone (E.164 sem '+')
     if not validate_phone(data.telefone):
         raise HTTPException(status_code=400, detail="Telefone inválido")
@@ -137,7 +135,8 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     db.refresh(inscricao)
 
     # Notificação push para o terreiro
-    broadcast_push_notification(
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="👤 Nova Inscrição",
         body=(
             f"{data.nome} se inscreveu na {gira.titulo} "
@@ -199,7 +198,8 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID):
     db.commit()
 
     # Notificação push para o terreiro
-    broadcast_push_notification(
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="❌ Inscrição Cancelada",
         body=f"{nome} cancelou a inscrição na {gira.titulo}",
         url=f"/giras/{gira.id}",

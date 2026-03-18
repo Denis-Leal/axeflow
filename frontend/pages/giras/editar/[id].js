@@ -42,6 +42,7 @@ export default function EditarGira() {
           data:                 g.data || '',
           horario:              g.horario ? g.horario.slice(0, 5) : '',
           limite_consulentes:   g.limite_consulentes || 20,
+          limite_membros:       g.limite_membros || null,
           abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
           fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
           responsavel_lista_id: g.responsavel_lista_id || '',
@@ -59,11 +60,30 @@ export default function EditarGira() {
     setError('');
     try {
       const payload = {
-        ...form,
-        limite_consulentes: parseInt(form.limite_consulentes),
+        titulo: form.titulo,
+        tipo: form.tipo,
+        acesso: form.acesso,
+        data: form.data,
         horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
-        responsavel_lista_id: form.responsavel_lista_id || null,
+        status: form.status,
       };
+      if (form.acesso === 'fechada') {
+        payload.limite_membros = parseInt(form.limite_membros);
+
+        // 🔥 zera campos inválidos explicitamente
+        payload.abertura_lista = null;
+        payload.fechamento_lista = null;
+        payload.responsavel_lista_id = null;
+        payload.limite_consulentes = null;
+
+      } else {
+        payload.limite_consulentes = parseInt(form.limite_consulentes);
+        payload.limite_membros = null;
+
+        payload.abertura_lista = form.abertura_lista || null;
+        payload.fechamento_lista = form.fechamento_lista || null;
+        payload.responsavel_lista_id = form.responsavel_lista_id || null;
+      }
       await api.put(`/giras/${id}`, payload);
       router.push(`/giras/${id}`);
     } catch (err) {
@@ -166,13 +186,22 @@ export default function EditarGira() {
                       <input type="time" className="form-control-custom" value={form.horario} required
                         onChange={e => set('horario', e.target.value)} />
                     </div>
+                    {form.acesso === 'fechada' && (
+                      <div className="col-md-6">
+                        <label className="form-label-custom">Limite de membros *</label>
+                        <input type="number" className="form-control-custom" value={form.limite_membros} required
+                          min="1" max="999" onChange={e => set('limite_membros', e.target.value)} />
+                      </div>
+                    )}
+                    {form.acesso !== 'fechada' && (
+                      <div className="col-md-6">
+                        <label className="form-label-custom">Limite de consulentes *</label>
+                        <input type="number" className="form-control-custom" value={form.limite_consulentes} required
+                          min="1" max="999" onChange={e => set('limite_consulentes', e.target.value)} />
+                      </div>
+                    )}
 
-                    <div className="col-md-6">
-                      <label className="form-label-custom">Limite de consulentes *</label>
-                      <input type="number" className="form-control-custom" value={form.limite_consulentes} required
-                        min="1" max="999" onChange={e => set('limite_consulentes', e.target.value)} />
-                    </div>
-
+                    {form.acesso !== 'fechada' && (<>
                     <div className="col-md-6">
                       <label className="form-label-custom">Responsável pela lista</label>
                       <select className="form-control-custom" value={form.responsavel_lista_id}
@@ -184,7 +213,6 @@ export default function EditarGira() {
                       </select>
                     </div>
 
-                    {form.acesso !== 'fechada' && (<>
                     <div className="col-md-6">
                       <label className="form-label-custom">Abertura da lista *</label>
                       <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}

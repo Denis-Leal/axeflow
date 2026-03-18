@@ -13,7 +13,7 @@ from app.models.usuario import Usuario
 from app.models.inscricao import InscricaoGira
 from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse
 from app.utils.slug import generate_gira_slug
-from app.services.push_service import broadcast_push_notification
+from app.services.push_service import send_push_to_terreiro
 from datetime import datetime
 
 
@@ -78,7 +78,8 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     data_fmt    = gira.data.strftime("%d/%m/%Y")
     horario_fmt = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
-    broadcast_push_notification(
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="✦ Nova Gira Criada",
         body=f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
         url=f"/giras/{gira.id}",
@@ -115,8 +116,26 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     campos_alterados = data.model_dump(exclude_unset=True)
+    # aplica alterações
     for field, value in campos_alterados.items():
         setattr(gira, field, value)
+
+    # 🔥 valida estado final
+    if gira.acesso == "fechada":
+        if gira.limite_membros == 0:
+            raise HTTPException(400, "Gira fechada precisa de limite_membros")
+
+        # limpa campos inválidos
+        gira.limite_consulentes = 0
+        gira.abertura_lista = None
+        gira.fechamento_lista = None
+        gira.responsavel_lista_id = None
+
+    elif gira.acesso == "publica":
+        if gira.limite_consulentes == 0:
+            raise HTTPException(400, "Gira pública precisa de limite_consulentes")
+
+        gira.limite_membros = None
     db.commit()
     db.refresh(gira)
 
@@ -130,7 +149,12 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         novo_status = campos_alterados["status"]
         if novo_status in msgs:
             titulo_push, corpo_push = msgs[novo_status]
-            broadcast_push_notification(title=titulo_push, body=corpo_push, url=f"/giras/{gira.id}")
+            send_push_to_terreiro(
+                terreiro_id=gira.terreiro_id,
+                title=titulo_push,
+                body=corpo_push,
+                url=f"/giras/{gira.id}",
+            )
 
     return _enrich(gira, db)
 
@@ -152,7 +176,8 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
     gira.deleted_at = datetime.utcnow()  # soft delete — dado preservado no banco
     db.commit()
 
-    broadcast_push_notification(
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="🗑️ Gira Removida",
         body=f"A gira {titulo} foi removida.",
         url="/giras",
