@@ -172,6 +172,7 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
     db.commit()
 
     send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="🗑️ Gira Removida",
         body=f"A gira {titulo} foi removida.",
         url="/giras",

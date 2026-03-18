@@ -138,6 +138,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
 
     # Notificação push para o terreiro
     send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="👤 Nova Inscrição",
         body=(
             f"{data.nome} se inscreveu na {gira.titulo} "
@@ -200,6 +201,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID):
 
     # Notificação push para o terreiro
     send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="❌ Inscrição Cancelada",
         body=f"{nome} cancelou a inscrição na {gira.titulo}",
         url=f"/giras/{gira.id}",
