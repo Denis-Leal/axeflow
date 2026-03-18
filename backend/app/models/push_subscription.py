@@ -14,5 +14,5 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID, ForeignKey("usuarios.id"), nullable=False)
     terreiro_id = Column(UUID, ForeignKey("terreiros.id"), nullable=False)
