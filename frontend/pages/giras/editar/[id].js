@@ -42,6 +42,7 @@ export default function EditarGira() {
           data:                 g.data || '',
           horario:              g.horario ? g.horario.slice(0, 5) : '',
           limite_consulentes:   g.limite_consulentes || 20,
+          limite_membros:       g.limite_membros || null,
           abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
           fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
           responsavel_lista_id: g.responsavel_lista_id || '',
