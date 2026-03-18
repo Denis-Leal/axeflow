@@ -149,7 +149,12 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         novo_status = campos_alterados["status"]
         if novo_status in msgs:
             titulo_push, corpo_push = msgs[novo_status]
-            send_push_to_terreiro(terreiro_id=gira.terreiro_id, title=titulo_push, body=corpo_push, url=f"/giras/{gira.id}")
+            send_push_to_terreiro(
+                terreiro_id=gira.terreiro_id,
+                title=titulo_push,
+                body=corpo_push,
+                url=f"/giras/{gira.id}",
+            )
 
     return _enrich(gira, db)
 

@@ -1,35 +1,49 @@
 """
 push_service.py — AxeFlow
-Subscriptions persistidas no PostgreSQL (não se perdem com restart do servidor).
+Gerenciamento de push notifications via Web Push (VAPID).
+
+Subscriptions são persistidas no PostgreSQL com terreiro_id —
+garantindo isolamento multi-tenant: cada terreiro só recebe
+notificações das suas próprias giras e ações.
 """
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from uuid import UUID
 from pywebpush import webpush, WebPushException
-from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.push_subscription import PushSubscription
-from app.models.usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
 
-# ── Helpers de DB ─────────────────────────────────────────────────────────────
+# ── Helpers de DB ──────────────────────────────────────────────────────────────
 
 def _get_db() -> Session:
     return SessionLocal()
 
 
-def add_subscription(subscription: Dict[str, Any], user_id: UUID, terreiro_id: UUID) -> bool:
-    """Salva ou atualiza uma subscription no banco."""
+# ── Gerenciamento de subscriptions ────────────────────────────────────────────
+
+def add_subscription(
+    subscription: Dict[str, Any],
+    user_id: UUID,
+    terreiro_id: UUID,
+) -> bool:
+    """
+    Salva ou atualiza uma push subscription no banco.
+
+    Associa a subscription ao usuário e ao seu terreiro.
+    Isso garante que o broadcast por terreiro funcione corretamente.
+
+    Retorna True se era nova, False se já existia (e foi atualizada).
+    """
     endpoint = subscription.get("endpoint")
     keys     = subscription.get("keys", {})
     p256dh   = keys.get("p256dh")
     auth     = keys.get("auth")
-    user_id  = user_id
-    terreiro_id = terreiro_id
 
     if not endpoint or not p256dh or not auth:
         logger.warning("[Push] Subscription inválida — campos ausentes")
@@ -39,52 +53,68 @@ def add_subscription(subscription: Dict[str, Any], user_id: UUID, terreiro_id: U
     try:
         existing = db.query(PushSubscription).filter_by(endpoint=endpoint).first()
         if existing:
-            existing.p256dh = p256dh
-            existing.auth   = auth
-            existing.user_id = user_id
+            # Atualiza chaves e re-associa ao usuário/terreiro atual
+            existing.p256dh      = p256dh
+            existing.auth        = auth
+            existing.user_id     = user_id
             existing.terreiro_id = terreiro_id
             db.commit()
-            logger.info(f"[Push] Subscription atualizada. Total: {db.query(PushSubscription).count()}")
-            return False  # já existia
+            logger.info("[Push] Subscription atualizada para terreiro %s", terreiro_id)
+            return False
         else:
-            sub = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, user_id=user_id, terreiro_id=terreiro_id)
+            sub = PushSubscription(
+                endpoint=endpoint,
+                p256dh=p256dh,
+                auth=auth,
+                user_id=user_id,
+                terreiro_id=terreiro_id,
+            )
             db.add(sub)
             db.commit()
-            logger.info(f"[Push] Subscription nova salva. Total: {db.query(PushSubscription).count()}")
+            total = db.query(PushSubscription).count()
+            logger.info("[Push] Nova subscription salva para terreiro %s. Total: %d", terreiro_id, total)
             return True
     except Exception as e:
         db.rollback()
-        logger.error(f"[Push] Erro ao salvar subscription: {e}")
+        logger.error("[Push] Erro ao salvar subscription: %s", e)
         return False
     finally:
         db.close()
 
 
-def remove_subscription(endpoint: str):
-    """Remove subscription expirada do banco."""
+def remove_subscription(endpoint: str) -> None:
+    """Remove subscription expirada ou inválida do banco."""
     db = _get_db()
     try:
         db.query(PushSubscription).filter_by(endpoint=endpoint).delete()
         db.commit()
-        logger.info(f"[Push] Subscription removida: {endpoint[:60]}...")
+        logger.info("[Push] Subscription removida: %s...", endpoint[:60])
     except Exception as e:
         db.rollback()
-        logger.error(f"[Push] Erro ao remover subscription: {e}")
+        logger.error("[Push] Erro ao remover subscription: %s", e)
     finally:
         db.close()
 
 
-def get_subscriptions_count() -> int:
+def get_subscriptions_count(terreiro_id: Optional[UUID] = None) -> int:
+    """
+    Retorna contagem de subscriptions.
+    Se terreiro_id for informado, filtra por terreiro.
+    """
     db = _get_db()
     try:
-        return db.query(PushSubscription).count()
+        query = db.query(PushSubscription)
+        if terreiro_id:
+            query = query.filter(PushSubscription.terreiro_id == terreiro_id)
+        return query.count()
     finally:
         db.close()
 
 
-# ── Envio ─────────────────────────────────────────────────────────────────────
+# ── Envio ──────────────────────────────────────────────────────────────────────
 
 def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str) -> bool:
+    """Envia push para uma subscription específica."""
     payload = json.dumps({
         "title": title,
         "body":  body,
@@ -109,29 +139,38 @@ def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str)
         return True
     except WebPushException as ex:
         status = ex.response.status_code if ex.response else None
-        logger.warning(f"[Push] Falha ao enviar: {ex} | Status: {status}")
+        logger.warning("[Push] Falha ao enviar para %s: %s | Status: %s",
+                       sub.endpoint[:40], ex, status)
+        # 404/410 = subscription expirada ou cancelada — remove do banco
         if status in (404, 410):
             remove_subscription(sub.endpoint)
         return False
     except Exception as ex:
-        logger.error(f"[Push] Erro inesperado ao enviar: {ex}")
+        logger.error("[Push] Erro inesperado ao enviar: %s", ex)
         return False
 
 
 def send_push_to_terreiro(
-    terreiro_id,
+    terreiro_id: UUID,
     title: str,
     body: str,
     url: str = "/dashboard",
     icon: str = "/icons/icon-192.png",
 ) -> Dict[str, int]:
+    """
+    Envia push notification apenas para os dispositivos do terreiro informado.
 
+    Isolamento multi-tenant: filtra subscriptions por terreiro_id,
+    garantindo que nenhum outro terreiro receba a notificação.
+    """
+    # Guard: sem chave VAPID, skip silencioso (evita crash em dev local)
     if not settings.VAPID_PRIVATE_KEY:
         logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado.")
         return {"enviados": 0, "falhas": 0, "total": 0}
 
     db = _get_db()
     try:
+        # Filtra SOMENTE as subscriptions do terreiro correto
         subs = (
             db.query(PushSubscription)
             .filter(PushSubscription.terreiro_id == terreiro_id)
@@ -139,19 +178,20 @@ def send_push_to_terreiro(
         )
 
         if not subs:
-            logger.info(f"[Push] Nenhuma subscription para terreiro {terreiro_id}")
+            logger.info("[Push] Nenhuma subscription para terreiro %s", terreiro_id)
             return {"enviados": 0, "falhas": 0, "total": 0}
 
         success, failed = 0, 0
-
         for sub in subs:
             if _send_one(sub, title=title, body=body, url=url, icon=icon):
                 success += 1
             else:
                 failed += 1
 
-        logger.info(f"[Push] Terreiro {terreiro_id}: {success} enviados, {failed} falhas de {len(subs)}")
+        logger.info(
+            "[Push] Terreiro %s — %d enviados, %d falhas de %d subscriptions",
+            terreiro_id, success, failed, len(subs),
+        )
         return {"enviados": success, "falhas": failed, "total": len(subs)}
-
     finally:
         db.close()
