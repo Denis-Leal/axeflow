@@ -121,17 +121,17 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     # 🔥 valida estado final
     if gira.acesso == "fechada":
-        if gira.limite_membros is None:
+        if gira.limite_membros == 0:
             raise HTTPException(400, "Gira fechada precisa de limite_membros")
 
         # limpa campos inválidos
-        gira.limite_consulentes = None
+        gira.limite_consulentes = 0
         gira.abertura_lista = None
         gira.fechamento_lista = None
         gira.responsavel_lista_id = None
 
     elif gira.acesso == "publica":
-        if gira.limite_consulentes is None:
+        if gira.limite_consulentes == 0:
             raise HTTPException(400, "Gira pública precisa de limite_consulentes")
 
         gira.limite_membros = None
