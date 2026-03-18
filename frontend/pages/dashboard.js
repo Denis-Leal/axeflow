@@ -179,7 +179,58 @@ export default function Dashboard() {
                 </div>
               );
             })()}
-
+            {/* Card: Giras abertas - confirmar presença */}
+            {(() =>{
+              const abertasPendentes = giras.filter(g =>
+                g.acesso === 'publica' &&
+                g.status === 'aberta' &&
+                (minhasPresencas[g.id] === 'pendente' || minhasPresencas[g.id] === 'confirmado')
+              );
+              if (abertasPendentes.length === 0) return null;
+              return (
+                <div className="card-custom mb-4">
+                  <div className="card-header">
+                    <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
+                      🔒 Gira Aberta — Confirme sua presença
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {abertasPendentes.map(g => {
+                      const meuStatus = minhasPresencas[g.id] || 'pendente';
+                      const jaConfirmei = meuStatus === 'confirmado';
+                      return (
+                        <div key={g.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '0.65rem 0.75rem', borderRadius: '8px', flexWrap: 'wrap', gap: '0.5rem',
+                          background: jaConfirmei ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.2)' : 'var(--cor-borda)'}`,
+                        }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{g.titulo}</span>
+                            <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
+                              {new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {g.horario?.slice(0,5)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const r = await api.post(`/membros/giras/${g.id}/confirmar-presenca`);
+                              setMinhasPresencas(prev => ({ ...prev, [g.id]: r.data.status }));
+                            }}
+                            style={{
+                              padding: '0.35rem 1rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem',
+                              background: jaConfirmei ? 'rgba(16,185,129,0.15)' : 'rgba(212,175,55,0.12)',
+                              border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.4)' : 'rgba(212,175,55,0.3)'}`,
+                              color: jaConfirmei ? '#10b981' : 'var(--cor-acento)',
+                            }}>
+                            {jaConfirmei ? '✓ Confirmado — cancelar?' : '+ Confirmar presença'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
             {proximasGiras.length > 0 && (
               proximasGiras.map(proximaGira => (
               <div className="card-custom mb-4">
