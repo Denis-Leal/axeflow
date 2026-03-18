@@ -87,7 +87,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
         "nome": novo.nome,
         "email": novo.email,
         "role": novo.role,
-        "email_convite_enviado": bool(settings.RESEND_API_KEY),
+        "email_convite_enviado": bool(settings.BREVO_API_KEY),
     }
 
 
