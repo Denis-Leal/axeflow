@@ -3,6 +3,7 @@ push_router.py — AxeFlow
 Endpoints para gerenciar push subscriptions e disparar notificações
 """
 from fastapi import APIRouter, HTTPException, Depends
+from app.core.security import get_current_user
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from app.services.push_service import (
@@ -29,7 +30,7 @@ class PushTestRequest(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @router.post("/subscribe")
-def subscribe(data: PushSubscribeRequest):
+def subscribe(data: PushSubscribeRequest, user = Depends(get_current_user)):
     """
     Recebe e salva uma push subscription vinda do browser.
     Chamado automaticamente após o usuário conceder permissão.
@@ -39,7 +40,11 @@ def subscribe(data: PushSubscribeRequest):
     if not sub.get("endpoint"):
         raise HTTPException(status_code=400, detail="Subscription inválida: endpoint ausente")
 
-    added = add_subscription(sub)
+    added = add_subscription(
+        subscription=sub,
+        user_id=user.id,
+        terreiro_id=user.terreiro_id,
+    )
     total = get_subscriptions_count()
 
     return {
@@ -51,7 +56,7 @@ def subscribe(data: PushSubscribeRequest):
 
 
 @router.post("/test")
-def send_test_push(data: PushTestRequest = PushTestRequest()):
+def send_test_push(data: PushTestRequest = PushTestRequest(), user = Depends(get_current_user)):
     """
     Dispara uma notificação de teste para todos os inscritos.
     Útil para testar via curl ou interface admin.
@@ -64,6 +69,7 @@ def send_test_push(data: PushTestRequest = PushTestRequest()):
         )
 
     result = send_push_to_terreiro(
+        terreiro_id=user.terreiro_id,
         title=data.title,
         body=data.body,
         url=data.url,
