@@ -31,7 +31,7 @@ def upgrade():
     # 2. Cria FKs
     op.create_foreign_key(
         'fk_push_user',
-        'push_subscriptions', 'users',
+        'push_subscriptions', 'usuarios',
         ['user_id'], ['id']
     )
 
