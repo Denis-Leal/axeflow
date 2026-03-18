@@ -61,6 +61,7 @@ export default function EditarGira() {
       const payload = {
         ...form,
         limite_consulentes: parseInt(form.limite_consulentes),
+        limite_membros: parseInt(form.limite_membros) || null,
         horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
         responsavel_lista_id: form.responsavel_lista_id || null,
       };
@@ -166,13 +167,22 @@ export default function EditarGira() {
                       <input type="time" className="form-control-custom" value={form.horario} required
                         onChange={e => set('horario', e.target.value)} />
                     </div>
+                    {form.acesso === 'fechada' && (
+                      <div className="col-md-6">
+                        <label className="form-label-custom">Limite de membros *</label>
+                        <input type="number" className="form-control-custom" value={form.limite_membros} required
+                          min="1" max="999" onChange={e => set('limite_membros', e.target.value)} />
+                      </div>
+                    )}
+                    {form.acesso !== 'fechada' && (
+                      <div className="col-md-6">
+                        <label className="form-label-custom">Limite de consulentes *</label>
+                        <input type="number" className="form-control-custom" value={form.limite_consulentes} required
+                          min="1" max="999" onChange={e => set('limite_consulentes', e.target.value)} />
+                      </div>
+                    )}
 
-                    <div className="col-md-6">
-                      <label className="form-label-custom">Limite de consulentes *</label>
-                      <input type="number" className="form-control-custom" value={form.limite_consulentes} required
-                        min="1" max="999" onChange={e => set('limite_consulentes', e.target.value)} />
-                    </div>
-
+                    {form.acesso !== 'fechada' && (<>
                     <div className="col-md-6">
                       <label className="form-label-custom">Responsável pela lista</label>
                       <select className="form-control-custom" value={form.responsavel_lista_id}
@@ -184,7 +194,6 @@ export default function EditarGira() {
                       </select>
                     </div>
 
-                    {form.acesso !== 'fechada' && (<>
                     <div className="col-md-6">
                       <label className="form-label-custom">Abertura da lista *</label>
                       <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}
