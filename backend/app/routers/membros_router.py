@@ -12,7 +12,9 @@ ADIÇÕES (sem alterar endpoints existentes):
       Comportamento idêntico ao confirmar-presenca, mas sem validar acesso=='fechada'.
 """
 import logging
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -21,6 +23,8 @@ from datetime import date
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role, hash_password
 from app.models.usuario import Usuario
+from app.services.email_service import send_convite_membro
+from app.models.terreiro import Terreiro
 from app.models.gira import Gira as GiraModel
 from app.models.inscricao import InscricaoGira
 from app.core.config import settings
