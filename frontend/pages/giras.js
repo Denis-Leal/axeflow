@@ -104,7 +104,7 @@ export default function Giras() {
                         <td>{new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                         <td>{g.horario}</td>
                         <td>
-                          {g.tipo === 'fechada' ? (
+                          {g.acesso === 'fechada' ? (
                             <span
                               style={{
                                 color: g.total_inscritos >= g.limite_membros
