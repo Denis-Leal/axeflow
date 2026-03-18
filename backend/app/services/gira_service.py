@@ -79,6 +79,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     horario_fmt = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
     send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
         title="✦ Nova Gira Criada",
         body=f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
         url=f"/giras/{gira.id}",
