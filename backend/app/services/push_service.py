@@ -5,6 +5,14 @@ Gerenciamento de push notifications via Web Push (VAPID).
 Subscriptions são persistidas no PostgreSQL com terreiro_id —
 garantindo isolamento multi-tenant: cada terreiro só recebe
 notificações das suas próprias giras e ações.
+
+CORREÇÃO MULTI-TENANT:
+    O payload de cada push agora inclui o campo `terreiro_id`
+    dentro de `data`. O frontend (sw.js + _app.js) usa esse
+    campo para validar se a notificação pertence ao terreiro
+    do usuário logado antes de navegar para a URL específica.
+    Isso evita que um dispositivo compartilhado entre terreiros
+    (mesma subscription sobrescrita) navegue para dados alheios.
 """
 import json
 import logging
@@ -22,6 +30,7 @@ logger = logging.getLogger(__name__)
 # ── Helpers de DB ──────────────────────────────────────────────────────────────
 
 def _get_db() -> Session:
+    """Abre uma sessão de banco de dados."""
     return SessionLocal()
 
 
@@ -53,7 +62,9 @@ def add_subscription(
     try:
         existing = db.query(PushSubscription).filter_by(endpoint=endpoint).first()
         if existing:
-            # Atualiza chaves e re-associa ao usuário/terreiro atual
+            # Atualiza chaves e re-associa ao usuário/terreiro atual.
+            # NOTA: um mesmo dispositivo físico pode ter sido usado em
+            # terreiros diferentes — o terreiro_id é sempre o do login atual.
             existing.p256dh      = p256dh
             existing.auth        = auth
             existing.user_id     = user_id
@@ -113,14 +124,32 @@ def get_subscriptions_count(terreiro_id: Optional[UUID] = None) -> int:
 
 # ── Envio ──────────────────────────────────────────────────────────────────────
 
-def _send_one(sub: PushSubscription, title: str, body: str, url: str, icon: str) -> bool:
-    """Envia push para uma subscription específica."""
+def _send_one(
+    sub: PushSubscription,
+    title: str,
+    body: str,
+    url: str,
+    icon: str,
+    terreiro_id: UUID,
+) -> bool:
+    """
+    Envia push para uma subscription específica.
+
+    O payload inclui `terreiro_id` dentro de `data` para que o frontend
+    possa validar se a notificação pertence ao terreiro do usuário logado.
+    Isso é a segunda camada de segurança multi-tenant no lado cliente.
+    """
     payload = json.dumps({
         "title": title,
         "body":  body,
         "icon":  icon,
         "badge": "/icons/notification-icon.png",
-        "data":  {"url": url},
+        "data": {
+            # URL da página de destino (ex: /giras/{id})
+            "url": url,
+            # terreiro_id permite ao frontend validar o contexto antes de navegar
+            "terreiro_id": str(terreiro_id),
+        },
     })
     subscription_info = {
         "endpoint": sub.endpoint,
@@ -154,16 +183,21 @@ def send_push_to_terreiro(
     terreiro_id: UUID,
     title: str,
     body: str,
-    url: str = "/dashboard",
+    url: str = "/giras",
     icon: str = "/icons/icon-192.png",
 ) -> Dict[str, int]:
     """
     Envia push notification apenas para os dispositivos do terreiro informado.
 
-    Isolamento multi-tenant: filtra subscriptions por terreiro_id,
-    garantindo que nenhum outro terreiro receba a notificação.
+    Isolamento multi-tenant (backend):
+        Filtra subscriptions por terreiro_id — nenhum outro terreiro
+        recebe a notificação.
+
+    Isolamento multi-tenant (frontend):
+        O payload inclui terreiro_id para que o sw.js e o _app.js
+        possam validar o contexto antes de navegar para a URL específica.
     """
-    # Guard: sem chave VAPID, skip silencioso (evita crash em dev local)
+    # Guard: sem chave VAPID configurada, skip silencioso (evita crash em dev)
     if not settings.VAPID_PRIVATE_KEY:
         logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado.")
         return {"enviados": 0, "falhas": 0, "total": 0}
@@ -183,7 +217,8 @@ def send_push_to_terreiro(
 
         success, failed = 0, 0
         for sub in subs:
-            if _send_one(sub, title=title, body=body, url=url, icon=icon):
+            # Passa terreiro_id para incluir no payload (validação no frontend)
+            if _send_one(sub, title=title, body=body, url=url, icon=icon, terreiro_id=terreiro_id):
                 success += 1
             else:
                 failed += 1

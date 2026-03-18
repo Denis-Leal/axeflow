@@ -1,3 +1,14 @@
+// =====================================================
+// api.js — AxeFlow
+// Cliente HTTP Axios com interceptors de autenticação.
+//
+// CORREÇÃO MULTI-TENANT (push notifications):
+//   O interceptor de 401 agora remove também o terreiro_id
+//   do localStorage, garantindo que após logout automático
+//   (token expirado) o _app.js não use um terreiro_id antigo
+//   para validar notificações push de outra sessão.
+// =====================================================
+
 import axios from 'axios';
 
 // Usa o proxy do Next.js (/api → backend:8000 internamente).
@@ -10,6 +21,8 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// ── Interceptor de Request ────────────────────────────
+// Injeta o token JWT em todas as requisições autenticadas
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
@@ -20,6 +33,10 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ── Interceptor de Response ───────────────────────────
+// Trata 401 (token expirado/inválido) globalmente:
+//   - Remove token E terreiro_id do localStorage
+//   - Redireciona para /login após um tick (evita cortar requisições paralelas)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -30,8 +47,9 @@ api.interceptors.response.use(
         // Espera um tick para não cortar requisições paralelas legítimas
         // (ex: dashboard fazendo listGiras + getMe ao mesmo tempo)
         setTimeout(() => {
-          // Só redireciona se o token ainda foi removido (não houve refresh entre)
+          // Remove token e terreiro_id para limpar contexto multi-tenant
           localStorage.removeItem('token');
+          localStorage.removeItem('terreiro_id');
           window.location.href = '/login';
         }, 100);
       }
@@ -42,24 +60,23 @@ api.interceptors.response.use(
 
 export default api;
 
-// Auth
-export const login = (email, senha) => api.post('/auth/login', { email, senha });
-export const register = (data) => api.post('/auth/register', data);
-export const getMe = () => api.get('/auth/me');
+// ── Auth ──────────────────────────────────────────────
+export const login    = (email, senha) => api.post('/auth/login', { email, senha });
+export const register = (data)         => api.post('/auth/register', data);
+export const getMe    = ()             => api.get('/auth/me');
 
-// Giras
-export const listGiras = () => api.get('/giras');
-export const createGira = (data) => api.post('/giras', data);
-export const getGira = (id) => api.get(`/giras/${id}`);
-export const updateGira = (id, data) => api.put(`/giras/${id}`, data);
-export const deleteGira = (id) => api.delete(`/giras/${id}`);
+// ── Giras ─────────────────────────────────────────────
+export const listGiras   = ()           => api.get('/giras');
+export const createGira  = (data)       => api.post('/giras', data);
+export const getGira     = (id)         => api.get(`/giras/${id}`);
+export const updateGira  = (id, data)   => api.put(`/giras/${id}`, data);
+export const deleteGira  = (id)         => api.delete(`/giras/${id}`);
 
-// Inscricoes
-export const listInscricoes = (giraId) => api.get(`/giras/${giraId}/inscricoes`);
-export const updatePresenca = (inscricaoId, status) =>
-  api.patch(`/inscricao/${inscricaoId}/presenca`, { status });
-export const cancelarInscricao = (inscricaoId) => api.delete(`/inscricao/${inscricaoId}`);
+// ── Inscrições ────────────────────────────────────────
+export const listInscricoes    = (giraId)              => api.get(`/giras/${giraId}/inscricoes`);
+export const updatePresenca    = (inscricaoId, status) => api.patch(`/inscricao/${inscricaoId}/presenca`, { status });
+export const cancelarInscricao = (inscricaoId)         => api.delete(`/inscricao/${inscricaoId}`);
 
-// Publico
-export const getGiraPublica = (slug) => api.get(`/public/gira/${slug}`);
-export const inscreverPublico = (slug, data) => api.post(`/public/gira/${slug}/inscrever`, data);
+// ── Público ───────────────────────────────────────────
+export const getGiraPublica   = (slug)        => api.get(`/public/gira/${slug}`);
+export const inscreverPublico = (slug, data)  => api.post(`/public/gira/${slug}/inscrever`, data);
