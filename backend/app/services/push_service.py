@@ -6,13 +6,15 @@ Subscriptions são persistidas no PostgreSQL com terreiro_id —
 garantindo isolamento multi-tenant: cada terreiro só recebe
 notificações das suas próprias giras e ações.
 
-CORREÇÃO MULTI-TENANT:
-    O payload de cada push agora inclui o campo `terreiro_id`
-    dentro de `data`. O frontend (sw.js + _app.js) usa esse
-    campo para validar se a notificação pertence ao terreiro
-    do usuário logado antes de navegar para a URL específica.
-    Isso evita que um dispositivo compartilhado entre terreiros
-    (mesma subscription sobrescrita) navegue para dados alheios.
+CORREÇÃO MULTI-TENANT (payload):
+    O payload de cada push inclui `terreiro_id` dentro de `data`.
+    O frontend (sw.js + _app.js) usa esse campo para validar se a
+    notificação pertence ao terreiro do usuário logado antes de navegar.
+
+CORREÇÃO LOGOUT:
+    remove_subscription agora aceita terreiro_id opcional para garantir
+    que apenas o dono da subscription possa removê-la via logout.
+    A remoção por expiração (404/410) continua sem validação de terreiro.
 """
 import json
 import logging
@@ -93,13 +95,33 @@ def add_subscription(
         db.close()
 
 
-def remove_subscription(endpoint: str) -> None:
-    """Remove subscription expirada ou inválida do banco."""
+def remove_subscription(endpoint: str, terreiro_id: Optional[UUID] = None) -> None:
+    """
+    Remove uma push subscription do banco.
+
+    Quando chamada via logout (terreiro_id informado):
+        Valida que a subscription pertence ao terreiro do usuário logado
+        antes de remover — evita que um terreiro remova subscription alheia.
+
+    Quando chamada por expiração (terreiro_id=None):
+        Remove sem validação de terreiro (o endpoint simplesmente não existe
+        mais nos servidores do Google/Mozilla).
+    """
     db = _get_db()
     try:
-        db.query(PushSubscription).filter_by(endpoint=endpoint).delete()
+        query = db.query(PushSubscription).filter_by(endpoint=endpoint)
+
+        # Filtro adicional de segurança quando chamado via logout
+        if terreiro_id is not None:
+            query = query.filter(PushSubscription.terreiro_id == terreiro_id)
+
+        deleted = query.delete()
         db.commit()
-        logger.info("[Push] Subscription removida: %s...", endpoint[:60])
+
+        if deleted:
+            logger.info("[Push] Subscription removida: %s...", endpoint[:60])
+        else:
+            logger.info("[Push] Nenhuma subscription encontrada para remover: %s...", endpoint[:60])
     except Exception as e:
         db.rollback()
         logger.error("[Push] Erro ao remover subscription: %s", e)
@@ -170,7 +192,7 @@ def _send_one(
         status = ex.response.status_code if ex.response else None
         logger.warning("[Push] Falha ao enviar para %s: %s | Status: %s",
                        sub.endpoint[:40], ex, status)
-        # 404/410 = subscription expirada ou cancelada — remove do banco
+        # 404/410 = subscription expirada ou cancelada — remove sem validar terreiro
         if status in (404, 410):
             remove_subscription(sub.endpoint)
         return False
@@ -190,21 +212,18 @@ def send_push_to_terreiro(
     Envia push notification apenas para os dispositivos do terreiro informado.
 
     Isolamento multi-tenant (backend):
-        Filtra subscriptions por terreiro_id — nenhum outro terreiro
-        recebe a notificação.
+        Filtra subscriptions por terreiro_id — nenhum outro terreiro recebe.
 
     Isolamento multi-tenant (frontend):
-        O payload inclui terreiro_id para que o sw.js e o _app.js
-        possam validar o contexto antes de navegar para a URL específica.
+        O payload inclui terreiro_id para que sw.js e _app.js validem
+        o contexto antes de navegar para a URL específica.
     """
-    # Guard: sem chave VAPID configurada, skip silencioso (evita crash em dev)
     if not settings.VAPID_PRIVATE_KEY:
         logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado.")
         return {"enviados": 0, "falhas": 0, "total": 0}
 
     db = _get_db()
     try:
-        # Filtra SOMENTE as subscriptions do terreiro correto
         subs = (
             db.query(PushSubscription)
             .filter(PushSubscription.terreiro_id == terreiro_id)
@@ -217,7 +236,6 @@ def send_push_to_terreiro(
 
         success, failed = 0, 0
         for sub in subs:
-            # Passa terreiro_id para incluir no payload (validação no frontend)
             if _send_one(sub, title=title, body=body, url=url, icon=icon, terreiro_id=terreiro_id):
                 success += 1
             else:

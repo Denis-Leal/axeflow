@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from app.services.push_service import (
     add_subscription,
+    remove_subscription,
     send_push_to_terreiro,
     get_subscriptions_count,
 )
@@ -21,10 +22,14 @@ class PushSubscribeRequest(BaseModel):
     subscription: Dict[str, Any]  # objeto PushSubscription serializado do browser
 
 
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str  # endpoint da subscription a ser removida
+
+
 class PushTestRequest(BaseModel):
     title: Optional[str] = "Nova gira disponível"
     body:  Optional[str] = "A lista para a gira foi aberta."
-    url:   Optional[str] = "/dashboard"
+    url:   Optional[str] = "/giras"
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -53,6 +58,26 @@ def subscribe(data: PushSubscribeRequest, user=Depends(get_current_user)):
         "total_subscriptions": total,
         "message": "Subscription registrada" if added else "Subscription atualizada",
     }
+
+
+@router.delete("/unsubscribe")
+def unsubscribe(data: PushUnsubscribeRequest, user=Depends(get_current_user)):
+    """
+    Remove a push subscription do banco ao fazer logout.
+
+    Chamado pelo frontend (logout.js) antes de limpar o localStorage.
+    Garante que, após trocar de conta no mesmo dispositivo, o novo login
+    não herde a subscription do usuário anterior.
+
+    O endpoint valida que a subscription pertence ao terreiro do usuário
+    logado antes de remover — evita remoção indevida de subscriptions alheias.
+    """
+    if not data.endpoint:
+        raise HTTPException(status_code=400, detail="endpoint ausente")
+
+    remove_subscription(endpoint=data.endpoint, terreiro_id=user.terreiro_id)
+
+    return {"ok": True, "message": "Subscription removida"}
 
 
 @router.post("/test")
