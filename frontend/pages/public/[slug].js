@@ -113,7 +113,7 @@ export default function GiraPublica({ gira, erro, slug }) {
     : 'Inscreva-se na gira pelo AxeFlow';
 
   const ogUrl   = `${APP_URL}/public/${slug}`;
-  const ogImage = `${APP_URL}/og-gira-preview.svg`; // imagem estática de preview
+  const ogImage = `${APP_URL}/og-gira-preview.png`; // imagem estática de preview
 
   // ── Estado de erro ────────────────────────────────────────────────────────
 
