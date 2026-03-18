@@ -26,37 +26,22 @@ export default function Dashboard() {
         setUser(userRes.data);
         setLoading(false);
 
-        // Carregar presenças em segundo plano — giras fechadas E públicas abertas
+        // Carregar presenças de giras fechadas em segundo plano
         // Erros aqui NÃO devem afetar o carregamento do dashboard
-        const girasAtivas = girasRes.data.filter(g => g.status !== 'concluida');
-        if (girasAtivas.length === 0) return;
-
-        const userId = userRes.data.id;
+        const fechadas = girasRes.data.filter(g => g.acesso === 'fechada' && g.status !== 'concluida');
+        if (fechadas.length === 0) return;
 
         Promise.all(
-          girasAtivas.map(g => {
-            if (g.acesso === 'fechada') {
-              // Giras fechadas: busca lista de membros com status de presença
-              return api.get(`/membros/giras/${g.id}/presenca-membros`)
-                .then(r => {
-                  const eu = r.data.find(m => m.membro_id === userId);
-                  return { giraId: g.id, status: eu?.status || 'pendente' };
-                })
-                .catch(() => null);
-            } else {
-              // Giras públicas: busca inscrições e procura pelo membro_id do usuário
-              return api.get(`/giras/${g.id}/inscricoes`)
-                .then(r => {
-                  const eu = r.data.find(i => i.membro_id === userId);
-                  return { giraId: g.id, status: eu?.status || 'pendente' };
-                })
-                .catch(() => null);
-            }
-          })
+          fechadas.map(g =>
+            api.get(`/membros/giras/${g.id}/presenca-membros`)
+              .then(r => ({ giraId: g.id, membros: r.data, userId: userRes.data.id }))
+              .catch(() => null) // silencia erros individuais
+          )
         ).then(results => {
           const presencas = {};
-          results.filter(Boolean).forEach(({ giraId, status }) => {
-            presencas[giraId] = status;
+          results.filter(Boolean).forEach(({ giraId, membros, userId }) => {
+            const eu = membros.find(m => m.membro_id === userId);
+            presencas[giraId] = eu?.status || 'pendente';
           });
           setMinhasPresencas(presencas);
         }).catch(() => {}); // nunca deixa explodir
@@ -73,7 +58,8 @@ export default function Dashboard() {
       });
   }, []);
 
-  const proximaGira = giras.find(g => g.status === 'aberta' || new Date(g.data) >= new Date());
+  // const proximaGira = giras.find(g => g.status === 'aberta' || new Date(g.data) >= new Date());
+  const proximasGiras = giras.filter(g => g.status === 'aberta' || (new Date(g.data) >= new Date()));
   const totalConsulentes = giras.reduce((acc, g) => acc + (g.total_inscritos || 0), 0);
   const girasAbertas = giras.filter(g => g.status === 'aberta').length;
 
@@ -141,65 +127,50 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Card: Confirmar presença — giras fechadas e públicas */}
+            {/* Card: Giras fechadas — confirmar presença */}
             {(() => {
-              // Mostra todas as giras ativas onde o membro pode confirmar presença
-              // Inclui: fechadas (só membros) e públicas (membros + consulentes)
-              const girasParaConfirmar = giras.filter(g =>
+              const fechadasPendentes = giras.filter(g =>
+                g.acesso === 'fechada' &&
                 g.status !== 'concluida' &&
-                (minhasPresencas[g.id] === 'pendente' || minhasPresencas[g.id] === 'confirmado' || minhasPresencas[g.id] === 'lista_espera')
+                (minhasPresencas[g.id] === 'pendente' || minhasPresencas[g.id] === 'confirmado')
               );
-              if (girasParaConfirmar.length === 0) return null;
+              if (fechadasPendentes.length === 0) return null;
               return (
                 <div className="card-custom mb-4">
                   <div className="card-header">
                     <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-                      ✦ Confirme sua presença nas giras
+                      🔒 Giras Fechadas — Confirme sua presença
                     </span>
                   </div>
                   <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {girasParaConfirmar.map(g => {
+                    {fechadasPendentes.map(g => {
                       const meuStatus = minhasPresencas[g.id] || 'pendente';
                       const jaConfirmei = meuStatus === 'confirmado';
-                      const naEspera   = meuStatus === 'lista_espera';
-                      const isFechada  = g.acesso === 'fechada';
                       return (
                         <div key={g.id} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           padding: '0.65rem 0.75rem', borderRadius: '8px', flexWrap: 'wrap', gap: '0.5rem',
-                          background: jaConfirmei ? 'rgba(16,185,129,0.06)' : naEspera ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.2)' : naEspera ? 'rgba(245,158,11,0.25)' : 'var(--cor-borda)'}`,
+                          background: jaConfirmei ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.2)' : 'var(--cor-borda)'}`,
                         }}>
                           <div>
-                            <span style={{ fontSize: '0.7rem', marginRight: '0.4rem', opacity: 0.6 }}>
-                              {isFechada ? '🔒' : '🌐'}
-                            </span>
                             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{g.titulo}</span>
                             <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
                               {new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {g.horario?.slice(0,5)}
                             </span>
-                            {naEspera && (
-                              <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600 }}>
-                                • Lista de espera
-                              </span>
-                            )}
                           </div>
                           <button
                             onClick={async () => {
-                              try {
-                                const r = await api.post(`/membros/giras/${g.id}/confirmar-presenca`);
-                                setMinhasPresencas(prev => ({ ...prev, [g.id]: r.data.status }));
-                              } catch (err) {
-                                console.error('Erro ao confirmar presença:', err);
-                              }
+                              const r = await api.post(`/membros/giras/${g.id}/confirmar-presenca`);
+                              setMinhasPresencas(prev => ({ ...prev, [g.id]: r.data.status }));
                             }}
                             style={{
                               padding: '0.35rem 1rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem',
-                              background: jaConfirmei ? 'rgba(16,185,129,0.15)' : naEspera ? 'rgba(245,158,11,0.12)' : 'rgba(212,175,55,0.12)',
-                              border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.4)' : naEspera ? 'rgba(245,158,11,0.35)' : 'rgba(212,175,55,0.3)'}`,
-                              color: jaConfirmei ? '#10b981' : naEspera ? '#f59e0b' : 'var(--cor-acento)',
+                              background: jaConfirmei ? 'rgba(16,185,129,0.15)' : 'rgba(212,175,55,0.12)',
+                              border: `1px solid ${jaConfirmei ? 'rgba(16,185,129,0.4)' : 'rgba(212,175,55,0.3)'}`,
+                              color: jaConfirmei ? '#10b981' : 'var(--cor-acento)',
                             }}>
-                            {jaConfirmei ? '✓ Confirmado — cancelar?' : naEspera ? '⏳ Na espera — cancelar?' : '+ Confirmar presença'}
+                            {jaConfirmei ? '✓ Confirmado — cancelar?' : '+ Confirmar presença'}
                           </button>
                         </div>
                       );
@@ -209,11 +180,12 @@ export default function Dashboard() {
               );
             })()}
 
-            {proximaGira && (
+            {proximasGiras.length > 0 && (
+              proximasGiras.map(proximaGira => (
               <div className="card-custom mb-4">
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-                    ✦ Próxima Gira
+                    ✦ Próxima Gira - {proximaGira.acesso === 'publica' ? 'Pública' : 'Fechada'}
                   </span>
                   <span className={`badge-status badge-${proximaGira.status}`}>{proximaGira.status}</span>
                 </div>
@@ -227,17 +199,24 @@ export default function Dashboard() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontSize: '1.5rem' }}>
-                      {proximaGira.total_inscritos}/{proximaGira.limite_consulentes}
+                      {proximaGira.acesso === 'publica' ? 
+                      `${proximaGira.total_inscritos}/${proximaGira.limite_consulentes}` 
+                      : 
+                      `${proximaGira.total_inscritos}/${proximaGira.limite_membros}`}
                     </div>
                     <small style={{ color: 'var(--cor-texto-suave)' }}>vagas ocupadas</small>
                   </div>
                 </div>
                 <div style={{ padding: '0 1rem 1rem' }}>
                   <div className="vagas-bar">
-                    <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_consulentes) * 100)}%` }}></div>
+                    {proximaGira.acesso === 'publica' ?
+                     <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_consulentes) * 100)}%` }}></div>
+                     :
+                    <div className="vagas-fill" style={{ width: `${Math.min(100, (proximaGira.total_inscritos / proximaGira.limite_membros) * 100)}%` }}></div>}
                   </div>
                 </div>
               </div>
+              ))
             )}
 
             <div className="card-custom">

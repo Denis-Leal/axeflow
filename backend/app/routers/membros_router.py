@@ -10,6 +10,14 @@ from app.models.usuario import Usuario
 from app.models.terreiro import Terreiro
 from app.schemas.auth_schema import UsuarioResponse
 from app.services.email_service import send_convite_membro
+from app.models.gira import Gira as GiraModel
+from sqlalchemy import and_
+from app.models.consulente import Consulente
+from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from sqlalchemy import func
+from app.models.gira import Gira
+from app.services.presenca_service import calcular_score
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,7 +78,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
             app_url=settings.APP_URL,
         )
         if not enviado:
-            logger.warning("[Membros] Email de convite não enviado para %s (BREVO_API_KEY configurada?)", data.email)
+            logger.warning("[Membros] Email de convite não enviado para %s (RESEND_API_KEY configurada?)", data.email)
     except Exception as e:
         logger.error("[Membros] Erro ao enviar email de convite: %s", e)
 
@@ -79,7 +87,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
         "nome": novo.nome,
         "email": novo.email,
         "role": novo.role,
-        "email_convite_enviado": bool(settings.BREVO_API_KEY),
+        "email_convite_enviado": bool(settings.RESEND_API_KEY),
     }
 
 
@@ -123,18 +131,12 @@ def update_membro(
         "ativo": membro.ativo,
     }
 
-
-from app.models.consulente import Consulente
-from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
-from sqlalchemy import func
-
 @router.get("/consulentes-lista")
 def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Retorna todos os consulentes que já se inscreveram em giras deste terreiro,
     incluindo primeira_visita, total de inscrições e comparecimentos.
     """
-    from app.models.gira import Gira
 
     # IDs das giras deste terreiro
     gira_ids = [g.id for g in db.query(Gira.id).filter(Gira.terreiro_id == user.terreiro_id).all()]
@@ -174,7 +176,6 @@ def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = De
 
 
 # ── Perfil CRM do consulente ───────────────────────────────────────────────────
-from app.models.gira import Gira as GiraModel
 
 @router.get("/consulentes/{consulente_id}/perfil")
 def get_perfil_consulente(
@@ -186,8 +187,7 @@ def get_perfil_consulente(
     Perfil CRM completo de um consulente:
     histórico cronológico, padrões de visita, score e linha do tempo.
     """
-    from app.services.presenca_service import calcular_score
-    from datetime import date
+
 
     consulente = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not consulente:
@@ -302,7 +302,6 @@ def get_presenca_membros(
     Para giras fechadas: retorna todos os membros ativos do terreiro
     com seu status de presença nessa gira (compareceu / faltou / pendente).
     """
-    from app.models.gira import Gira as GiraModel
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -327,7 +326,6 @@ def get_presenca_membros(
         ).first()
 
         # Buscar via campo membro_id que vamos adicionar na inscrição
-        from sqlalchemy import and_
         presenca = db.query(InscricaoGira).filter(
             and_(
                 InscricaoGira.gira_id == gira_id,
@@ -355,8 +353,6 @@ def marcar_presenca_membro(
     db: Session = Depends(get_db)
 ):
     """Marca ou atualiza presença de um membro em gira fechada."""
-    from app.models.gira import Gira as GiraModel
-    from sqlalchemy import and_
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -405,74 +401,40 @@ def confirmar_presenca_propria(
     db: Session = Depends(get_db)
 ):
     """
-    O próprio membro logado confirma presença em uma gira — pública ou fechada.
-
-    Giras fechadas: inscrição simples via membro_id, sem limite de vagas.
-    Giras públicas: inscrição respeita o limite_consulentes e a lista de espera.
-
-    Comportamento de toggle:
-      - Sem inscrição → cria com status 'confirmado'
-      - Já confirmado → cancela (remove a inscrição)
-      - Admin já registrou compareceu/faltou → bloqueia reversão
+    O próprio membro logado confirma que vai comparecer à gira fechada.
+    Status: 'confirmado' (intenção) — admin pode depois mudar para compareceu/faltou.
     """
 
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
-        GiraModel.terreiro_id == user.terreiro_id,
-        GiraModel.deleted_at.is_(None),
+        GiraModel.terreiro_id == user.terreiro_id
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
+    if getattr(gira, 'acesso', 'publica') != 'fechada':
+        raise HTTPException(status_code=400, detail="Esta gira é pública")
 
-    # Busca inscrição existente do membro (campo membro_id)
     presenca = db.query(InscricaoGira).filter(
         and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == user.id)
     ).first()
 
-    # ── Toggle: já inscrito ────────────────────────────────────────────────────
     if presenca:
+        # Toggle: se já confirmou, cancela
         if presenca.status == "confirmado":
-            # Cancela a inscrição
             db.delete(presenca)
             db.commit()
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
-        # Admin já registrou presença/falta — membro não pode reverter
+        # Se admin já marcou compareceu/faltou, não deixa o membro reverter
         return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
 
-    # ── Nova inscrição ─────────────────────────────────────────────────────────
-    proxima_posicao = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira_id
-    ).count() + 1
-
-    if gira.acesso == "publica":
-        # Gira pública: respeita limite de vagas — pode entrar na lista de espera
-        confirmados = db.query(InscricaoGira).filter(
-            InscricaoGira.gira_id == gira_id,
-            InscricaoGira.status == StatusInscricaoEnum.confirmado,
-        ).count()
-
-        limite = gira.limite_consulentes or 0
-        status_inicial = (
-            StatusInscricaoEnum.confirmado
-            if confirmados < limite
-            else StatusInscricaoEnum.lista_espera
-        )
-    else:
-        # Gira fechada: sem limite de vagas para membros
-        status_inicial = StatusInscricaoEnum.confirmado
-
+    max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
     presenca = InscricaoGira(
         gira_id=gira_id,
         membro_id=user.id,
         consulente_id=None,
-        posicao=proxima_posicao,
-        status=status_inicial,
+        posicao=max_pos + 1,
+        status="confirmado",
     )
     db.add(presenca)
     db.commit()
-
-    return {
-        "ok": True,
-        "status": status_inicial,
-        "acao": "confirmado" if status_inicial == StatusInscricaoEnum.confirmado else "lista_espera",
-    }
+    return {"ok": True, "status": "confirmado", "acao": "confirmado"}
