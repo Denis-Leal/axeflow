@@ -2,22 +2,15 @@
 membros_router.py — AxeFlow
 Gerenciamento de membros, presença em giras e consulentes.
 
-ADIÇÕES (sem alterar endpoints existentes):
-  - GET  /membros/giras/{id}/presenca-membros-publica
-      Retorna lista de membros com status de presença para giras PÚBLICAS.
-
-  - POST /membros/giras/{id}/confirmar-presenca-publica
-      O próprio membro confirma/cancela presença em gira PÚBLICA.
-
-CORREÇÃO:
-  - Adicionado send_push_to_terreiro nos endpoints de confirmação de presença
-    (confirmar-presenca e confirmar-presenca-publica), notificando o terreiro
-    quando um membro confirma ou cancela sua presença.
+ADIÇÃO:
+  - PATCH /membros/consulentes/{id}/notas
+      Admin atualiza as notas internas do terreiro sobre um consulente.
+      Campo livre: "veio pela primeira vez com Maria", "prefere tarde", etc.
 """
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -38,6 +31,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/membros", tags=["membros"])
 
 
+# ── Schemas locais ─────────────────────────────────────────────────────────────
+
 class MembroCreate(BaseModel):
     nome: str
     email: EmailStr
@@ -45,6 +40,17 @@ class MembroCreate(BaseModel):
     telefone: Optional[str] = None
     role: str = "membro"
 
+
+class NotasConsulenteUpdate(BaseModel):
+    """Payload para atualizar as notas internas sobre um consulente."""
+    notas: Optional[str] = Field(
+        default=None,
+        max_length=1000,
+        description="Observações internas do terreiro (ex: 'veio com Maria pela 1ª vez')",
+    )
+
+
+# ── Membros ────────────────────────────────────────────────────────────────────
 
 @router.get("")
 def list_membros(
@@ -158,7 +164,7 @@ def update_membro(
     }
 
 
-# ── Lista de consulentes ───────────────────────────────────────────────────────
+# ── Consulentes ────────────────────────────────────────────────────────────────
 
 @router.get("/consulentes-lista")
 def list_consulentes(
@@ -204,6 +210,58 @@ def list_consulentes(
         })
 
     return result
+
+
+@router.patch("/consulentes/{consulente_id}/notas")
+def update_notas_consulente(
+    consulente_id: UUID,
+    data: NotasConsulenteUpdate,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
+    """
+    Atualiza as notas internas do terreiro sobre um consulente (admin/operador).
+
+    Campo livre para anotações como "veio pela primeira vez com Maria",
+    "prefere horário da tarde", "tem restrições de mobilidade", etc.
+    Enviar notas=null ou notas="" limpa o campo.
+    """
+    from app.models.consulente import Consulente
+    from app.models.gira import Gira
+
+    # Valida que o consulente pertence a este terreiro (tem inscrição em alguma gira)
+    consulente = (
+        db.query(Consulente)
+        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
+        .join(Gira, Gira.id == InscricaoGira.gira_id)
+        .filter(
+            Consulente.id == consulente_id,
+            Gira.terreiro_id == user.terreiro_id,
+        )
+        .first()
+    )
+    if not consulente:
+        raise HTTPException(status_code=404, detail="Consulente não encontrado")
+
+    # Sanitiza: strip + limita a 1000 chars; string vazia vira null
+    notas_sanitizadas = None
+    if data.notas:
+        notas_sanitizadas = data.notas.strip()[:1000] or None
+
+    consulente.notas = notas_sanitizadas
+    db.commit()
+
+    logger.info(
+        "[Consulentes] Notas atualizadas para %s por %s",
+        consulente_id,
+        user.id,
+    )
+
+    return {
+        "ok":    True,
+        "id":    str(consulente.id),
+        "notas": consulente.notas,
+    }
 
 
 @router.get("/consulentes/{consulente_id}")
@@ -289,6 +347,8 @@ def get_consulente(
         "telefone":        consulente.telefone,
         "primeira_visita": consulente.primeira_visita,
         "cadastrado_em":   consulente.created_at.isoformat(),
+        # Campo notas retornado para exibição no perfil
+        "notas":             consulente.notas,
         "total_inscricoes":  len(nao_cancelados),
         "comparecimentos":   len(comparecimentos),
         "faltas":            len(faltas),
@@ -425,7 +485,6 @@ def confirmar_presenca_propria(
             db.delete(presenca)
             db.commit()
 
-            # Notifica o terreiro que o membro cancelou a presença
             send_push_to_terreiro(
                 terreiro_id=gira.terreiro_id,
                 title="❌ Presença Cancelada",
@@ -450,7 +509,6 @@ def confirmar_presenca_propria(
     db.add(presenca)
     db.commit()
 
-    # Notifica o terreiro que o membro confirmou presença
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
         title="✅ Presença Confirmada",
@@ -542,7 +600,6 @@ def confirmar_presenca_publica(
             db.delete(presenca)
             db.commit()
 
-            # Notifica o terreiro que o membro cancelou a presença
             send_push_to_terreiro(
                 terreiro_id=gira.terreiro_id,
                 title="❌ Presença Cancelada",
@@ -567,7 +624,6 @@ def confirmar_presenca_publica(
     db.add(presenca)
     db.commit()
 
-    # Notifica o terreiro que o membro confirmou presença
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
         title="✅ Presença Confirmada",

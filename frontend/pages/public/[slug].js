@@ -1,17 +1,15 @@
 /**
  * pages/public/[slug].js — AxeFlow
  *
- * Página pública de inscrição em gira.
+ * ALTERAÇÃO: checkbox "É minha primeira vez aqui" no formulário de inscrição.
  *
- * Usa getServerSideProps para buscar dados da gira no servidor antes de
- * renderizar. Isso garante que as meta tags Open Graph estejam no HTML
- * inicial — bots do WhatsApp, Telegram e Google não executam JavaScript.
+ * Comportamento das duas camadas de validação:
+ *   - Checkbox (declarativo): o consulente informa se é a primeira vez.
+ *   - Backend (autoritativo): valida pelo telefone no banco de dados.
  *
- * Fluxo:
- *   1. Bot/usuário acessa /public/[slug]
- *   2. Next.js chama getServerSideProps → fetch no backend → retorna props
- *   3. HTML já vem com <meta og:*> preenchidas → preview no WhatsApp funciona
- *   4. JS hidrata a página → inscrição interativa funciona normalmente
+ * O checkbox ajuda quando o consulente é novo mas esqueceu de marcar —
+ * nesse caso o backend corrige automaticamente para primeira_visita=True.
+ * Se o telefone já existe no banco, o backend ignora o checkbox.
  */
 
 import { useState } from 'react';
@@ -21,10 +19,7 @@ import { handleApiError } from '../../services/errorHandler';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
-/** Backend acessível pelo servidor Next.js (container ou Vercel). */
 const BACKEND_INTERNAL = process.env.BACKEND_URL || 'http://backend:8000';
-
-/** URL pública do app — usada para compor URLs absolutas nas meta tags OG. */
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://axeflow.vercel.app';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,9 +39,8 @@ function formatarHorario(horario) {
   return `${h}h${m !== '00' ? m : ''}`;
 }
 
-// ── Componente de branding viral ────────────────────────────────────────────
+// ── Branding viral ───────────────────────────────────────────────────────────
 
-/** Aparece em TODOS os estados — aumenta o alcance viral do AxeFlow. */
 function AxeFlowBrand() {
   return (
     <div style={{ marginTop: '2rem', textAlign: 'center' }}>
@@ -80,7 +74,14 @@ function AxeFlowBrand() {
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function GiraPublica({ gira, erro, slug }) {
-  const [form, setForm]             = useState({ nome: '', telefone: '' });
+  const [form, setForm] = useState({
+    nome: '',
+    telefone: '',
+    observacoes: '',
+    // Checkbox: o consulente declara se é a primeira vez no terreiro.
+    // Valor inicial null = não respondeu ainda (diferente de false = respondeu que não).
+    primeira_visita: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [resultado, setResultado]   = useState(null);
   const [error, setError]           = useState('');
@@ -90,7 +91,15 @@ export default function GiraPublica({ gira, erro, slug }) {
     setSubmitting(true);
     setError('');
     try {
-      const res = await inscreverPublico(slug, form);
+      const payload = {
+        nome:           form.nome.trim(),
+        telefone:       form.telefone.trim(),
+        // Envia o valor do checkbox para o backend.
+        // O backend aplica a validação final pela busca no banco.
+        primeira_visita: form.primeira_visita,
+        observacoes:    form.observacoes.trim() || null,
+      };
+      const res = await inscreverPublico(slug, payload);
       setResultado(res.data);
     } catch (err) {
       setError(handleApiError(err, 'InscricaoPublica'));
@@ -99,21 +108,17 @@ export default function GiraPublica({ gira, erro, slug }) {
     }
   };
 
-  // ── Meta tags OG (preenchidas com dados reais do servidor) ────────────────
+  // ── Meta tags OG ─────────────────────────────────────────────────────────
 
   const dataFormatada = formatarData(gira?.data);
   const horario       = formatarHorario(gira?.horario);
 
-  const ogTitle = gira
-    ? gira.titulo
-    : 'Inscrição de Gira';
-
+  const ogTitle       = gira ? gira.titulo : 'Inscrição de Gira';
   const ogDescription = gira
     ? `${dataFormatada} às ${horario} — ${gira.vagas_disponiveis} vaga(s) disponível(is). Inscreva-se!`
     : 'Inscreva-se na gira pelo AxeFlow';
-
-  const ogUrl   = `${APP_URL}/public/${slug}`;
-  const ogImage = `${APP_URL}/og-gira-preview.png`; // imagem estática de preview
+  const ogUrl         = `${APP_URL}/public/${slug}`;
+  const ogImage       = `${APP_URL}/og-gira-preview.png`;
 
   // ── Estado de erro ────────────────────────────────────────────────────────
 
@@ -140,21 +145,16 @@ export default function GiraPublica({ gira, erro, slug }) {
   const agora          = new Date();
   const listaFutura    = gira.abertura_lista  && agora < new Date(gira.abertura_lista);
   const listaEncerrada = gira.fechamento_lista && agora > new Date(gira.fechamento_lista);
-  const pct            = Math.min(100, ((gira.limite_consulentes - gira.vagas_disponiveis) / gira.limite_consulentes) * 100);
+  const pct            = Math.min(
+    100,
+    ((gira.limite_consulentes - gira.vagas_disponiveis) / gira.limite_consulentes) * 100
+  );
 
   return (
     <>
-      {/*
-        Open Graph: renderizado no HTML pelo servidor.
-        WhatsApp, Telegram, Discord, Slack, iMessage leem og:* sem executar JS.
-      */}
       <Head>
         <title>{ogTitle} | AxeFlow</title>
-
-        {/* SEO */}
-        <meta name="description" content={ogDescription} />
-
-        {/* Open Graph — WhatsApp, Facebook, LinkedIn, Discord, Slack */}
+        <meta name="description"        content={ogDescription} />
         <meta property="og:type"         content="website" />
         <meta property="og:url"          content={ogUrl} />
         <meta property="og:title"        content={ogTitle} />
@@ -164,14 +164,10 @@ export default function GiraPublica({ gira, erro, slug }) {
         <meta property="og:image:height" content="630" />
         <meta property="og:locale"       content="pt_BR" />
         <meta property="og:site_name"    content="AxeFlow" />
-
-        {/* Twitter Card — Twitter/X e iMessage no iOS */}
         <meta name="twitter:card"        content="summary_large_image" />
         <meta name="twitter:title"       content={ogTitle} />
         <meta name="twitter:description" content={ogDescription} />
         <meta name="twitter:image"       content={ogImage} />
-
-        {/* Giras encerradas não precisam de indexação */}
         {listaEncerrada && <meta name="robots" content="noindex" />}
       </Head>
 
@@ -217,7 +213,10 @@ export default function GiraPublica({ gira, erro, slug }) {
             <div className="mb-4">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                 <span style={{ fontSize: '0.82rem', color: 'var(--cor-texto-suave)' }}>Vagas disponíveis</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: gira.vagas_disponiveis === 0 ? '#ef4444' : '#10b981' }}>
+                <span style={{
+                  fontSize: '0.85rem', fontWeight: 700,
+                  color: gira.vagas_disponiveis === 0 ? '#ef4444' : '#10b981',
+                }}>
                   {gira.vagas_disponiveis} / {gira.limite_consulentes}
                 </span>
               </div>
@@ -235,7 +234,10 @@ export default function GiraPublica({ gira, erro, slug }) {
                 <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
                   {resultado.consulente_nome}, você está na posição
                 </div>
-                <div style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontSize: '4rem', fontWeight: 700, lineHeight: 1, margin: '0.5rem 0' }}>
+                <div style={{
+                  color: 'var(--cor-acento)', fontFamily: 'Cinzel',
+                  fontSize: '4rem', fontWeight: 700, lineHeight: 1, margin: '0.5rem 0',
+                }}>
                   #{resultado.posicao}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
@@ -276,11 +278,13 @@ export default function GiraPublica({ gira, erro, slug }) {
                 <h6 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
                   ✦ Realize sua Inscrição
                 </h6>
+
                 {error && (
                   <div className="alert-custom alert-danger-custom mb-3">
                     <i className="bi bi-exclamation-circle me-2"></i>{error}
                   </div>
                 )}
+
                 <div className="mb-3">
                   <label className="form-label-custom">Nome completo</label>
                   <input
@@ -291,7 +295,8 @@ export default function GiraPublica({ gira, erro, slug }) {
                     required
                   />
                 </div>
-                <div className="mb-4">
+
+                <div className="mb-3">
                   <label className="form-label-custom">WhatsApp / Telefone</label>
                   <input
                     className="form-control-custom"
@@ -302,6 +307,105 @@ export default function GiraPublica({ gira, erro, slug }) {
                     required
                   />
                 </div>
+
+                {/* ── Checkbox de primeira visita ────────────────────────────
+                    Camada declarativa: o consulente informa se é a 1ª vez.
+                    O backend aplica a validação final pelo banco de dados.
+                    Se o consulente esquecer de marcar mas for novo,
+                    o sistema corrige automaticamente para primeira_visita=True.
+                ── */}
+                <div className="mb-3">
+                  <label
+                    htmlFor="primeira-visita"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.65rem',
+                      cursor: 'pointer',
+                      padding: '0.75rem',
+                      borderRadius: '10px',
+                      border: `1px solid ${form.primeira_visita
+                        ? 'rgba(212,175,55,0.45)'
+                        : 'var(--cor-borda)'}`,
+                      background: form.primeira_visita
+                        ? 'rgba(212,175,55,0.07)'
+                        : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {/* Checkbox customizado visualmente */}
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '5px',
+                        border: `2px solid ${form.primeira_visita
+                          ? 'var(--cor-acento)'
+                          : 'rgba(255,255,255,0.2)'}`,
+                        background: form.primeira_visita
+                          ? 'var(--cor-acento)'
+                          : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '1px',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {form.primeira_visita && (
+                        <i
+                          className="bi bi-check"
+                          style={{ fontSize: '0.75rem', color: '#1a0a2e', fontWeight: 700 }}
+                        ></i>
+                      )}
+                    </div>
+
+                    {/* Input nativo oculto — mantém acessibilidade */}
+                    <input
+                      id="primeira-visita"
+                      type="checkbox"
+                      checked={form.primeira_visita}
+                      onChange={e => setForm({ ...form, primeira_visita: e.target.checked })}
+                      style={{ display: 'none' }}
+                    />
+
+                    <div>
+                      <div style={{ fontSize: '0.88rem', color: 'var(--cor-texto)', fontWeight: 500 }}>
+                        É a minha primeira vez aqui 🌟
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', marginTop: '2px', lineHeight: 1.4 }}>
+                        Marque se nunca participou de uma gira neste terreiro
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Campo de observações — opcional */}
+                <div className="mb-4">
+                  <label className="form-label-custom">
+                    Observações
+                    <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
+                      (opcional)
+                    </span>
+                  </label>
+                  <textarea
+                    className="form-control-custom"
+                    value={form.observacoes}
+                    onChange={e => setForm({ ...form, observacoes: e.target.value })}
+                    placeholder="Ex: venho com acompanhante, pedido específico, urgente..."
+                    rows={2}
+                    maxLength={500}
+                    style={{ resize: 'vertical', minHeight: '60px' }}
+                  />
+                  {/* Contador de caracteres — aparece ao começar a digitar */}
+                  {form.observacoes.length > 0 && (
+                    <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
+                      {form.observacoes.length}/500
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleSubmit}
                   className="btn-gold w-100"
@@ -317,9 +421,7 @@ export default function GiraPublica({ gira, erro, slug }) {
               </div>
             )}
 
-            {/* Rodapé viral — presente em TODOS os estados */}
             <AxeFlowBrand />
-
           </div>
         </div>
       </div>

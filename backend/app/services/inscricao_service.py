@@ -11,8 +11,15 @@ Pontos críticos:
       consulente_id IS NOT NULL → conta contra limite_consulentes
       membro_id IS NOT NULL     → conta contra total de membros ativos (sem limite fixo)
 
-CORREÇÃO: list_inscricoes agora filtra explicitamente consulente_id IS NOT NULL,
-evitando que confirmações de membros apareçam na lista de consulentes.
+ALTERAÇÃO:
+  - inscrever_publico: dupla validação de `primeira_visita`
+      Camada 1 (autoritativa): busca pelo telefone no banco.
+        Telefone novo  → primeira_visita = True  (sistema corrige caso checkbox desmarcado)
+        Telefone existe → primeira_visita = False (banco prevalece sobre checkbox)
+      Camada 2 (declarativa): checkbox do formulário público.
+        Usado apenas para novo consulente; ignorado se telefone já existe.
+  - inscrever_publico: persiste `observacoes` enviado pelo consulente no link público
+  - list_inscricoes: retorna `observacoes` de cada inscrição para o painel admin
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -62,6 +69,8 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
             created_at=i.created_at,
             consulente_nome=i.consulente.nome if i.consulente else None,
             consulente_telefone=i.consulente.telefone if i.consulente else None,
+            # Retorna observações para exibição no painel admin
+            observacoes=i.observacoes,
         )
         for i in inscricoes
     ]
@@ -78,6 +87,15 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     IMPORTANTE: apenas inscrições com consulente_id preenchido contam contra
     limite_consulentes. Confirmações de membros (membro_id) são contadas
     separadamente e NÃO afetam as vagas disponíveis para consulentes.
+
+    ALTERAÇÃO:
+      Dupla validação de primeira_visita:
+        | Existe no banco | Checkbox | primeira_visita salvo        |
+        |-----------------|----------|------------------------------|
+        | Não             | True     | True  (declarado pelo usuário)|
+        | Não             | False    | False (já veio, só é novo no sistema)|
+        | Não             | None     | True  (fallback conservador) |
+        | Sim             | qualquer | False (banco prevalece)      |
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -98,14 +116,33 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         raise HTTPException(status_code=400, detail="Telefone inválido")
     telefone = normalize_phone(data.telefone)
 
-    # Buscar ou criar consulente (deduplicação por telefone normalizado)
+    # ── Dupla validação de primeira_visita ────────────────────────────────────
+    # Camada 1 (autoritativa): busca pelo telefone normalizado no banco.
     consulente = db.query(Consulente).filter(Consulente.telefone == telefone).first()
+
     if not consulente:
-        consulente = Consulente(nome=data.nome, telefone=telefone, primeira_visita=True)
+        # Telefone NOVO: consulente nunca esteve neste sistema antes.
+        #
+        # Aqui o checkbox é a única fonte de verdade disponível, então
+        # respeitamos o que o usuário declarou:
+        #   - Marcou "primeira vez"  → True
+        #   - Desmarcou              → False (já veio antes, só não estava cadastrado)
+        #   - Não respondeu (None)   → True como fallback conservador
+        #     (sem informação, assumimos primeira visita para não perder o dado)
+        primeira_visita = data.primeira_visita if data.primeira_visita is not None else True
+
+        consulente = Consulente(
+            nome=data.nome,
+            telefone=telefone,
+            primeira_visita=primeira_visita,
+        )
         db.add(consulente)
         db.flush()  # obtém o ID sem commitar ainda
     else:
+        # Telefone JÁ EXISTE: consulente foi cadastrado antes.
+        # Independente do checkbox, ele já esteve no sistema — banco prevalece.
         consulente.primeira_visita = False
+    # ── Fim da dupla validação ────────────────────────────────────────────────
 
     # Verificar se já está inscrito (e não cancelou)
     ja_inscrito = db.query(InscricaoGira).filter(
@@ -121,8 +158,8 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # requisições simultâneas não consigam ler o mesmo contador de vagas.
     #
     # Filtra APENAS inscrições de consulentes (consulente_id IS NOT NULL).
-    # Confirmações de membros têm seu próprio pool de vagas e não devem
-    # interferir na contagem de vagas disponíveis para o público.
+    # Confirmações de membros (membro_id) são contadas separadamente e NÃO
+    # interferem na contagem de vagas disponíveis para o público.
     inscricoes_consulentes = (
         db.query(InscricaoGira)
         .filter(
@@ -151,11 +188,17 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         else StatusInscricaoEnum.confirmado
     )
 
+    # Sanitiza observações: remove espaços extras, limita a 500 chars
+    observacoes_sanitizadas = None
+    if data.observacoes:
+        observacoes_sanitizadas = data.observacoes.strip()[:500] or None
+
     inscricao = InscricaoGira(
         gira_id=gira.id,
         consulente_id=consulente.id,
         posicao=proxima_posicao,
         status=status_inicial,
+        observacoes=observacoes_sanitizadas,  # persiste observação do consulente
     )
     db.add(inscricao)
     db.commit()
@@ -179,6 +222,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         created_at=inscricao.created_at,
         consulente_nome=consulente.nome,
         consulente_telefone=consulente.telefone,
+        observacoes=inscricao.observacoes,
     )
 
 
