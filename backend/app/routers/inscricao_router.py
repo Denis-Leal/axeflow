@@ -2,7 +2,12 @@
 inscricao_router.py — AxeFlow
 Gerenciamento de inscrições de consulentes e presenças de membros.
 
-CORREÇÃO: list_inscricoes agora filtra apenas consulentes externos
+ADIÇÃO:
+  - Endpoint /consulentes/{id}/perfil: campo `observacoes` incluído
+    em cada item do histórico, para exibir a mensagem deixada pelo
+    consulente na inscrição daquela gira específica.
+
+CORREÇÃO: list_inscricoes filtra apenas consulentes externos
 (consulente_id IS NOT NULL), evitando que confirmações de membros
 apareçam misturadas na lista de consulentes.
 """
@@ -34,7 +39,7 @@ def list_inscricoes(
     """
     Lista inscrições de CONSULENTES da gira com score de presença histórico.
 
-    IMPORTANTE: filtra apenas inscrições onde consulente_id IS NOT NULL.
+    Filtra apenas inscrições onde consulente_id IS NOT NULL.
     Confirmações de membros (membro_id IS NOT NULL) são retornadas pelo
     endpoint /giras/{id}/presenca-membros e NÃO devem aparecer aqui.
     """
@@ -96,15 +101,21 @@ def perfil_consulente(
     """
     Perfil completo do consulente — CRM espiritual.
     Retorna histórico completo de visitas, frequência, padrões e score.
+
+    ADIÇÃO: cada item do histórico inclui `observacoes`, que é a mensagem
+    deixada pelo próprio consulente no momento da inscrição naquela gira.
     """
     c = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
 
-    # Apenas giras deste terreiro
+    # Apenas giras deste terreiro (sem soft-deleted)
     gira_ids = {
         str(g.id): g
-        for g in db.query(Gira).filter(Gira.terreiro_id == user.terreiro_id).all()
+        for g in db.query(Gira).filter(
+            Gira.terreiro_id == user.terreiro_id,
+            Gira.deleted_at.is_(None),
+        ).all()
     }
 
     inscricoes = (
@@ -117,7 +128,7 @@ def perfil_consulente(
         .all()
     )
 
-    # Histórico detalhado de cada visita
+    # Histórico detalhado de cada visita — inclui observacoes da inscrição
     historico = []
     ultima_presenca = None
     for i in inscricoes:
@@ -133,6 +144,9 @@ def perfil_consulente(
             "posicao":      i.posicao,
             "status":       i.status,
             "inscrito_em":  i.created_at.isoformat(),
+            # Observação deixada pelo consulente na hora da inscrição
+            # None quando não preenchida (campo opcional no formulário público)
+            "observacoes":  i.observacoes,
         }
         historico.append(entrada)
         if i.status == "compareceu" and ultima_presenca is None:
@@ -144,7 +158,7 @@ def perfil_consulente(
     faltas          = [i for i in inscricoes if i.status == "faltou"]
     cancelamentos   = [i for i in inscricoes if i.status == "cancelado"]
 
-    # Tipos de gira que mais frequentou
+    # Tipos de gira que mais frequentou (baseado em comparecimentos)
     tipos: dict[str, int] = {}
     for i in comparecimentos:
         g = gira_ids.get(str(i.gira_id))
@@ -166,16 +180,18 @@ def perfil_consulente(
         "nome":            c.nome,
         "telefone":        c.telefone,
         "primeira_visita": c.primeira_visita,
-        "cadastrado_em":   c.created_at.isoformat() if c.created_at else None,
+        "cadastrado_em":   c.created_at.isoformat(),
+        # Notas internas do terreiro sobre o consulente
+        "notas":           c.notas,
 
         # Score de confiabilidade
         "score": score,
 
-        # Campos esperados pelo frontend de perfil
+        # Contadores para os cards de métricas
         "comparecimentos": len(comparecimentos),
         "faltas":          len(faltas),
 
-        # Status de retorno
+        # Status de retorno baseado na última presença
         "status_retorno": (
             "nunca_compareceu" if not datas_presenca
             else "ativo"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 60)
@@ -201,6 +217,6 @@ def perfil_consulente(
             "tipos_favoritos":   tipos_ordenados[:3],
         },
 
-        # Histórico completo de visitas
+        # Histórico completo — cada item inclui observacoes da inscrição
         "historico": historico,
     }
