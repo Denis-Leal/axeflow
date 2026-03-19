@@ -68,11 +68,11 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
 
     novo = Usuario(
         terreiro_id=user.terreiro_id,
-        nome=data["nome"],
-        email=data["email"],
-        telefone=data.get("telefone", ""),
-        senha_hash=hash_password(data["senha"]),
-        role=data.get("role", "membro"),
+        nome=data.nome,
+        email=data.email,
+        telefone=data.telefone,
+        senha_hash=hash_password(data.senha),
+        role=data.role,
     )
     db.add(novo)
     db.commit()
