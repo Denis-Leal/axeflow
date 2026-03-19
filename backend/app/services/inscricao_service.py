@@ -7,6 +7,9 @@ Pontos críticos:
   - Telefone normalizado antes de qualquer consulta (evita duplicatas silenciosas)
   - Soft delete em giras (filtra deleted_at IS NULL)
   - Status lista_espera quando gira está lotada
+  - Vagas de consulentes e vagas de membros são contadas SEPARADAMENTE:
+      consulente_id IS NOT NULL → conta contra limite_consulentes
+      membro_id IS NOT NULL     → conta contra total de membros ativos (sem limite fixo)
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -58,6 +61,10 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     Usa SELECT FOR UPDATE na contagem de vagas para evitar race condition:
     sem o lock, duas requisições simultâneas podem ambas passar pela verificação
     de vagas e criar inscrições além do limite.
+
+    IMPORTANTE: apenas inscrições com consulente_id preenchido contam contra
+    limite_consulentes. Confirmações de membros (membro_id) são contadas
+    separadamente e NÃO afetam as vagas disponíveis para consulentes.
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -99,10 +106,15 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # ── CONTROLE DE CONCORRÊNCIA ──────────────────────────────────────────────
     # SELECT FOR UPDATE: bloqueia as linhas durante a transação para que
     # requisições simultâneas não consigam ler o mesmo contador de vagas.
-    inscricoes_ativas = (
+    #
+    # Filtra APENAS inscrições de consulentes (consulente_id IS NOT NULL).
+    # Confirmações de membros têm seu próprio pool de vagas e não devem
+    # interferir na contagem de vagas disponíveis para o público.
+    inscricoes_consulentes = (
         db.query(InscricaoGira)
         .filter(
             InscricaoGira.gira_id == gira.id,
+            InscricaoGira.consulente_id.isnot(None),  # apenas consulentes externos
             InscricaoGira.status.in_([
                 StatusInscricaoEnum.confirmado,
                 StatusInscricaoEnum.lista_espera,
@@ -112,14 +124,15 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         .all()
     )
 
-    confirmados = sum(
-        1 for i in inscricoes_ativas
+    confirmados_consulentes = sum(
+        1 for i in inscricoes_consulentes
         if i.status == StatusInscricaoEnum.confirmado
     )
-    proxima_posicao = len(inscricoes_ativas) + 1
+    # Posição na fila considera apenas consulentes (membros têm lista separada)
+    proxima_posicao = len(inscricoes_consulentes) + 1
 
-    # Se atingiu limite → entra na lista de espera em vez de erro
-    if confirmados >= gira.limite_consulentes:
+    # Se atingiu limite de consulentes → entra na lista de espera
+    if confirmados_consulentes >= gira.limite_consulentes:
         status_inicial = StatusInscricaoEnum.lista_espera
     else:
         status_inicial = StatusInscricaoEnum.confirmado
@@ -140,7 +153,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         title="👤 Nova Inscrição",
         body=(
             f"{data.nome} se inscreveu na {gira.titulo} "
-            f"(vaga {confirmados + 1}/{gira.limite_consulentes})"
+            f"(vaga {confirmados_consulentes + 1}/{gira.limite_consulentes})"
         ),
         url=f"/giras/{gira.id}",
     )
