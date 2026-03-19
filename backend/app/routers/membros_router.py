@@ -5,11 +5,14 @@ Gerenciamento de membros, presença em giras e consulentes.
 ADIÇÕES (sem alterar endpoints existentes):
   - GET  /membros/giras/{id}/presenca-membros-publica
       Retorna lista de membros com status de presença para giras PÚBLICAS.
-      Reutiliza a mesma estrutura de resposta do endpoint de giras fechadas.
 
   - POST /membros/giras/{id}/confirmar-presenca-publica
       O próprio membro confirma/cancela presença em gira PÚBLICA.
-      Comportamento idêntico ao confirmar-presenca, mas sem validar acesso=='fechada'.
+
+CORREÇÃO:
+  - Adicionado send_push_to_terreiro nos endpoints de confirmação de presença
+    (confirmar-presenca e confirmar-presenca-publica), notificando o terreiro
+    quando um membro confirma ou cancela sua presença.
 """
 import logging
 from typing import Optional
@@ -24,6 +27,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role, hash_password
 from app.models.usuario import Usuario
 from app.services.email_service import send_convite_membro
+from app.services.push_service import send_push_to_terreiro
 from app.models.terreiro import Terreiro
 from app.models.gira import Gira as GiraModel
 from app.models.inscricao import InscricaoGira
@@ -33,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/membros", tags=["membros"])
 
+
 class MembroCreate(BaseModel):
     nome: str
     email: EmailStr
@@ -40,8 +45,12 @@ class MembroCreate(BaseModel):
     telefone: Optional[str] = None
     role: str = "membro"
 
+
 @router.get("")
-def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_membros(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Lista todos os membros ativos do terreiro."""
     membros = db.query(Usuario).filter(
         Usuario.terreiro_id == user.terreiro_id,
@@ -61,7 +70,11 @@ def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depend
 
 
 @router.post("")
-def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):
+def create_membro(
+    data: MembroCreate,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
     existing = db.query(Usuario).filter(Usuario.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -78,11 +91,9 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
     db.commit()
     db.refresh(novo)
 
-    # Buscar nome do terreiro para o email
     terreiro = db.query(Terreiro).filter(Terreiro.id == user.terreiro_id).first()
     terreiro_nome = terreiro.nome if terreiro else "seu terreiro"
 
-    # Enviar email de convite (assíncrono — não bloqueia a resposta)
     try:
         enviado = send_convite_membro(
             nome=data.nome,
@@ -93,7 +104,10 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
             app_url=settings.APP_URL,
         )
         if not enviado:
-            logger.warning("[Membros] Email de convite não enviado para %s (BREVO_API_KEY configurada?)", data.email)
+            logger.warning(
+                "[Membros] Email de convite não enviado para %s (BREVO_API_KEY configurada?)",
+                data.email,
+            )
     except Exception as e:
         logger.error("[Membros] Erro ao enviar email de convite: %s", e)
 
@@ -121,16 +135,16 @@ def update_membro(
     if not membro:
         raise HTTPException(status_code=404, detail="Membro não encontrado")
 
-    # Admin não pode desativar a si mesmo
     if str(membro.id) == str(user.id) and data.get("ativo") is False:
         raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta")
 
-    if "nome"     in data: membro.nome      = data["nome"]
-    if "telefone" in data: membro.telefone  = data["telefone"]
-    if "role"     in data and data["role"] in ["admin", "operador", "membro"]:
+    if "nome"     in data: membro.nome     = data["nome"]
+    if "telefone" in data: membro.telefone = data["telefone"]
+    if "role"     in data and data["role"] in ("admin", "operador", "membro"):
         membro.role = data["role"]
-    if "ativo"    in data: membro.ativo     = bool(data["ativo"])
-    if "senha"    in data and data["senha"]: membro.senha_hash = hash_password(data["senha"])
+    if "ativo"    in data: membro.ativo    = bool(data["ativo"])
+    if "senha"    in data and data["senha"]:
+        membro.senha_hash = hash_password(data["senha"])
 
     db.commit()
     db.refresh(membro)
@@ -147,40 +161,44 @@ def update_membro(
 # ── Lista de consulentes ───────────────────────────────────────────────────────
 
 @router.get("/consulentes-lista")
-def list_consulentes(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_consulentes(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Retorna todos os consulentes que já se inscreveram em giras deste terreiro,
     incluindo primeira_visita, total de inscrições e comparecimentos.
     """
     from app.models.consulente import Consulente
-    from app.models.inscricao import InscricaoGira
     from app.models.gira import Gira
 
-    consulentes = db.query(Consulente).join(
-        InscricaoGira, InscricaoGira.consulente_id == Consulente.id
-    ).join(
-        Gira, Gira.id == InscricaoGira.gira_id
-    ).filter(
-        Gira.terreiro_id == user.terreiro_id,
-    ).distinct().all()
+    consulentes = (
+        db.query(Consulente)
+        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
+        .join(Gira, Gira.id == InscricaoGira.gira_id)
+        .filter(Gira.terreiro_id == user.terreiro_id)
+        .distinct()
+        .all()
+    )
 
     result = []
     for c in consulentes:
-        inscricoes = db.query(InscricaoGira).join(
-            Gira, Gira.id == InscricaoGira.gira_id
-        ).filter(
-            InscricaoGira.consulente_id == c.id,
-            Gira.terreiro_id == user.terreiro_id,
-        ).all()
-
-        total       = len([i for i in inscricoes if i.status != "cancelado"])
-        compareceu  = len([i for i in inscricoes if i.status == "compareceu"])
-
+        inscricoes = (
+            db.query(InscricaoGira)
+            .join(Gira, Gira.id == InscricaoGira.gira_id)
+            .filter(
+                InscricaoGira.consulente_id == c.id,
+                Gira.terreiro_id == user.terreiro_id,
+            )
+            .all()
+        )
+        total      = len([i for i in inscricoes if i.status != "cancelado"])
+        compareceu = len([i for i in inscricoes if i.status == "compareceu"])
         result.append({
-            "id":              str(c.id),
-            "nome":            c.nome,
-            "telefone":        c.telefone,
-            "primeira_visita": c.primeira_visita,
+            "id":               str(c.id),
+            "nome":             c.nome,
+            "telefone":         c.telefone,
+            "primeira_visita":  c.primeira_visita,
             "total_inscricoes": total,
             "comparecimentos":  compareceu,
         })
@@ -196,32 +214,35 @@ def get_consulente(
 ):
     """Retorna perfil detalhado de um consulente com histórico e score."""
     from app.models.consulente import Consulente
-    from app.models.inscricao import InscricaoGira
     from app.models.gira import Gira
 
-    consulente = db.query(Consulente).join(
-        InscricaoGira, InscricaoGira.consulente_id == Consulente.id
-    ).join(
-        Gira, Gira.id == InscricaoGira.gira_id
-    ).filter(
-        Consulente.id == consulente_id,
-        Gira.terreiro_id == user.terreiro_id,
-    ).first()
-
+    consulente = (
+        db.query(Consulente)
+        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
+        .join(Gira, Gira.id == InscricaoGira.gira_id)
+        .filter(
+            Consulente.id == consulente_id,
+            Gira.terreiro_id == user.terreiro_id,
+        )
+        .first()
+    )
     if not consulente:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
 
-    inscricoes = db.query(InscricaoGira).join(
-        Gira, Gira.id == InscricaoGira.gira_id
-    ).filter(
-        InscricaoGira.consulente_id == consulente_id,
-        Gira.terreiro_id == user.terreiro_id,
-    ).all()
+    inscricoes = (
+        db.query(InscricaoGira)
+        .join(Gira, Gira.id == InscricaoGira.gira_id)
+        .filter(
+            InscricaoGira.consulente_id == consulente_id,
+            Gira.terreiro_id == user.terreiro_id,
+        )
+        .all()
+    )
 
-    def calcular_score(total, compareceu, faltas):
-        if total == 0: return 0
-        taxa = compareceu / total
-        return round(taxa * 100)
+    def calcular_score(total: int, compareceu: int, faltas: int) -> int:
+        if total == 0:
+            return 0
+        return round((compareceu / total) * 100)
 
     historico = []
     for i in inscricoes:
@@ -249,7 +270,7 @@ def get_consulente(
         delta = date.today() - date.fromisoformat(ultima_visita)
         dias_ausente = delta.days
 
-    tipos = {}
+    tipos: dict[str, int] = {}
     for h in comparecimentos:
         t = h["gira_tipo"] or "Não especificado"
         tipos[t] = tipos.get(t, 0) + 1
@@ -257,17 +278,17 @@ def get_consulente(
 
     score = calcular_score(len(nao_cancelados), len(comparecimentos), len(faltas))
 
-    if dias_ausente is None:          status_retorno = "nunca_compareceu"
-    elif dias_ausente <= 60:          status_retorno = "ativo"
-    elif dias_ausente <= 180:         status_retorno = "morno"
-    else:                             status_retorno = "inativo"
+    if dias_ausente is None:    status_retorno = "nunca_compareceu"
+    elif dias_ausente <= 60:    status_retorno = "ativo"
+    elif dias_ausente <= 180:   status_retorno = "morno"
+    else:                       status_retorno = "inativo"
 
     return {
-        "id":            str(consulente.id),
-        "nome":          consulente.nome,
-        "telefone":      consulente.telefone,
+        "id":              str(consulente.id),
+        "nome":            consulente.nome,
+        "telefone":        consulente.telefone,
         "primeira_visita": consulente.primeira_visita,
-        "cadastrado_em": consulente.created_at.isoformat(),
+        "cadastrado_em":   consulente.created_at.isoformat(),
         "total_inscricoes":  len(nao_cancelados),
         "comparecimentos":   len(comparecimentos),
         "faltas":            len(faltas),
@@ -300,7 +321,7 @@ def get_presenca_membros(
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-    if getattr(gira, 'acesso', 'publica') != 'fechada':
+    if getattr(gira, "acesso", "publica") != "fechada":
         raise HTTPException(status_code=400, detail="Esta gira é pública — use a lista de inscrições")
 
     membros = db.query(Usuario).filter(
@@ -383,6 +404,8 @@ def confirmar_presenca_propria(
     """
     O próprio membro confirma/cancela presença em gira FECHADA.
     Toggle: confirmar → cancelar → confirmar…
+
+    Envia push notification ao terreiro informando a ação do membro.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -390,7 +413,7 @@ def confirmar_presenca_propria(
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-    if getattr(gira, 'acesso', 'publica') != 'fechada':
+    if getattr(gira, "acesso", "publica") != "fechada":
         raise HTTPException(status_code=400, detail="Esta gira é pública")
 
     presenca = db.query(InscricaoGira).filter(
@@ -401,10 +424,21 @@ def confirmar_presenca_propria(
         if presenca.status == "confirmado":
             db.delete(presenca)
             db.commit()
+
+            # Notifica o terreiro que o membro cancelou a presença
+            send_push_to_terreiro(
+                terreiro_id=gira.terreiro_id,
+                title="❌ Presença Cancelada",
+                body=f"{user.nome} cancelou a presença na {gira.titulo}",
+                url=f"/giras/{gira.id}",
+            )
+
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
+
         # Admin já marcou compareceu/faltou — membro não pode reverter
         return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
 
+    # Cria nova confirmação de presença
     max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
     presenca = InscricaoGira(
         gira_id=gira_id,
@@ -415,6 +449,15 @@ def confirmar_presenca_propria(
     )
     db.add(presenca)
     db.commit()
+
+    # Notifica o terreiro que o membro confirmou presença
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
+        title="✅ Presença Confirmada",
+        body=f"{user.nome} confirmou presença na {gira.titulo}",
+        url=f"/giras/{gira.id}",
+    )
+
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
 
 
@@ -439,7 +482,7 @@ def get_presenca_membros_publica(
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-    if getattr(gira, 'acesso', 'publica') != 'publica':
+    if getattr(gira, "acesso", "publica") != "publica":
         raise HTTPException(status_code=400, detail="Esta gira é fechada — use presenca-membros")
 
     membros = db.query(Usuario).filter(
@@ -478,6 +521,8 @@ def confirmar_presenca_publica(
 
     Comportamento idêntico ao confirmar-presenca (giras fechadas),
     mas aceita giras com acesso == 'publica'.
+
+    Envia push notification ao terreiro informando a ação do membro.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -485,7 +530,7 @@ def confirmar_presenca_publica(
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-    if getattr(gira, 'acesso', 'publica') != 'publica':
+    if getattr(gira, "acesso", "publica") != "publica":
         raise HTTPException(status_code=400, detail="Esta gira é fechada — use confirmar-presenca")
 
     presenca = db.query(InscricaoGira).filter(
@@ -496,10 +541,21 @@ def confirmar_presenca_publica(
         if presenca.status == "confirmado":
             db.delete(presenca)
             db.commit()
+
+            # Notifica o terreiro que o membro cancelou a presença
+            send_push_to_terreiro(
+                terreiro_id=gira.terreiro_id,
+                title="❌ Presença Cancelada",
+                body=f"{user.nome} cancelou a presença na {gira.titulo}",
+                url=f"/giras/{gira.id}",
+            )
+
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
+
         # Admin já marcou compareceu/faltou — membro não pode reverter
         return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
 
+    # Cria nova confirmação de presença
     max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
     presenca = InscricaoGira(
         gira_id=gira_id,
@@ -510,4 +566,13 @@ def confirmar_presenca_publica(
     )
     db.add(presenca)
     db.commit()
+
+    # Notifica o terreiro que o membro confirmou presença
+    send_push_to_terreiro(
+        terreiro_id=gira.terreiro_id,
+        title="✅ Presença Confirmada",
+        body=f"{user.nome} confirmou presença na {gira.titulo}",
+        url=f"/giras/{gira.id}",
+    )
+
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
