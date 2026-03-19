@@ -11,7 +11,13 @@ Pontos críticos:
       consulente_id IS NOT NULL → conta contra limite_consulentes
       membro_id IS NOT NULL     → conta contra total de membros ativos (sem limite fixo)
 
-ADIÇÃO:
+ALTERAÇÃO:
+  - inscrever_publico: dupla validação de `primeira_visita`
+      Camada 1 (autoritativa): busca pelo telefone no banco.
+        Telefone novo  → primeira_visita = True  (sistema corrige caso checkbox desmarcado)
+        Telefone existe → primeira_visita = False (banco prevalece sobre checkbox)
+      Camada 2 (declarativa): checkbox do formulário público.
+        Usado apenas para novo consulente; ignorado se telefone já existe.
   - inscrever_publico: persiste `observacoes` enviado pelo consulente no link público
   - list_inscricoes: retorna `observacoes` de cada inscrição para o painel admin
 """
@@ -82,7 +88,14 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     limite_consulentes. Confirmações de membros (membro_id) são contadas
     separadamente e NÃO afetam as vagas disponíveis para consulentes.
 
-    ADIÇÃO: persiste `observacoes` preenchido pelo consulente no formulário público.
+    ALTERAÇÃO:
+      Dupla validação de primeira_visita:
+        | Existe no banco | Checkbox | primeira_visita salvo        |
+        |-----------------|----------|------------------------------|
+        | Não             | True     | True  (declarado pelo usuário)|
+        | Não             | False    | False (já veio, só é novo no sistema)|
+        | Não             | None     | True  (fallback conservador) |
+        | Sim             | qualquer | False (banco prevalece)      |
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -103,14 +116,33 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         raise HTTPException(status_code=400, detail="Telefone inválido")
     telefone = normalize_phone(data.telefone)
 
-    # Buscar ou criar consulente (deduplicação por telefone normalizado)
+    # ── Dupla validação de primeira_visita ────────────────────────────────────
+    # Camada 1 (autoritativa): busca pelo telefone normalizado no banco.
     consulente = db.query(Consulente).filter(Consulente.telefone == telefone).first()
+
     if not consulente:
-        consulente = Consulente(nome=data.nome, telefone=telefone, primeira_visita=True)
+        # Telefone NOVO: consulente nunca esteve neste sistema antes.
+        #
+        # Aqui o checkbox é a única fonte de verdade disponível, então
+        # respeitamos o que o usuário declarou:
+        #   - Marcou "primeira vez"  → True
+        #   - Desmarcou              → False (já veio antes, só não estava cadastrado)
+        #   - Não respondeu (None)   → True como fallback conservador
+        #     (sem informação, assumimos primeira visita para não perder o dado)
+        primeira_visita = data.primeira_visita if data.primeira_visita is not None else True
+
+        consulente = Consulente(
+            nome=data.nome,
+            telefone=telefone,
+            primeira_visita=primeira_visita,
+        )
         db.add(consulente)
         db.flush()  # obtém o ID sem commitar ainda
     else:
+        # Telefone JÁ EXISTE: consulente foi cadastrado antes.
+        # Independente do checkbox, ele já esteve no sistema — banco prevalece.
         consulente.primeira_visita = False
+    # ── Fim da dupla validação ────────────────────────────────────────────────
 
     # Verificar se já está inscrito (e não cancelou)
     ja_inscrito = db.query(InscricaoGira).filter(

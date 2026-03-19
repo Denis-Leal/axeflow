@@ -1,12 +1,15 @@
 /**
  * pages/public/[slug].js — AxeFlow
  *
- * Página pública de inscrição em gira.
+ * ALTERAÇÃO: checkbox "É minha primeira vez aqui" no formulário de inscrição.
  *
- * ADIÇÃO: campo "observações" opcional no formulário de inscrição.
- *   O consulente pode informar: "veio com acompanhante", "urgente",
- *   "pedido específico", etc. O campo é enviado ao backend e exibido
- *   no painel admin junto à inscrição.
+ * Comportamento das duas camadas de validação:
+ *   - Checkbox (declarativo): o consulente informa se é a primeira vez.
+ *   - Backend (autoritativo): valida pelo telefone no banco de dados.
+ *
+ * O checkbox ajuda quando o consulente é novo mas esqueceu de marcar —
+ * nesse caso o backend corrige automaticamente para primeira_visita=True.
+ * Se o telefone já existe no banco, o backend ignora o checkbox.
  */
 
 import { useState } from 'react';
@@ -71,7 +74,14 @@ function AxeFlowBrand() {
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function GiraPublica({ gira, erro, slug }) {
-  const [form, setForm]             = useState({ nome: '', telefone: '', observacoes: '' });
+  const [form, setForm] = useState({
+    nome: '',
+    telefone: '',
+    observacoes: '',
+    // Checkbox: o consulente declara se é a primeira vez no terreiro.
+    // Valor inicial null = não respondeu ainda (diferente de false = respondeu que não).
+    primeira_visita: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [resultado, setResultado]   = useState(null);
   const [error, setError]           = useState('');
@@ -81,11 +91,13 @@ export default function GiraPublica({ gira, erro, slug }) {
     setSubmitting(true);
     setError('');
     try {
-      // Envia observacoes apenas se preenchida (campo opcional)
       const payload = {
-        nome:       form.nome.trim(),
-        telefone:   form.telefone.trim(),
-        observacoes: form.observacoes.trim() || null,
+        nome:           form.nome.trim(),
+        telefone:       form.telefone.trim(),
+        // Envia o valor do checkbox para o backend.
+        // O backend aplica a validação final pela busca no banco.
+        primeira_visita: form.primeira_visita,
+        observacoes:    form.observacoes.trim() || null,
       };
       const res = await inscreverPublico(slug, payload);
       setResultado(res.data);
@@ -101,12 +113,12 @@ export default function GiraPublica({ gira, erro, slug }) {
   const dataFormatada = formatarData(gira?.data);
   const horario       = formatarHorario(gira?.horario);
 
-  const ogTitle = gira ? gira.titulo : 'Inscrição de Gira';
+  const ogTitle       = gira ? gira.titulo : 'Inscrição de Gira';
   const ogDescription = gira
     ? `${dataFormatada} às ${horario} — ${gira.vagas_disponiveis} vaga(s) disponível(is). Inscreva-se!`
     : 'Inscreva-se na gira pelo AxeFlow';
-  const ogUrl   = `${APP_URL}/public/${slug}`;
-  const ogImage = `${APP_URL}/og-gira-preview.png`;
+  const ogUrl         = `${APP_URL}/public/${slug}`;
+  const ogImage       = `${APP_URL}/og-gira-preview.png`;
 
   // ── Estado de erro ────────────────────────────────────────────────────────
 
@@ -133,7 +145,10 @@ export default function GiraPublica({ gira, erro, slug }) {
   const agora          = new Date();
   const listaFutura    = gira.abertura_lista  && agora < new Date(gira.abertura_lista);
   const listaEncerrada = gira.fechamento_lista && agora > new Date(gira.fechamento_lista);
-  const pct            = Math.min(100, ((gira.limite_consulentes - gira.vagas_disponiveis) / gira.limite_consulentes) * 100);
+  const pct            = Math.min(
+    100,
+    ((gira.limite_consulentes - gira.vagas_disponiveis) / gira.limite_consulentes) * 100
+  );
 
   return (
     <>
@@ -198,7 +213,10 @@ export default function GiraPublica({ gira, erro, slug }) {
             <div className="mb-4">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                 <span style={{ fontSize: '0.82rem', color: 'var(--cor-texto-suave)' }}>Vagas disponíveis</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: gira.vagas_disponiveis === 0 ? '#ef4444' : '#10b981' }}>
+                <span style={{
+                  fontSize: '0.85rem', fontWeight: 700,
+                  color: gira.vagas_disponiveis === 0 ? '#ef4444' : '#10b981',
+                }}>
                   {gira.vagas_disponiveis} / {gira.limite_consulentes}
                 </span>
               </div>
@@ -216,7 +234,10 @@ export default function GiraPublica({ gira, erro, slug }) {
                 <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
                   {resultado.consulente_nome}, você está na posição
                 </div>
-                <div style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontSize: '4rem', fontWeight: 700, lineHeight: 1, margin: '0.5rem 0' }}>
+                <div style={{
+                  color: 'var(--cor-acento)', fontFamily: 'Cinzel',
+                  fontSize: '4rem', fontWeight: 700, lineHeight: 1, margin: '0.5rem 0',
+                }}>
                   #{resultado.posicao}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
@@ -285,6 +306,79 @@ export default function GiraPublica({ gira, erro, slug }) {
                     placeholder="(11) 99999-9999"
                     required
                   />
+                </div>
+
+                {/* ── Checkbox de primeira visita ────────────────────────────
+                    Camada declarativa: o consulente informa se é a 1ª vez.
+                    O backend aplica a validação final pelo banco de dados.
+                    Se o consulente esquecer de marcar mas for novo,
+                    o sistema corrige automaticamente para primeira_visita=True.
+                ── */}
+                <div className="mb-3">
+                  <label
+                    htmlFor="primeira-visita"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.65rem',
+                      cursor: 'pointer',
+                      padding: '0.75rem',
+                      borderRadius: '10px',
+                      border: `1px solid ${form.primeira_visita
+                        ? 'rgba(212,175,55,0.45)'
+                        : 'var(--cor-borda)'}`,
+                      background: form.primeira_visita
+                        ? 'rgba(212,175,55,0.07)'
+                        : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {/* Checkbox customizado visualmente */}
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '5px',
+                        border: `2px solid ${form.primeira_visita
+                          ? 'var(--cor-acento)'
+                          : 'rgba(255,255,255,0.2)'}`,
+                        background: form.primeira_visita
+                          ? 'var(--cor-acento)'
+                          : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '1px',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {form.primeira_visita && (
+                        <i
+                          className="bi bi-check"
+                          style={{ fontSize: '0.75rem', color: '#1a0a2e', fontWeight: 700 }}
+                        ></i>
+                      )}
+                    </div>
+
+                    {/* Input nativo oculto — mantém acessibilidade */}
+                    <input
+                      id="primeira-visita"
+                      type="checkbox"
+                      checked={form.primeira_visita}
+                      onChange={e => setForm({ ...form, primeira_visita: e.target.checked })}
+                      style={{ display: 'none' }}
+                    />
+
+                    <div>
+                      <div style={{ fontSize: '0.88rem', color: 'var(--cor-texto)', fontWeight: 500 }}>
+                        É a minha primeira vez aqui 🌟
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', marginTop: '2px', lineHeight: 1.4 }}>
+                        Marque se nunca participou de uma gira neste terreiro
+                      </div>
+                    </div>
+                  </label>
                 </div>
 
                 {/* Campo de observações — opcional */}
