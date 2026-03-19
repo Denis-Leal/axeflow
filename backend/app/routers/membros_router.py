@@ -93,7 +93,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
             app_url=settings.APP_URL,
         )
         if not enviado:
-            logger.warning("[Membros] Email de convite não enviado para %s (RESEND_API_KEY configurada?)", data.email)
+            logger.warning("[Membros] Email de convite não enviado para %s (BREVO_API_KEY configurada?)", data.email)
     except Exception as e:
         logger.error("[Membros] Erro ao enviar email de convite: %s", e)
 
@@ -102,7 +102,7 @@ def create_membro(data: MembroCreate, user: Usuario = Depends(require_role("admi
         "nome":                  novo.nome,
         "email":                 novo.email,
         "role":                  novo.role,
-        "email_convite_enviado": bool(settings.RESEND_API_KEY),
+        "email_convite_enviado": bool(settings.BREVO_API_KEY),
     }
 
 
