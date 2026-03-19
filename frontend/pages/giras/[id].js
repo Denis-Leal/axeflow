@@ -1,3 +1,11 @@
+/**
+ * pages/giras/[id].js — AxeFlow
+ *
+ * ADIÇÃO: observações do consulente exibidas inline na lista de inscritos.
+ *   Aparece abaixo do telefone, em destaque sutil, apenas quando preenchida.
+ *   Sem coluna extra — reaproveita o espaço já existente na célula de Nome.
+ */
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -53,7 +61,47 @@ function AlertaFalta({ score }) {
   );
 }
 
-// ── Painel de presença de membros (reutilizado para pública e fechada) ────────
+/**
+ * Exibe a observação do consulente de forma discreta, abaixo do telefone.
+ * Aparece apenas quando `observacoes` está preenchido.
+ */
+function ObservacaoBadge({ texto }) {
+  if (!texto) return null;
+  return (
+    <div
+      title={texto}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: '4px',
+        marginTop: '4px',
+        background: 'rgba(212,175,55,0.07)',
+        border: '1px solid rgba(212,175,55,0.2)',
+        borderRadius: '6px',
+        padding: '3px 7px',
+        maxWidth: '260px',          // evita texto longo quebrar o layout
+      }}
+    >
+      {/* Ícone de balão de fala */}
+      <i
+        className="bi bi-chat-left-text"
+        style={{ fontSize: '0.65rem', color: '#d4af37', marginTop: '2px', flexShrink: 0 }}
+      ></i>
+      <span style={{
+        fontSize: '0.72rem',
+        color: '#d4af37',
+        lineHeight: '1.4',
+        // Trunca com reticências se passar de 2 linhas
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {texto}
+      </span>
+    </div>
+  );
+}
+
+// ── Painel de presença de membros ─────────────────────────────────────────────
 function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro }) {
   const confirmados = membrosPresenca.filter(m => m.status === 'compareceu').length;
   const confirmando = membrosPresenca.filter(m => m.status === 'confirmado').length;
@@ -89,7 +137,6 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
           <div className="empty-state"><p>Nenhum membro encontrado</p></div>
         )}
         {membrosPresenca.map(m => {
-          // Mapeamento visual de cada status
           const statusCor = {
             compareceu: { bg: 'rgba(16,185,129,0.07)',  border: 'rgba(16,185,129,0.2)',  text: '#10b981', label: '✓ Compareceu' },
             faltou:     { bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.18)',  text: '#ef4444', label: '✗ Faltou' },
@@ -112,7 +159,6 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
                 <span style={{ marginLeft: '0.75rem', fontSize: '0.72rem', color: statusCor.text, fontWeight: 600 }}>{statusCor.label}</span>
               </div>
 
-              {/* Botões de presença — apenas admin pode finalizar (compareceu/faltou) */}
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <button
                   onClick={() => onUpdateMembro(m.membro_id, m.status === 'compareceu' ? 'pendente' : 'compareceu')}
@@ -151,13 +197,13 @@ export default function GiraDetalhe() {
   const router = useRouter();
   const { id } = router.query;
 
-  const [gira, setGira] = useState(null);
-  const [inscricoes, setInscricoes] = useState([]);       // apenas consulentes
-  const [membrosPresenca, setMembrosPresenca] = useState([]); // membros do terreiro
-  const [loading, setLoading] = useState(true);
-  const [filtro, setFiltro] = useState('todos');
-  const [ordenar, setOrdenar] = useState('posicao');
-  const [linkCopiado, setLinkCopiado] = useState(false);
+  const [gira, setGira]                     = useState(null);
+  const [inscricoes, setInscricoes]         = useState([]);
+  const [membrosPresenca, setMembrosPresenca] = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [filtro, setFiltro]                 = useState('todos');
+  const [ordenar, setOrdenar]               = useState('posicao');
+  const [linkCopiado, setLinkCopiado]       = useState(false);
 
   // ── Carregamento inicial ────────────────────────────────────────────────────
   useEffect(() => {
@@ -191,10 +237,7 @@ export default function GiraDetalhe() {
   };
 
   const handlePresencaMembro = async (membroId, status) => {
-    const endpoint = gira.acesso === 'fechada'
-      ? `/membros/giras/${id}/presenca-membros/${membroId}`
-      : `/membros/giras/${id}/presenca-membros/${membroId}`;
-    await api.post(endpoint, { status });
+    await api.post(`/membros/giras/${id}/presenca-membros/${membroId}`, { status });
     setMembrosPresenca(prev => prev.map(m =>
       m.membro_id === membroId ? { ...m, status } : m
     ));
@@ -225,6 +268,8 @@ export default function GiraDetalhe() {
   // ── Métricas ────────────────────────────────────────────────────────────────
   const ativas  = inscricoes.filter(i => i.status !== 'cancelado');
   const alertas = inscricoes.filter(i => i.score_presenca?.alerta).length;
+  // Contagem de inscrições com observação — útil para dar visibilidade ao admin
+  const comObservacao = inscricoes.filter(i => i.observacoes).length;
 
   // Filtro + ordenação da lista de consulentes
   let filtradas = inscricoes.filter(i => filtro === 'todos' || i.status === filtro);
@@ -380,9 +425,8 @@ export default function GiraDetalhe() {
               </div>
             )}
 
-            {/* ── Painel de membros (FECHADA: único painel | PÚBLICA: painel complementar) ── */}
+            {/* ── Painel de membros (FECHADA: único | PÚBLICA: complementar) ── */}
             {gira.acesso === 'fechada' ? (
-              // Giras fechadas: só o painel de membros (sem lista de consulentes)
               <PainelPresencaMembros
                 giraId={id}
                 acesso={gira.acesso}
@@ -391,12 +435,29 @@ export default function GiraDetalhe() {
               />
             ) : (
               <>
-                {/* ── GIRA PÚBLICA: lista de consulentes (principal) ── */}
+                {/* ── GIRA PÚBLICA: lista de consulentes ── */}
                 <div className="card-custom mb-4">
                   <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
                       ✦ Lista de Consulentes
                     </span>
+
+                    {/* Badge: quantos deixaram observação — orienta o admin a rolar a lista */}
+                    {comObservacao > 0 && (
+                      <span
+                        title="Consulentes que deixaram uma mensagem na inscrição"
+                        style={{
+                          fontSize: '0.72rem', color: '#d4af37',
+                          background: 'rgba(212,175,55,0.1)',
+                          border: '1px solid rgba(212,175,55,0.25)',
+                          borderRadius: '20px', padding: '1px 8px',
+                        }}
+                      >
+                        <i className="bi bi-chat-left-text me-1"></i>
+                        {comObservacao} com observaç{comObservacao > 1 ? 'ões' : 'ão'}
+                      </span>
+                    )}
+
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
                       {/* Filtros por status */}
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -446,9 +507,13 @@ export default function GiraDetalhe() {
                           const sc = i.score_presenca;
                           return (
                             <tr key={i.id} style={{ background: sc?.alerta ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
+
+                              {/* Posição na fila */}
                               <td style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontWeight: 700 }}>
                                 {i.posicao}º
                               </td>
+
+                              {/* Nome + telefone + observação inline */}
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                   <strong>{i.consulente_nome}</strong>
@@ -457,7 +522,11 @@ export default function GiraDetalhe() {
                                 <div style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
                                   {i.consulente_telefone}
                                 </div>
+                                {/* Observação deixada pelo consulente na hora da inscrição */}
+                                <ObservacaoBadge texto={i.observacoes} />
                               </td>
+
+                              {/* Score de histórico */}
                               <td>
                                 {sc ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -476,12 +545,18 @@ export default function GiraDetalhe() {
                                   <span style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>—</span>
                                 )}
                               </td>
+
+                              {/* Status badge */}
                               <td>
                                 <span className={`badge-status badge-${i.status}`}>{i.status}</span>
                               </td>
+
+                              {/* Data de inscrição */}
                               <td className="d-none d-md-table-cell" style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem' }}>
                                 {new Date(i.created_at).toLocaleString('pt-BR')}
                               </td>
+
+                              {/* Ações */}
                               <td>
                                 {i.status !== 'cancelado' && (
                                   <div className="d-flex gap-1">
