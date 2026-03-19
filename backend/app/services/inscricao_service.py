@@ -7,12 +7,19 @@ Pontos críticos:
   - Telefone normalizado antes de qualquer consulta (evita duplicatas silenciosas)
   - Soft delete em giras (filtra deleted_at IS NULL)
   - Status lista_espera quando gira está lotada
+  - Vagas de consulentes e vagas de membros são contadas SEPARADAMENTE:
+      consulente_id IS NOT NULL → conta contra limite_consulentes
+      membro_id IS NOT NULL     → conta contra total de membros ativos (sem limite fixo)
+
+CORREÇÃO: list_inscricoes agora filtra explicitamente consulente_id IS NOT NULL,
+evitando que confirmações de membros apareçam na lista de consulentes.
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from fastapi import HTTPException
 from uuid import UUID
 from datetime import datetime
+
 from app.models.gira import Gira
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
@@ -21,19 +28,28 @@ from app.utils.validators import normalize_phone, validate_phone
 from app.services.push_service import send_push_to_terreiro
 
 
-def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID):
-    """Lista inscrições de uma gira, ordenadas por posição na fila."""
+def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[InscricaoResponse]:
+    """
+    Lista inscrições de CONSULENTES de uma gira, ordenadas por posição na fila.
+
+    Filtra explicitamente consulente_id IS NOT NULL para garantir que
+    confirmações de membros (membro_id IS NOT NULL) nunca apareçam aqui.
+    As duas categorias têm listas separadas na UI.
+    """
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
         Gira.terreiro_id == terreiro_id,
-        Gira.deleted_at.is_(None),  # ignora giras com soft delete
+        Gira.deleted_at.is_(None),
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     inscricoes = (
         db.query(InscricaoGira)
-        .filter(InscricaoGira.gira_id == gira_id)
+        .filter(
+            InscricaoGira.gira_id == gira_id,
+            InscricaoGira.consulente_id.isnot(None),  # APENAS consulentes externos
+        )
         .order_by(InscricaoGira.posicao)
         .all()
     )
@@ -58,6 +74,10 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     Usa SELECT FOR UPDATE na contagem de vagas para evitar race condition:
     sem o lock, duas requisições simultâneas podem ambas passar pela verificação
     de vagas e criar inscrições além do limite.
+
+    IMPORTANTE: apenas inscrições com consulente_id preenchido contam contra
+    limite_consulentes. Confirmações de membros (membro_id) são contadas
+    separadamente e NÃO afetam as vagas disponíveis para consulentes.
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -99,10 +119,15 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # ── CONTROLE DE CONCORRÊNCIA ──────────────────────────────────────────────
     # SELECT FOR UPDATE: bloqueia as linhas durante a transação para que
     # requisições simultâneas não consigam ler o mesmo contador de vagas.
-    inscricoes_ativas = (
+    #
+    # Filtra APENAS inscrições de consulentes (consulente_id IS NOT NULL).
+    # Confirmações de membros têm seu próprio pool de vagas e não devem
+    # interferir na contagem de vagas disponíveis para o público.
+    inscricoes_consulentes = (
         db.query(InscricaoGira)
         .filter(
             InscricaoGira.gira_id == gira.id,
+            InscricaoGira.consulente_id.isnot(None),  # apenas consulentes externos
             InscricaoGira.status.in_([
                 StatusInscricaoEnum.confirmado,
                 StatusInscricaoEnum.lista_espera,
@@ -112,17 +137,19 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         .all()
     )
 
-    confirmados = sum(
-        1 for i in inscricoes_ativas
+    confirmados_consulentes = sum(
+        1 for i in inscricoes_consulentes
         if i.status == StatusInscricaoEnum.confirmado
     )
-    proxima_posicao = len(inscricoes_ativas) + 1
+    # Posição na fila considera apenas consulentes (membros têm lista separada)
+    proxima_posicao = len(inscricoes_consulentes) + 1
 
-    # Se atingiu limite → entra na lista de espera em vez de erro
-    if confirmados >= gira.limite_consulentes:
-        status_inicial = StatusInscricaoEnum.lista_espera
-    else:
-        status_inicial = StatusInscricaoEnum.confirmado
+    # Se atingiu limite de consulentes → entra na lista de espera
+    status_inicial = (
+        StatusInscricaoEnum.lista_espera
+        if confirmados_consulentes >= gira.limite_consulentes
+        else StatusInscricaoEnum.confirmado
+    )
 
     inscricao = InscricaoGira(
         gira_id=gira.id,
@@ -140,7 +167,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         title="👤 Nova Inscrição",
         body=(
             f"{data.nome} se inscreveu na {gira.titulo} "
-            f"(vaga {confirmados + 1}/{gira.limite_consulentes})"
+            f"(vaga {confirmados_consulentes + 1}/{gira.limite_consulentes})"
         ),
         url=f"/giras/{gira.id}",
     )
@@ -155,7 +182,12 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     )
 
 
-def update_presenca(db: Session, inscricao_id: UUID, data: PresencaUpdate, terreiro_id: UUID):
+def update_presenca(
+    db: Session,
+    inscricao_id: UUID,
+    data: PresencaUpdate,
+    terreiro_id: UUID,
+) -> dict:
     """Atualiza status de presença de uma inscrição (compareceu / faltou)."""
     inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
     if not inscricao:
@@ -179,7 +211,7 @@ def update_presenca(db: Session, inscricao_id: UUID, data: PresencaUpdate, terre
     return {"ok": True, "status": inscricao.status}
 
 
-def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID):
+def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> dict:
     """Cancela inscrição. Não penaliza o score (cancelamento é aviso prévio)."""
     inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
     if not inscricao:

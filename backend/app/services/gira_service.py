@@ -4,6 +4,11 @@ Serviço de gestão de giras.
 
 Soft delete: giras nunca são apagadas fisicamente.
 deleted_at preenchido = gira "deletada" — todas as queries filtram deleted_at IS NULL.
+
+IMPORTANTE sobre total_inscritos:
+  Para giras PÚBLICAS → conta apenas inscrições de consulentes (consulente_id IS NOT NULL).
+  Para giras FECHADAS → conta apenas inscrições de membros (membro_id IS NOT NULL).
+  As duas categorias usam pools de vagas distintos e não se misturam.
 """
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -15,6 +20,32 @@ from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse
 from app.utils.slug import generate_gira_slug
 from app.services.push_service import send_push_to_terreiro
 from datetime import datetime
+
+
+def _count_inscritos(db: Session, gira: Gira) -> int:
+    """
+    Conta inscrições ativas de acordo com o tipo de acesso da gira.
+
+    Públicas  → consulentes externos (consulente_id IS NOT NULL)
+    Fechadas  → membros do terreiro (membro_id IS NOT NULL)
+
+    Garante que a confirmação de membros nunca afeta o contador de
+    vagas de consulentes e vice-versa.
+    """
+    if gira.acesso == "fechada":
+        # Giras fechadas: contar presenças de membros
+        return db.query(InscricaoGira).filter(
+            InscricaoGira.gira_id == gira.id,
+            InscricaoGira.membro_id.isnot(None),
+            InscricaoGira.status != "cancelado",
+        ).count()
+    else:
+        # Giras públicas: contar inscrições de consulentes externos
+        return db.query(InscricaoGira).filter(
+            InscricaoGira.gira_id == gira.id,
+            InscricaoGira.consulente_id.isnot(None),
+            InscricaoGira.status != "cancelado",
+        ).count()
 
 
 def _enrich(gira: Gira, db: Session, total_inscritos: int = 0) -> GiraResponse:
@@ -39,14 +70,7 @@ def list_giras(db: Session, terreiro_id: UUID):
         .all()
     )
 
-    result = []
-    for g in giras:
-        total = db.query(InscricaoGira).filter(
-            InscricaoGira.gira_id == g.id,
-            InscricaoGira.status != "cancelado",
-        ).count()
-        result.append(_enrich(g, db, total))
-    return result
+    return [_enrich(g, db, _count_inscritos(db, g)) for g in giras]
 
 
 def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
@@ -75,8 +99,8 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     db.refresh(gira)
 
     # Notificar membros sobre nova gira
-    data_fmt    = gira.data.strftime("%d/%m/%Y")
-    horario_fmt = gira.horario.strftime("%H:%M")
+    data_fmt     = gira.data.strftime("%d/%m/%Y")
+    horario_fmt  = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
@@ -98,11 +122,7 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    total = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira.id,
-        InscricaoGira.status != "cancelado",
-    ).count()
-    return _enrich(gira, db, total)
+    return _enrich(gira, db, _count_inscritos(db, gira))
 
 
 def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID) -> GiraResponse:
@@ -120,22 +140,20 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
     for field, value in campos_alterados.items():
         setattr(gira, field, value)
 
-    # 🔥 valida estado final
+    # Valida e limpa campos inconsistentes após a atualização
     if gira.acesso == "fechada":
         if gira.limite_membros == 0:
             raise HTTPException(400, "Gira fechada precisa de limite_membros")
-
-        # limpa campos inválidos
-        gira.limite_consulentes = 0
-        gira.abertura_lista = None
-        gira.fechamento_lista = None
+        gira.limite_consulentes  = 0
+        gira.abertura_lista      = None
+        gira.fechamento_lista    = None
         gira.responsavel_lista_id = None
 
     elif gira.acesso == "publica":
         if gira.limite_consulentes == 0:
             raise HTTPException(400, "Gira pública precisa de limite_consulentes")
-
         gira.limite_membros = None
+
     db.commit()
     db.refresh(gira)
 
@@ -156,7 +174,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
                 url=f"/giras/{gira.id}",
             )
 
-    return _enrich(gira, db)
+    return _enrich(gira, db, _count_inscritos(db, gira))
 
 
 def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):

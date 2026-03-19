@@ -3,6 +3,10 @@ public_router.py — AxeFlow
 Endpoints públicos (sem autenticação): inscrição de consulentes via link compartilhável.
 
 Rate limiting aplicado por IP para prevenir spam.
+
+IMPORTANTE: vagas_disponiveis conta apenas inscrições de consulentes
+(consulente_id IS NOT NULL). Confirmações de membros do terreiro
+(membro_id IS NOT NULL) são independentes e não reduzem vagas do público.
 """
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
@@ -27,6 +31,9 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
     """
     Retorna dados públicos de uma gira para exibição na página de inscrição.
     Giras fechadas ou com soft delete retornam 404.
+
+    vagas_disponiveis reflete apenas inscrições de consulentes externos —
+    confirmações de membros do terreiro não afetam esse número.
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -40,17 +47,23 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     agora = datetime.utcnow()
-    total_inscritos = db.query(InscricaoGira).filter(
+
+    # Conta apenas inscrições de CONSULENTES (consulente_id IS NOT NULL).
+    # Membros confirmados são contados em pool separado e não ocupam vagas do público.
+    total_consulentes_confirmados = db.query(InscricaoGira).filter(
         InscricaoGira.gira_id == gira.id,
+        InscricaoGira.consulente_id.isnot(None),        # apenas externos
         InscricaoGira.status == StatusInscricaoEnum.confirmado,
     ).count()
 
     lista_espera = db.query(InscricaoGira).filter(
         InscricaoGira.gira_id == gira.id,
+        InscricaoGira.consulente_id.isnot(None),        # apenas externos
         InscricaoGira.status == StatusInscricaoEnum.lista_espera,
     ).count()
 
-    vagas_disponiveis = max(0, gira.limite_consulentes - total_inscritos)
+    vagas_disponiveis = max(0, gira.limite_consulentes - total_consulentes_confirmados)
+
     lista_aberta = (
         gira.abertura_lista is not None
         and gira.fechamento_lista is not None

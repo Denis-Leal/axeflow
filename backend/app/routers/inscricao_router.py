@@ -1,6 +1,15 @@
+"""
+inscricao_router.py — AxeFlow
+Gerenciamento de inscrições de consulentes e presenças de membros.
+
+CORREÇÃO: list_inscricoes agora filtra apenas consulentes externos
+(consulente_id IS NOT NULL), evitando que confirmações de membros
+apareçam misturadas na lista de consulentes.
+"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from uuid import UUID
+
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.schemas.inscricao_schema import PresencaUpdate
@@ -17,21 +26,31 @@ router = APIRouter(tags=["inscricoes"])
 
 
 @router.get("/giras/{gira_id}/inscricoes")
-def list_inscricoes(gira_id: UUID, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Lista inscrições enriquecidas com score de presença histórico de cada consulente."""
+def list_inscricoes(
+    gira_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lista inscrições de CONSULENTES da gira com score de presença histórico.
+
+    IMPORTANTE: filtra apenas inscrições onde consulente_id IS NOT NULL.
+    Confirmações de membros (membro_id IS NOT NULL) são retornadas pelo
+    endpoint /giras/{id}/presenca-membros e NÃO devem aparecer aqui.
+    """
     inscricoes = inscricao_service.list_inscricoes(db, gira_id, user.terreiro_id)
     scores = get_scores_para_gira(db, gira_id, user.terreiro_id)
 
     result = []
     for i in inscricoes:
         item = i.model_dump() if hasattr(i, "model_dump") else dict(i)
-        # Buscar score pelo consulente_id — precisamos do id, não só do telefone
-        # O score está keyed por consulente_id (str UUID)
-        score = None
-        # Localizar o consulente_id via inscricao
+
+        # Busca score pelo consulente_id da inscrição
         insc = db.query(InscricaoGira).filter(InscricaoGira.id == i.id).first()
-        if insc:
+        score = None
+        if insc and insc.consulente_id:
             score = scores.get(str(insc.consulente_id))
+
         item["score_presenca"] = score
         result.append(item)
 
@@ -39,28 +58,45 @@ def list_inscricoes(gira_id: UUID, user: Usuario = Depends(get_current_user), db
 
 
 @router.patch("/inscricao/{inscricao_id}/presenca")
-def update_presenca(inscricao_id: UUID, data: PresencaUpdate, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_presenca(
+    inscricao_id: UUID,
+    data: PresencaUpdate,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Atualiza status de presença de uma inscrição (compareceu / faltou)."""
     return inscricao_service.update_presenca(db, inscricao_id, data, user.terreiro_id)
 
 
 @router.delete("/inscricao/{inscricao_id}")
-def cancelar_inscricao(inscricao_id: UUID, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def cancelar_inscricao(
+    inscricao_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancela inscrição de um consulente."""
     return inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id)
 
 
 @router.get("/consulentes/ranking")
-def ranking_presenca(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def ranking_presenca(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Ranking de confiabilidade de todos os consulentes do terreiro."""
     return get_ranking_consulentes(db, user.terreiro_id)
 
 
 @router.get("/consulentes/{consulente_id}/perfil")
-def perfil_consulente(consulente_id: UUID, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+def perfil_consulente(
+    consulente_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Perfil completo do consulente — CRM espiritual.
     Retorna histórico completo de visitas, frequência, padrões e score.
     """
-
     c = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
@@ -103,20 +139,20 @@ def perfil_consulente(consulente_id: UUID, user: Usuario = Depends(get_current_u
             ultima_presenca = gira.data.isoformat()
 
     # Estatísticas gerais
-    nao_cancelados = [i for i in inscricoes if i.status != "cancelado"]
+    nao_cancelados  = [i for i in inscricoes if i.status != "cancelado"]
     comparecimentos = [i for i in inscricoes if i.status == "compareceu"]
     faltas          = [i for i in inscricoes if i.status == "faltou"]
     cancelamentos   = [i for i in inscricoes if i.status == "cancelado"]
 
     # Tipos de gira que mais frequentou
-    tipos = {}
+    tipos: dict[str, int] = {}
     for i in comparecimentos:
         g = gira_ids.get(str(i.gira_id))
         tipo = (g.tipo or "Sem tipo") if g else "Sem tipo"
         tipos[tipo] = tipos.get(tipo, 0) + 1
     tipos_ordenados = sorted(tipos.items(), key=lambda x: x[1], reverse=True)
 
-    # Primeira e última visita
+    # Primeira e última presença confirmada
     datas_presenca = sorted([
         gira_ids[str(i.gira_id)].data
         for i in comparecimentos
@@ -126,26 +162,45 @@ def perfil_consulente(consulente_id: UUID, user: Usuario = Depends(get_current_u
     score = get_score_consulente(db, consulente_id, user.terreiro_id)
 
     return {
-        "id":             str(c.id),
-        "nome":           c.nome,
-        "telefone":       c.telefone,
+        "id":              str(c.id),
+        "nome":            c.nome,
+        "telefone":        c.telefone,
         "primeira_visita": c.primeira_visita,
-        "cadastrado_em":  c.created_at.isoformat() if c.created_at else None,
+        "cadastrado_em":   c.created_at.isoformat() if c.created_at else None,
 
         # Score de confiabilidade
         "score": score,
 
-        # Estatísticas
+        # Campos esperados pelo frontend de perfil
+        "comparecimentos": len(comparecimentos),
+        "faltas":          len(faltas),
+
+        # Status de retorno
+        "status_retorno": (
+            "nunca_compareceu" if not datas_presenca
+            else "ativo"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 60)
+            else "morno"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 180)
+            else "inativo"
+        ),
+        "ultima_visita":  datas_presenca[-1].isoformat() if datas_presenca else None,
+        "primeira_data":  datas_presenca[0].isoformat()  if datas_presenca else None,
+        "dias_ausente": (
+            (__import__("datetime").date.today() - datas_presenca[-1]).days
+            if datas_presenca else None
+        ),
+        "tipos_favoritos": tipos_ordenados[:3],
+
+        # Estatísticas completas
         "stats": {
-            "total_inscricoes":  len(nao_cancelados),
-            "comparecimentos":   len(comparecimentos),
-            "faltas":            len(faltas),
-            "cancelamentos":     len(cancelamentos),
+            "total_inscricoes": len(nao_cancelados),
+            "comparecimentos":  len(comparecimentos),
+            "faltas":           len(faltas),
+            "cancelamentos":    len(cancelamentos),
             "primeira_presenca": datas_presenca[0].isoformat() if datas_presenca else None,
             "ultima_presenca":   datas_presenca[-1].isoformat() if datas_presenca else None,
             "tipos_favoritos":   tipos_ordenados[:3],
         },
 
-        # Histórico completo
+        # Histórico completo de visitas
         "historico": historico,
     }

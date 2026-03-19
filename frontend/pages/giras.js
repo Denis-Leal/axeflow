@@ -104,9 +104,27 @@ export default function Giras() {
                         <td>{new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                         <td>{g.horario}</td>
                         <td>
-                          <span style={{ color: g.total_inscritos >= g.limite_consulentes ? '#ef4444' : 'var(--cor-sucesso)' }}>
-                            {g.total_inscritos}/{g.limite_consulentes}
-                          </span>
+                          {g.acesso === 'fechada' ? (
+                            <span
+                              style={{
+                                color: g.total_inscritos >= g.limite_membros
+                                  ? '#ef4444'
+                                  : 'var(--cor-sucesso)'
+                              }}
+                            >
+                              {g.total_inscritos}/{g.limite_membros}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                color: g.total_inscritos >= g.limite_consulentes
+                                  ? '#ef4444'
+                                  : 'var(--cor-sucesso)'
+                              }}
+                            >
+                              {g.total_inscritos}/{g.limite_consulentes}
+                            </span>
+                          )}
                         </td>
                         <td><span className={`badge-status badge-${g.status}`}>{g.status}</span></td>
                         <td>
