@@ -1,3 +1,14 @@
+/**
+ * pages/consulentes/[id].js — AxeFlow
+ *
+ * Perfil detalhado do consulente — CRM espiritual.
+ *
+ * ADIÇÃO: campo "Notas do Terreiro" (admin/operador podem editar).
+ *   Exibido abaixo dos cards de métricas, antes do histórico de giras.
+ *   Salvo via PATCH /membros/consulentes/{id}/notas.
+ *   Consulentes comuns (membros) veem o campo somente leitura se preenchido.
+ */
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -15,7 +26,6 @@ const COR = {
   cinza:    { bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)', text: '#94a3b8' },
 };
 
-// ── Labels de status de retorno ───────────────────────────────────────────────
 const STATUS_RETORNO = {
   ativo:            { label: 'Ativo',           cor: '#10b981', emoji: '🟢', desc: 'Veio nos últimos 60 dias' },
   morno:            { label: 'Morno',           cor: '#f59e0b', emoji: '🟡', desc: 'Entre 60 e 180 dias sem vir' },
@@ -23,7 +33,6 @@ const STATUS_RETORNO = {
   nunca_compareceu: { label: 'Nunca compareceu',cor: '#94a3b8', emoji: '⚫', desc: 'Inscreveu mas nunca apareceu' },
 };
 
-// ── Ícone por status de inscrição ─────────────────────────────────────────────
 const ICONE_STATUS = {
   compareceu: 'bi-check-circle-fill',
   faltou:     'bi-x-circle-fill',
@@ -31,13 +40,165 @@ const ICONE_STATUS = {
   cancelado:  'bi-dash-circle',
 };
 
+// ── Componente de notas do terreiro ──────────────────────────────────────────
+
+/**
+ * Bloco de notas internas do terreiro sobre o consulente.
+ * Admin/operador: editável inline com salvar/cancelar.
+ * Membro: somente leitura (apenas se houver conteúdo).
+ */
+function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
+  const [notas, setNotas]         = useState(notasIniciais || '');
+  const [editando, setEditando]   = useState(false);
+  const [rascunho, setRascunho]   = useState(notasIniciais || '');
+  const [salvando, setSalvando]   = useState(false);
+  const [feedback, setFeedback]   = useState(''); // 'ok' | 'erro' | ''
+
+  // Iniciar edição — abre o textarea com o valor atual
+  const handleEditar = () => {
+    setRascunho(notas);
+    setEditando(true);
+    setFeedback('');
+  };
+
+  // Cancelar sem salvar
+  const handleCancelar = () => {
+    setEditando(false);
+    setFeedback('');
+  };
+
+  // Salvar via PATCH
+  const handleSalvar = async () => {
+    setSalvando(true);
+    setFeedback('');
+    try {
+      const res = await api.patch(`/membros/consulentes/${consulenteId}/notas`, {
+        notas: rascunho.trim() || null,
+      });
+      setNotas(res.data.notas || '');
+      setEditando(false);
+      setFeedback('ok');
+      // Remove feedback visual após 3s
+      setTimeout(() => setFeedback(''), 3000);
+    } catch {
+      setFeedback('erro');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // Membro sem permissão de edição: oculta o bloco se vazio
+  if (!podeEditar && !notas) return null;
+
+  return (
+    <div className="card-custom mb-4">
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
+          📝 Notas do Terreiro
+        </span>
+
+        {/* Feedback de salvo */}
+        {feedback === 'ok' && (
+          <span style={{ fontSize: '0.78rem', color: '#10b981', marginLeft: '0.5rem' }}>
+            ✓ Salvo
+          </span>
+        )}
+        {feedback === 'erro' && (
+          <span style={{ fontSize: '0.78rem', color: '#ef4444', marginLeft: '0.5rem' }}>
+            Erro ao salvar
+          </span>
+        )}
+
+        {/* Botão editar — apenas admin/operador, fora do modo edição */}
+        {podeEditar && !editando && (
+          <button
+            onClick={handleEditar}
+            style={{
+              marginLeft: 'auto', background: 'none',
+              border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)',
+              borderRadius: '6px', padding: '0.2rem 0.6rem',
+              cursor: 'pointer', fontSize: '0.78rem',
+            }}
+          >
+            <i className="bi bi-pencil me-1"></i>
+            {notas ? 'Editar' : 'Adicionar nota'}
+          </button>
+        )}
+      </div>
+
+      <div style={{ padding: '1rem 1.25rem' }}>
+        {editando ? (
+          /* Modo edição */
+          <>
+            <textarea
+              value={rascunho}
+              onChange={e => setRascunho(e.target.value)}
+              className="form-control-custom"
+              placeholder="Ex: veio pela primeira vez com Maria, prefere tarde, tem dificuldade de locomoção..."
+              rows={3}
+              maxLength={1000}
+              style={{ resize: 'vertical', minHeight: '80px', marginBottom: '0.5rem' }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
+                {rascunho.length}/1000
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handleCancelar}
+                  className="btn-outline-gold"
+                  style={{ fontSize: '0.82rem', padding: '0.3rem 0.8rem' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSalvar}
+                  className="btn-gold"
+                  disabled={salvando}
+                  style={{ fontSize: '0.82rem', padding: '0.3rem 0.8rem' }}
+                >
+                  {salvando
+                    ? <span className="spinner-border spinner-border-sm me-1"></span>
+                    : null}
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </>
+        ) : notas ? (
+          /* Modo leitura — exibe o texto preservando quebras de linha */
+          <p style={{
+            margin: 0,
+            color: 'var(--cor-texto)',
+            fontSize: '0.9rem',
+            lineHeight: '1.6',
+            whiteSpace: 'pre-wrap',   // preserva quebras de linha inseridas pelo admin
+            wordBreak: 'break-word',
+          }}>
+            {notas}
+          </p>
+        ) : (
+          /* Vazio — admin vê placeholder */
+          <p style={{ margin: 0, color: 'var(--cor-texto-suave)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+            Nenhuma nota registrada ainda.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Página principal ──────────────────────────────────────────────────────────
+
 export default function PerfilConsulente() {
   const router = useRouter();
   const { id } = router.query;
 
   const [perfil, setPerfil] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [loading, setLoading]  = useState(true);
+  const [erro, setErro]        = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -45,10 +206,15 @@ export default function PerfilConsulente() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    // CORREÇÃO: o endpoint correto é /consulentes/{id}/perfil (inscricao_router),
-    // não /membros/consulentes/{id}/perfil (membros_router retorna dados resumidos).
-    api.get(`/consulentes/${id}/perfil`)
-      .then(r => setPerfil(r.data))
+    // Carrega perfil do consulente e role do usuário logado em paralelo
+    Promise.all([
+      api.get(`/consulentes/${id}/perfil`),
+      api.get('/auth/me'),
+    ])
+      .then(([perfilRes, meRes]) => {
+        setPerfil(perfilRes.data);
+        setUserRole(meRes.data.role);
+      })
       .catch(err => {
         if (err.response?.status === 401) {
           localStorage.removeItem('token');
@@ -67,7 +233,7 @@ export default function PerfilConsulente() {
     </div>
   );
 
-  // ── Erro / não encontrado ─────────────────────────────────────────────────
+  // ── Erro ──────────────────────────────────────────────────────────────────
   if (erro || !perfil) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
       <div style={{ textAlign:'center' }}>
@@ -85,6 +251,9 @@ export default function PerfilConsulente() {
   const finalizadas  = perfil.comparecimentos + perfil.faltas;
   const taxaPresenca = finalizadas > 0 ? Math.round((perfil.comparecimentos / finalizadas) * 100) : null;
 
+  // Admin e operador podem editar notas
+  const podeEditarNotas = ['admin', 'operador'].includes(userRole);
+
   return (
     <>
       <Head><title>{perfil.nome} | AxeFlow</title></Head>
@@ -95,7 +264,6 @@ export default function PerfilConsulente() {
           {/* ── Topbar ── */}
           <div className="topbar">
             <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
-              {/* Avatar com inicial do nome */}
               <div style={{
                 width:'44px', height:'44px', borderRadius:'50%',
                 background:'rgba(212,175,55,0.12)', border:'1px solid rgba(212,175,55,0.3)',
@@ -230,7 +398,6 @@ export default function PerfilConsulente() {
                 </div>
               </div>
 
-              {/* Card de tipos favoritos — apenas se houver dados */}
               {perfil.tipos_favoritos?.length > 0 && (
                 <div className="stat-card">
                   <div style={{ fontSize:'0.7rem', color:'var(--cor-texto-suave)', marginBottom:'6px' }}>Giras preferidas</div>
@@ -245,7 +412,14 @@ export default function PerfilConsulente() {
 
             </div>
 
-            {/* ── Linha do tempo de giras ── */}
+            {/* ── Notas do Terreiro (admin/operador: editável | membro: leitura) ── */}
+            <NotasTerreiro
+              consulenteId={id}
+              notasIniciais={perfil.notas}
+              podeEditar={podeEditarNotas}
+            />
+
+            {/* ── Histórico de giras ── */}
             <div className="card-custom">
               <div className="card-header" style={{ display:'flex', alignItems:'center' }}>
                 <span style={{ fontFamily:'Cinzel', fontSize:'0.9rem', color:'var(--cor-acento)' }}>
@@ -262,7 +436,6 @@ export default function PerfilConsulente() {
                 )}
 
                 {perfil.historico.map((h, idx) => {
-                  // Cor de fundo por status da inscrição
                   const scGira = {
                     compareceu: { bg:'rgba(16,185,129,0.1)',  text:'#10b981' },
                     faltou:     { bg:'rgba(239,68,68,0.09)',  text:'#ef4444' },
@@ -270,9 +443,7 @@ export default function PerfilConsulente() {
                     cancelado:  { bg:'rgba(148,163,184,0.07)',text:'#94a3b8' },
                   }[h.status] || { bg:'rgba(148,163,184,0.07)', text:'#94a3b8' };
 
-                  const isLast = idx === perfil.historico.length - 1;
-
-                  // Campo de data: o backend retorna gira_data no perfil do inscricao_router
+                  const isLast  = idx === perfil.historico.length - 1;
                   const dataStr = h.gira_data || h.data;
 
                   return (

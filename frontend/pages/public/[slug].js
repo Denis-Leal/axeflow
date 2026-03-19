@@ -3,15 +3,10 @@
  *
  * Página pública de inscrição em gira.
  *
- * Usa getServerSideProps para buscar dados da gira no servidor antes de
- * renderizar. Isso garante que as meta tags Open Graph estejam no HTML
- * inicial — bots do WhatsApp, Telegram e Google não executam JavaScript.
- *
- * Fluxo:
- *   1. Bot/usuário acessa /public/[slug]
- *   2. Next.js chama getServerSideProps → fetch no backend → retorna props
- *   3. HTML já vem com <meta og:*> preenchidas → preview no WhatsApp funciona
- *   4. JS hidrata a página → inscrição interativa funciona normalmente
+ * ADIÇÃO: campo "observações" opcional no formulário de inscrição.
+ *   O consulente pode informar: "veio com acompanhante", "urgente",
+ *   "pedido específico", etc. O campo é enviado ao backend e exibido
+ *   no painel admin junto à inscrição.
  */
 
 import { useState } from 'react';
@@ -21,10 +16,7 @@ import { handleApiError } from '../../services/errorHandler';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
-/** Backend acessível pelo servidor Next.js (container ou Vercel). */
 const BACKEND_INTERNAL = process.env.BACKEND_URL || 'http://backend:8000';
-
-/** URL pública do app — usada para compor URLs absolutas nas meta tags OG. */
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://axeflow.vercel.app';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,9 +36,8 @@ function formatarHorario(horario) {
   return `${h}h${m !== '00' ? m : ''}`;
 }
 
-// ── Componente de branding viral ────────────────────────────────────────────
+// ── Branding viral ───────────────────────────────────────────────────────────
 
-/** Aparece em TODOS os estados — aumenta o alcance viral do AxeFlow. */
 function AxeFlowBrand() {
   return (
     <div style={{ marginTop: '2rem', textAlign: 'center' }}>
@@ -80,7 +71,7 @@ function AxeFlowBrand() {
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function GiraPublica({ gira, erro, slug }) {
-  const [form, setForm]             = useState({ nome: '', telefone: '' });
+  const [form, setForm]             = useState({ nome: '', telefone: '', observacoes: '' });
   const [submitting, setSubmitting] = useState(false);
   const [resultado, setResultado]   = useState(null);
   const [error, setError]           = useState('');
@@ -90,7 +81,13 @@ export default function GiraPublica({ gira, erro, slug }) {
     setSubmitting(true);
     setError('');
     try {
-      const res = await inscreverPublico(slug, form);
+      // Envia observacoes apenas se preenchida (campo opcional)
+      const payload = {
+        nome:       form.nome.trim(),
+        telefone:   form.telefone.trim(),
+        observacoes: form.observacoes.trim() || null,
+      };
+      const res = await inscreverPublico(slug, payload);
       setResultado(res.data);
     } catch (err) {
       setError(handleApiError(err, 'InscricaoPublica'));
@@ -99,21 +96,17 @@ export default function GiraPublica({ gira, erro, slug }) {
     }
   };
 
-  // ── Meta tags OG (preenchidas com dados reais do servidor) ────────────────
+  // ── Meta tags OG ─────────────────────────────────────────────────────────
 
   const dataFormatada = formatarData(gira?.data);
   const horario       = formatarHorario(gira?.horario);
 
-  const ogTitle = gira
-    ? gira.titulo
-    : 'Inscrição de Gira';
-
+  const ogTitle = gira ? gira.titulo : 'Inscrição de Gira';
   const ogDescription = gira
     ? `${dataFormatada} às ${horario} — ${gira.vagas_disponiveis} vaga(s) disponível(is). Inscreva-se!`
     : 'Inscreva-se na gira pelo AxeFlow';
-
   const ogUrl   = `${APP_URL}/public/${slug}`;
-  const ogImage = `${APP_URL}/og-gira-preview.png`; // imagem estática de preview
+  const ogImage = `${APP_URL}/og-gira-preview.png`;
 
   // ── Estado de erro ────────────────────────────────────────────────────────
 
@@ -144,17 +137,9 @@ export default function GiraPublica({ gira, erro, slug }) {
 
   return (
     <>
-      {/*
-        Open Graph: renderizado no HTML pelo servidor.
-        WhatsApp, Telegram, Discord, Slack, iMessage leem og:* sem executar JS.
-      */}
       <Head>
         <title>{ogTitle} | AxeFlow</title>
-
-        {/* SEO */}
-        <meta name="description" content={ogDescription} />
-
-        {/* Open Graph — WhatsApp, Facebook, LinkedIn, Discord, Slack */}
+        <meta name="description"        content={ogDescription} />
         <meta property="og:type"         content="website" />
         <meta property="og:url"          content={ogUrl} />
         <meta property="og:title"        content={ogTitle} />
@@ -164,14 +149,10 @@ export default function GiraPublica({ gira, erro, slug }) {
         <meta property="og:image:height" content="630" />
         <meta property="og:locale"       content="pt_BR" />
         <meta property="og:site_name"    content="AxeFlow" />
-
-        {/* Twitter Card — Twitter/X e iMessage no iOS */}
         <meta name="twitter:card"        content="summary_large_image" />
         <meta name="twitter:title"       content={ogTitle} />
         <meta name="twitter:description" content={ogDescription} />
         <meta name="twitter:image"       content={ogImage} />
-
-        {/* Giras encerradas não precisam de indexação */}
         {listaEncerrada && <meta name="robots" content="noindex" />}
       </Head>
 
@@ -276,11 +257,13 @@ export default function GiraPublica({ gira, erro, slug }) {
                 <h6 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
                   ✦ Realize sua Inscrição
                 </h6>
+
                 {error && (
                   <div className="alert-custom alert-danger-custom mb-3">
                     <i className="bi bi-exclamation-circle me-2"></i>{error}
                   </div>
                 )}
+
                 <div className="mb-3">
                   <label className="form-label-custom">Nome completo</label>
                   <input
@@ -291,7 +274,8 @@ export default function GiraPublica({ gira, erro, slug }) {
                     required
                   />
                 </div>
-                <div className="mb-4">
+
+                <div className="mb-3">
                   <label className="form-label-custom">WhatsApp / Telefone</label>
                   <input
                     className="form-control-custom"
@@ -302,6 +286,32 @@ export default function GiraPublica({ gira, erro, slug }) {
                     required
                   />
                 </div>
+
+                {/* Campo de observações — opcional */}
+                <div className="mb-4">
+                  <label className="form-label-custom">
+                    Observações
+                    <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
+                      (opcional)
+                    </span>
+                  </label>
+                  <textarea
+                    className="form-control-custom"
+                    value={form.observacoes}
+                    onChange={e => setForm({ ...form, observacoes: e.target.value })}
+                    placeholder="Ex: venho com acompanhante, pedido específico, urgente..."
+                    rows={2}
+                    maxLength={500}
+                    style={{ resize: 'vertical', minHeight: '60px' }}
+                  />
+                  {/* Contador de caracteres — aparece ao começar a digitar */}
+                  {form.observacoes.length > 0 && (
+                    <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
+                      {form.observacoes.length}/500
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleSubmit}
                   className="btn-gold w-100"
@@ -317,9 +327,7 @@ export default function GiraPublica({ gira, erro, slug }) {
               </div>
             )}
 
-            {/* Rodapé viral — presente em TODOS os estados */}
             <AxeFlowBrand />
-
           </div>
         </div>
       </div>
