@@ -2,9 +2,8 @@
 usuario.py — AxeFlow
 Model de usuário do sistema (admin, operador ou membro do terreiro).
 
-IMPORTANTE: email é único POR TERREIRO, não globalmente.
-Um mesmo email pode pertencer a usuários em terreiros diferentes.
-A unicidade é garantida pela constraint uq_usuario_email_terreiro.
+ALTERAÇÃO: adicionado relacionamento `inscricoes_membro` para o novo
+model InscricaoMembro. O back_populates espelhado em inscricao_membro.py.
 """
 import uuid
 from datetime import datetime
@@ -28,10 +27,8 @@ class Usuario(Base):
     terreiro_id = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
     nome        = Column(String(255), nullable=False)
     telefone    = Column(String(20))
-    # unique=True removido — unicidade é por (email + terreiro_id), não global
     email       = Column(String(255), nullable=False)
     senha_hash  = Column(String(255), nullable=False)
-    # String puro — valores controlados por RoleEnum no código Python
     role        = Column(String(50), default=RoleEnum.membro)
     ativo       = Column(Boolean, default=True)
     created_at  = Column(DateTime, default=datetime.utcnow)
@@ -40,7 +37,9 @@ class Usuario(Base):
     terreiro          = relationship("Terreiro", back_populates="usuarios")
     giras_responsavel = relationship("Gira", back_populates="responsavel_lista")
 
+    # Relacionamento com o novo model separado de inscrição de membros
+    inscricoes_membro = relationship("InscricaoMembro", back_populates="membro")
+
     __table_args__ = (
-        # Email único dentro do mesmo terreiro — permite mesmo email em terreiros diferentes
         UniqueConstraint("email", "terreiro_id", name="uq_usuario_email_terreiro"),
     )

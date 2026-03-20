@@ -1,11 +1,17 @@
 """
 membros_router.py — AxeFlow
-Gerenciamento de membros, presença em giras e consulentes.
 
-ADIÇÃO:
-  - PATCH /membros/consulentes/{id}/notas
-      Admin atualiza as notas internas do terreiro sobre um consulente.
-      Campo livre: "veio pela primeira vez com Maria", "prefere tarde", etc.
+CORREÇÃO: todas as operações de inscrição de membro agora usam
+InscricaoMembro em vez de InscricaoGira.
+
+Funções afetadas:
+  - marcar_presenca_membro       (admin/operador marca presença)
+  - confirmar_presenca_propria   (membro confirma em gira fechada)
+  - confirmar_presenca_publica   (membro confirma em gira pública)
+  - get_presenca_membros         (leitura gira fechada)
+  - get_presenca_membros_publica (leitura gira pública)
+
+InscricaoGira (legado) não é mais referenciado nestas funções.
 """
 import logging
 from typing import Optional
@@ -19,11 +25,12 @@ from datetime import date
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role, hash_password
 from app.models.usuario import Usuario
+from app.models.inscricao_membro import InscricaoMembro
+from app.models.inscricao_status import StatusInscricaoEnum
 from app.services.email_service import send_convite_membro
 from app.services.push_service import send_push_to_terreiro
 from app.models.terreiro import Terreiro
 from app.models.gira import Gira as GiraModel
-from app.models.inscricao import InscricaoGira
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -42,11 +49,10 @@ class MembroCreate(BaseModel):
 
 
 class NotasConsulenteUpdate(BaseModel):
-    """Payload para atualizar as notas internas sobre um consulente."""
     notas: Optional[str] = Field(
         default=None,
         max_length=1000,
-        description="Observações internas do terreiro (ex: 'veio com Maria pela 1ª vez')",
+        description="Observações internas do terreiro sobre o consulente",
     )
 
 
@@ -171,18 +177,15 @@ def list_consulentes(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Retorna todos os consulentes que já se inscreveram em giras deste terreiro,
-    incluindo primeira_visita, total de inscrições e comparecimentos.
-    """
+    """Consulentes que já se inscreveram em giras deste terreiro."""
     from app.models.consulente import Consulente
-    from app.models.gira import Gira
+    from app.models.inscricao_consulente import InscricaoConsulente
 
     consulentes = (
         db.query(Consulente)
-        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
-        .join(Gira, Gira.id == InscricaoGira.gira_id)
-        .filter(Gira.terreiro_id == user.terreiro_id)
+        .join(InscricaoConsulente, InscricaoConsulente.consulente_id == Consulente.id)
+        .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
+        .filter(GiraModel.terreiro_id == user.terreiro_id)
         .distinct()
         .all()
     )
@@ -190,11 +193,11 @@ def list_consulentes(
     result = []
     for c in consulentes:
         inscricoes = (
-            db.query(InscricaoGira)
-            .join(Gira, Gira.id == InscricaoGira.gira_id)
+            db.query(InscricaoConsulente)
+            .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
             .filter(
-                InscricaoGira.consulente_id == c.id,
-                Gira.terreiro_id == user.terreiro_id,
+                InscricaoConsulente.consulente_id == c.id,
+                GiraModel.terreiro_id == user.terreiro_id,
             )
             .all()
         )
@@ -219,31 +222,23 @@ def update_notas_consulente(
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    """
-    Atualiza as notas internas do terreiro sobre um consulente (admin/operador).
-
-    Campo livre para anotações como "veio pela primeira vez com Maria",
-    "prefere horário da tarde", "tem restrições de mobilidade", etc.
-    Enviar notas=null ou notas="" limpa o campo.
-    """
+    """Atualiza notas internas do terreiro sobre um consulente (admin/operador)."""
     from app.models.consulente import Consulente
-    from app.models.gira import Gira
+    from app.models.inscricao_consulente import InscricaoConsulente
 
-    # Valida que o consulente pertence a este terreiro (tem inscrição em alguma gira)
     consulente = (
         db.query(Consulente)
-        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
-        .join(Gira, Gira.id == InscricaoGira.gira_id)
+        .join(InscricaoConsulente, InscricaoConsulente.consulente_id == Consulente.id)
+        .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
         .filter(
             Consulente.id == consulente_id,
-            Gira.terreiro_id == user.terreiro_id,
+            GiraModel.terreiro_id == user.terreiro_id,
         )
         .first()
     )
     if not consulente:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
 
-    # Sanitiza: strip + limita a 1000 chars; string vazia vira null
     notas_sanitizadas = None
     if data.notas:
         notas_sanitizadas = data.notas.strip()[:1000] or None
@@ -251,116 +246,9 @@ def update_notas_consulente(
     consulente.notas = notas_sanitizadas
     db.commit()
 
-    logger.info(
-        "[Consulentes] Notas atualizadas para %s por %s",
-        consulente_id,
-        user.id,
-    )
+    logger.info("[Consulentes] Notas atualizadas para %s por %s", consulente_id, user.id)
 
-    return {
-        "ok":    True,
-        "id":    str(consulente.id),
-        "notas": consulente.notas,
-    }
-
-
-@router.get("/consulentes/{consulente_id}")
-def get_consulente(
-    consulente_id: UUID,
-    user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Retorna perfil detalhado de um consulente com histórico e score."""
-    from app.models.consulente import Consulente
-    from app.models.gira import Gira
-
-    consulente = (
-        db.query(Consulente)
-        .join(InscricaoGira, InscricaoGira.consulente_id == Consulente.id)
-        .join(Gira, Gira.id == InscricaoGira.gira_id)
-        .filter(
-            Consulente.id == consulente_id,
-            Gira.terreiro_id == user.terreiro_id,
-        )
-        .first()
-    )
-    if not consulente:
-        raise HTTPException(status_code=404, detail="Consulente não encontrado")
-
-    inscricoes = (
-        db.query(InscricaoGira)
-        .join(Gira, Gira.id == InscricaoGira.gira_id)
-        .filter(
-            InscricaoGira.consulente_id == consulente_id,
-            Gira.terreiro_id == user.terreiro_id,
-        )
-        .all()
-    )
-
-    def calcular_score(total: int, compareceu: int, faltas: int) -> int:
-        if total == 0:
-            return 0
-        return round((compareceu / total) * 100)
-
-    historico = []
-    for i in inscricoes:
-        g = db.query(Gira).filter(Gira.id == i.gira_id).first()
-        if g:
-            historico.append({
-                "gira_id":    str(g.id),
-                "gira_titulo": g.titulo,
-                "gira_tipo":   g.tipo,
-                "data":        g.data.isoformat(),
-                "status":      i.status,
-            })
-
-    nao_cancelados  = [h for h in historico if h["status"] != "cancelado"]
-    comparecimentos = [h for h in historico if h["status"] == "compareceu"]
-    faltas          = [h for h in historico if h["status"] == "faltou"]
-    cancelamentos   = [h for h in historico if h["status"] == "cancelado"]
-
-    datas_compareceu = sorted([h["data"] for h in comparecimentos])
-    ultima_visita    = datas_compareceu[-1] if datas_compareceu else None
-    primeira_data    = datas_compareceu[0]  if datas_compareceu else None
-
-    dias_ausente = None
-    if ultima_visita:
-        delta = date.today() - date.fromisoformat(ultima_visita)
-        dias_ausente = delta.days
-
-    tipos: dict[str, int] = {}
-    for h in comparecimentos:
-        t = h["gira_tipo"] or "Não especificado"
-        tipos[t] = tipos.get(t, 0) + 1
-    tipos_favoritos = sorted(tipos.items(), key=lambda x: x[1], reverse=True)
-
-    score = calcular_score(len(nao_cancelados), len(comparecimentos), len(faltas))
-
-    if dias_ausente is None:    status_retorno = "nunca_compareceu"
-    elif dias_ausente <= 60:    status_retorno = "ativo"
-    elif dias_ausente <= 180:   status_retorno = "morno"
-    else:                       status_retorno = "inativo"
-
-    return {
-        "id":              str(consulente.id),
-        "nome":            consulente.nome,
-        "telefone":        consulente.telefone,
-        "primeira_visita": consulente.primeira_visita,
-        "cadastrado_em":   consulente.created_at.isoformat(),
-        # Campo notas retornado para exibição no perfil
-        "notas":             consulente.notas,
-        "total_inscricoes":  len(nao_cancelados),
-        "comparecimentos":   len(comparecimentos),
-        "faltas":            len(faltas),
-        "cancelamentos":     len(cancelamentos),
-        "score":             score,
-        "primeira_data":     primeira_data,
-        "ultima_visita":     ultima_visita,
-        "dias_ausente":      dias_ausente,
-        "status_retorno":    status_retorno,
-        "tipos_favoritos":   tipos_favoritos,
-        "historico":         historico,
-    }
+    return {"ok": True, "id": str(consulente.id), "notas": consulente.notas}
 
 
 # ── Presença em giras FECHADAS ────────────────────────────────────────────────
@@ -372,8 +260,8 @@ def get_presenca_membros(
     db: Session = Depends(get_db),
 ):
     """
-    Para giras FECHADAS: retorna todos os membros ativos do terreiro
-    com seu status de presença nessa gira (compareceu / faltou / pendente).
+    Para giras FECHADAS: retorna todos os membros ativos com status de presença.
+    Usa InscricaoMembro — não mais InscricaoGira.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -391,10 +279,10 @@ def get_presenca_membros(
 
     result = []
     for m in membros:
-        presenca = db.query(InscricaoGira).filter(
+        presenca = db.query(InscricaoMembro).filter(
             and_(
-                InscricaoGira.gira_id == gira_id,
-                InscricaoGira.membro_id == m.id,
+                InscricaoMembro.gira_id == gira_id,
+                InscricaoMembro.membro_id == m.id,
             )
         ).first()
         result.append({
@@ -428,8 +316,8 @@ def marcar_presenca_membro(
     if status not in ("compareceu", "faltou", "pendente"):
         raise HTTPException(status_code=400, detail="Status inválido")
 
-    presenca = db.query(InscricaoGira).filter(
-        and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == membro_id)
+    presenca = db.query(InscricaoMembro).filter(
+        and_(InscricaoMembro.gira_id == gira_id, InscricaoMembro.membro_id == membro_id)
     ).first()
 
     if status == "pendente":
@@ -441,11 +329,13 @@ def marcar_presenca_membro(
     if presenca:
         presenca.status = status
     else:
-        max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
-        presenca = InscricaoGira(
+        # posicao = total de inscrições de membro nesta gira + 1
+        max_pos = db.query(InscricaoMembro).filter(
+            InscricaoMembro.gira_id == gira_id
+        ).count()
+        presenca = InscricaoMembro(
             gira_id=gira_id,
             membro_id=membro_id,
-            consulente_id=None,
             posicao=max_pos + 1,
             status=status,
         )
@@ -463,9 +353,8 @@ def confirmar_presenca_propria(
 ):
     """
     O próprio membro confirma/cancela presença em gira FECHADA.
-    Toggle: confirmar → cancelar → confirmar…
-
-    Envia push notification ao terreiro informando a ação do membro.
+    Toggle: confirmar → cancelar → confirmar...
+    Salva em InscricaoMembro.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -476,12 +365,12 @@ def confirmar_presenca_propria(
     if getattr(gira, "acesso", "publica") != "fechada":
         raise HTTPException(status_code=400, detail="Esta gira é pública")
 
-    presenca = db.query(InscricaoGira).filter(
-        and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == user.id)
+    presenca = db.query(InscricaoMembro).filter(
+        and_(InscricaoMembro.gira_id == gira_id, InscricaoMembro.membro_id == user.id)
     ).first()
 
     if presenca:
-        if presenca.status == "confirmado":
+        if presenca.status == StatusInscricaoEnum.confirmado:
             db.delete(presenca)
             db.commit()
 
@@ -491,20 +380,21 @@ def confirmar_presenca_propria(
                 body=f"{user.nome} cancelou a presença na {gira.titulo}",
                 url=f"/giras/{gira.id}",
             )
-
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
 
         # Admin já marcou compareceu/faltou — membro não pode reverter
         return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
 
     # Cria nova confirmação de presença
-    max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
-    presenca = InscricaoGira(
+    max_pos = db.query(InscricaoMembro).filter(
+        InscricaoMembro.gira_id == gira_id
+    ).count()
+
+    presenca = InscricaoMembro(
         gira_id=gira_id,
         membro_id=user.id,
-        consulente_id=None,
         posicao=max_pos + 1,
-        status="confirmado",
+        status=StatusInscricaoEnum.confirmado,
     )
     db.add(presenca)
     db.commit()
@@ -515,7 +405,6 @@ def confirmar_presenca_propria(
         body=f"{user.nome} confirmou presença na {gira.titulo}",
         url=f"/giras/{gira.id}",
     )
-
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
 
 
@@ -528,11 +417,8 @@ def get_presenca_membros_publica(
     db: Session = Depends(get_db),
 ):
     """
-    Para giras PÚBLICAS: retorna todos os membros ativos do terreiro
-    com seu status de presença nessa gira.
-
-    Mesma estrutura de resposta que presenca-membros (giras fechadas),
-    sem a restrição de acesso == 'fechada'.
+    Para giras PÚBLICAS: retorna todos os membros ativos com status de presença.
+    Usa InscricaoMembro — não mais InscricaoGira.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -550,10 +436,10 @@ def get_presenca_membros_publica(
 
     result = []
     for m in membros:
-        presenca = db.query(InscricaoGira).filter(
+        presenca = db.query(InscricaoMembro).filter(
             and_(
-                InscricaoGira.gira_id == gira_id,
-                InscricaoGira.membro_id == m.id,
+                InscricaoMembro.gira_id == gira_id,
+                InscricaoMembro.membro_id == m.id,
             )
         ).first()
         result.append({
@@ -575,12 +461,8 @@ def confirmar_presenca_publica(
 ):
     """
     O próprio membro confirma/cancela presença em gira PÚBLICA.
-    Toggle: confirmar → cancelar → confirmar…
-
-    Comportamento idêntico ao confirmar-presenca (giras fechadas),
-    mas aceita giras com acesso == 'publica'.
-
-    Envia push notification ao terreiro informando a ação do membro.
+    Toggle: confirmar → cancelar → confirmar...
+    Salva em InscricaoMembro.
     """
     gira = db.query(GiraModel).filter(
         GiraModel.id == gira_id,
@@ -591,12 +473,12 @@ def confirmar_presenca_publica(
     if getattr(gira, "acesso", "publica") != "publica":
         raise HTTPException(status_code=400, detail="Esta gira é fechada — use confirmar-presenca")
 
-    presenca = db.query(InscricaoGira).filter(
-        and_(InscricaoGira.gira_id == gira_id, InscricaoGira.membro_id == user.id)
+    presenca = db.query(InscricaoMembro).filter(
+        and_(InscricaoMembro.gira_id == gira_id, InscricaoMembro.membro_id == user.id)
     ).first()
 
     if presenca:
-        if presenca.status == "confirmado":
+        if presenca.status == StatusInscricaoEnum.confirmado:
             db.delete(presenca)
             db.commit()
 
@@ -606,20 +488,20 @@ def confirmar_presenca_publica(
                 body=f"{user.nome} cancelou a presença na {gira.titulo}",
                 url=f"/giras/{gira.id}",
             )
-
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
 
-        # Admin já marcou compareceu/faltou — membro não pode reverter
         return {"ok": False, "status": presenca.status, "acao": "ja_registrado"}
 
     # Cria nova confirmação de presença
-    max_pos = db.query(InscricaoGira).filter(InscricaoGira.gira_id == gira_id).count()
-    presenca = InscricaoGira(
+    max_pos = db.query(InscricaoMembro).filter(
+        InscricaoMembro.gira_id == gira_id
+    ).count()
+
+    presenca = InscricaoMembro(
         gira_id=gira_id,
         membro_id=user.id,
-        consulente_id=None,
         posicao=max_pos + 1,
-        status="confirmado",
+        status=StatusInscricaoEnum.confirmado,
     )
     db.add(presenca)
     db.commit()
@@ -630,5 +512,4 @@ def confirmar_presenca_publica(
         body=f"{user.nome} confirmou presença na {gira.titulo}",
         url=f"/giras/{gira.id}",
     )
-
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
