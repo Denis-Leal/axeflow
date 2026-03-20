@@ -22,3 +22,6 @@ from app.models.push_subscription import PushSubscription
 
 # AuditLog deve estar aqui para o Alembic detectar a tabela no autogenerate
 from app.models.audit_log import AuditLog
+
+# ApiKey — autenticação de integrações externas
+from app.models.api_key import ApiKey

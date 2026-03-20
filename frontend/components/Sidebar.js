@@ -2,10 +2,9 @@
 // Sidebar.js — AxeFlow
 // Barra lateral de navegação (desktop).
 //
-// CORREÇÃO: handleLogout agora usa o helper centralizado
-//   de logout (services/logout.js), que remove a push
-//   subscription do browser e do backend antes de limpar
-//   o localStorage e redirecionar para /login.
+// ALTERAÇÃO: adicionados links para /contato e /sobre
+//   na seção inferior da sidebar, acima do botão Sair.
+//   São acessíveis a todos os perfis (admin, operador, membro).
 // =====================================================
 
 import Link from 'next/link';
@@ -16,17 +15,17 @@ import { logout } from '../services/logout';
 
 export default function Sidebar() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [user, setUser]         = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     getMe().then(r => setUser(r.data)).catch(() => {});
   }, []);
 
+  // Retorna 'active' se o pathname começa com o path informado
   const isActive = (path) => router.pathname.startsWith(path) ? 'active' : '';
 
   const handleLogout = async () => {
-    // Evita duplo clique durante o processo de logout
     if (loggingOut) return;
     setLoggingOut(true);
     // Remove push subscription + limpa localStorage + redireciona
@@ -35,12 +34,14 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
+      {/* ── Branding ── */}
       <div className="sidebar-brand">
         <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>☽✦☾</div>
         <h4>AxeFlow</h4>
         {user && <small>{user.terreiro_nome}</small>}
       </div>
 
+      {/* ── Navegação principal ── */}
       <nav className="sidebar-nav">
         <Link href="/dashboard" className={`nav-item-custom ${isActive('/dashboard')}`}>
           <i className="bi bi-speedometer2"></i> Dashboard
@@ -54,14 +55,27 @@ export default function Sidebar() {
         <Link href="/membros" className={`nav-item-custom ${isActive('/membros')}`}>
           <i className="bi bi-person-badge"></i> Membros
         </Link>
+
+        {/* Divisor ornamental */}
         <div className="divider-ornamental" style={{ margin: '1rem 1.5rem' }}>
           <span style={{ fontSize: '0.7rem' }}>✦</span>
         </div>
+
         <Link href="/configuracoes" className={`nav-item-custom ${isActive('/configuracoes')}`}>
           <i className="bi bi-gear"></i> Configurações
         </Link>
+        <Link href="/api-docs" className={`nav-item-custom ${isActive('/api-docs')}`}>
+          <i className="bi bi-code-slash"></i> API & Integrações
+        </Link>
+        <Link href="/contato" className={`nav-item-custom ${isActive('/contato')}`}>
+          <i className="bi bi-chat-dots"></i> Contato
+        </Link>
+        <Link href="/sobre" className={`nav-item-custom ${isActive('/sobre')}`}>
+          <i className="bi bi-info-circle"></i> Sobre
+        </Link>
       </nav>
 
+      {/* ── Rodapé com dados do usuário e botão Sair ── */}
       <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--cor-borda)' }}>
         {user && (
           <div style={{ marginBottom: '0.75rem' }}>

@@ -76,8 +76,43 @@ export const deleteGira  = (id)         => api.delete(`/giras/${id}`);
 export const listInscricoes    = (giraId)              => api.get(`/giras/${giraId}/inscricoes`);
 export const updatePresenca    = (inscricaoId, status) => api.patch(`/inscricao/${inscricaoId}/presenca`, { status });
 export const updatePresencaMembro = (id, membroId, status) => api.post(`/membros/giras/${id}/presenca-membros/${membroId}`, { status });
+export const cancelarInscricaoMembro = (id, membroId) => api.delete(`/membros/giras/${id}/presenca-membros/${membroId}`);
+export const getPresencaMembros = (giraId) => api.get(`/membros/giras/${giraId}/presenca-membros`);
+export const getPresencaMembrosPublica = (giraId) => api.get(`/membros/giras/${giraId}/presenca-membros-publica`);
+export const confirmarPresencaMembro = (giraId) => api.post(`/membros/giras/${giraId}/confirmar-presenca`);
+export const confirmarPresencaMembroPublica = (giraId) => api.post(`/membros/giras/${giraId}/confirmar-presenca-publica`);
 export const cancelarInscricao = (inscricaoId)         => api.delete(`/inscricao/${inscricaoId}`);
+
+// ── Consulentes ───────────────────────────────────────
+export const listConsulentes   = ()           => api.get('/consulentes');
+export const createConsulente  = (data)       => api.post('/consulentes', data);
+export const updateConsulente  = (id, data)   => api.put(`/consulentes/${id}`, data);
+export const deleteConsulente  = (id)         => api.delete(`/consulentes/${id}`);
+export const getRankingConsulentes = () => api.get('/consulentes/ranking');
 
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)        => api.get(`/public/gira/${slug}`);
 export const inscreverPublico = (slug, data)  => api.post(`/public/gira/${slug}/inscrever`, data);
+
+// ── Membros ───────────────────────────────────────────
+export const listMembros   = ()           => api.get('/membros');
+export const createMembro  = (data)       => api.post('/membros', data);
+export const updateMembro  = (id, data)   => api.put(`/membros/${id}`, data);
+export const deleteMembro  = (id)         => api.delete(`/membros/${id}`);
+
+// ── Configurações ─────────────────────────────────────
+export const getConfig     = ()           => api.get('/config');
+export const updateConfig  = (data)       => api.put('/config', data);
+export const changePassword = (data) => api.patch('/auth/senha', data);
+
+// ── Contato ───────────────────────────────────────────
+export const enviarContato = (data)       => api.post('/contato', data);
+
+// ── Push Notifications ─────────────────────────────────
+export const registerPushSubscription = (subscription) => api.post('/push/register', { subscription });
+export const unregisterPushSubscription = () => api.post('/push/unregister');
+
+// ── Auditoria ───────────────────────────────────────────
+export const listAuditoria = () => api.get('/auditoria');
+
+// (Outros endpoints podem ser adicionados aqui conforme necessário)

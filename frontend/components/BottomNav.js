@@ -1,15 +1,39 @@
+// =====================================================
+// BottomNav.js — AxeFlow
+// Barra de navegação inferior (mobile).
+//
+// ALTERAÇÃO: adicionados links /contato e /sobre
+//   na gaveta "Mais", junto com Membros e Configurações.
+//   Mantém o comportamento de fechar a gaveta ao clicar.
+// =====================================================
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+
+// Páginas que ativam o botão "Mais" quando acessadas
+const PAGINAS_MAIS = ['/membros', '/configuracoes', '/contato', '/sobre', '/api-docs'];
 
 export default function BottomNav() {
   const router = useRouter();
   const p = router.pathname;
   const [maisAberto, setMaisAberto] = useState(false);
 
+  // Verifica se a página atual pertence ao grupo "Mais"
+  const maisAtivo = PAGINAS_MAIS.includes(p);
+
+  // Itens da gaveta "Mais" — centralizados para facilitar manutenção
+  const itensMais = [
+    { href: '/membros',       icon: 'bi-person-badge', label: 'Membros' },
+    { href: '/configuracoes', icon: 'bi-gear',         label: 'Configurações' },
+    { href: '/api-docs',      icon: 'bi-code-slash',   label: 'API & Integrações' },
+    { href: '/contato',       icon: 'bi-chat-dots',    label: 'Contato' },
+    { href: '/sobre',         icon: 'bi-info-circle',  label: 'Sobre' },
+  ];
+
   return (
     <>
-      {/* Overlay para fechar o menu "Mais" */}
+      {/* ── Overlay: fecha a gaveta ao clicar fora ── */}
       {maisAberto && (
         <div
           onClick={() => setMaisAberto(false)}
@@ -20,7 +44,7 @@ export default function BottomNav() {
         />
       )}
 
-      {/* Gaveta "Mais" */}
+      {/* ── Gaveta "Mais" ── */}
       {maisAberto && (
         <div style={{
           position: 'fixed',
@@ -31,41 +55,30 @@ export default function BottomNav() {
           borderRadius: '14px',
           padding: '0.5rem',
           zIndex: 300,
-          minWidth: '180px',
+          minWidth: '190px',
           boxShadow: '0 -4px 24px rgba(0,0,0,0.4)',
         }}>
-          <Link
-            href="/membros"
-            onClick={() => setMaisAberto(false)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.75rem 1rem', borderRadius: '10px', textDecoration: 'none',
-              color: p === '/membros' ? 'var(--cor-acento)' : 'var(--cor-texto)',
-              background: p === '/membros' ? 'rgba(212,175,55,0.08)' : 'transparent',
-              fontSize: '0.9rem',
-            }}
-          >
-            <i className="bi bi-person-badge" style={{ fontSize: '1.1rem' }}></i>
-            Membros
-          </Link>
-          <Link
-            href="/configuracoes"
-            onClick={() => setMaisAberto(false)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.75rem 1rem', borderRadius: '10px', textDecoration: 'none',
-              color: p === '/configuracoes' ? 'var(--cor-acento)' : 'var(--cor-texto)',
-              background: p === '/configuracoes' ? 'rgba(212,175,55,0.08)' : 'transparent',
-              fontSize: '0.9rem',
-            }}
-          >
-            <i className="bi bi-gear" style={{ fontSize: '1.1rem' }}></i>
-            Configurações
-          </Link>
+          {itensMais.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMaisAberto(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '0.75rem 1rem', borderRadius: '10px', textDecoration: 'none',
+                color: p === item.href ? 'var(--cor-acento)' : 'var(--cor-texto)',
+                background: p === item.href ? 'rgba(212,175,55,0.08)' : 'transparent',
+                fontSize: '0.9rem',
+              }}
+            >
+              <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem' }}></i>
+              {item.label}
+            </Link>
+          ))}
         </div>
       )}
 
-      {/* Barra de navegação inferior */}
+      {/* ── Barra de navegação inferior ── */}
       <nav className="bottom-nav">
         <Link href="/dashboard" className={p === '/dashboard' ? 'active' : ''}>
           <i className="bi bi-speedometer2"></i>
@@ -77,7 +90,7 @@ export default function BottomNav() {
           <span>Giras</span>
         </Link>
 
-        {/* Botão central + Nova Gira */}
+        {/* Botão central: Nova Gira */}
         <Link
           href="/giras/nova"
           style={{
@@ -97,19 +110,19 @@ export default function BottomNav() {
           <span>Consulentes</span>
         </Link>
 
-        {/* Menu Mais */}
+        {/* Botão "Mais" — abre gaveta com itens secundários */}
         <button
           onClick={() => setMaisAberto(v => !v)}
-          className={p === '/membros' || p === '/configuracoes' ? 'active' : ''}
+          className={maisAtivo ? 'active' : ''}
           style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             background: 'none', border: 'none', cursor: 'pointer',
-            color: (p === '/membros' || p === '/configuracoes' || maisAberto)
-              ? 'var(--cor-acento)' : 'var(--cor-texto-suave)',
+            color: (maisAtivo || maisAberto) ? 'var(--cor-acento)' : 'var(--cor-texto-suave)',
             fontSize: '0.6rem', gap: '2px',
-            borderTop: (p === '/membros' || p === '/configuracoes' || maisAberto)
-              ? '2px solid var(--cor-acento)' : '2px solid transparent',
+            borderTop: (maisAtivo || maisAberto)
+              ? '2px solid var(--cor-acento)'
+              : '2px solid transparent',
             padding: '0',
           }}
         >
