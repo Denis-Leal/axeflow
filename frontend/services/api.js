@@ -75,6 +75,7 @@ export const deleteGira  = (id)         => api.delete(`/giras/${id}`);
 // ── Inscrições ────────────────────────────────────────
 export const listInscricoes    = (giraId)              => api.get(`/giras/${giraId}/inscricoes`);
 export const updatePresenca    = (inscricaoId, status) => api.patch(`/inscricao/${inscricaoId}/presenca`, { status });
+export const updatePresencaMembro = (id, membroId, status) => api.post(`/membros/giras/${id}/presenca-membros/${membroId}`, { status });
 export const cancelarInscricao = (inscricaoId)         => api.delete(`/inscricao/${inscricaoId}`);
 
 // ── Público ───────────────────────────────────────────

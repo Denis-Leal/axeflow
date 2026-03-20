@@ -28,8 +28,9 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import ConfirmModal from '../../components/ConfirmModal';
-import { getGira, listInscricoes, updatePresenca, cancelarInscricao } from '../../services/api';
+import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao } from '../../services/api';
 import api from '../../services/api';
+import { handleApiError } from '../../services/errorHandler';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
 const COR_SCORE = {
@@ -319,15 +320,43 @@ export default function GiraDetalhe() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handlePresenca = async (inscricaoId, status) => {
+    try {
     await updatePresenca(inscricaoId, status);
     setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
+    }
+    catch (err) {
+      const msg = handleApiError(err, 'Atualizar presença');
+      setModal({
+        aberto: true,
+        titulo: 'Erro ao atualizar presença',
+        mensagem: msg,
+        apenasOk: true,
+        tipoBotao: 'perigo',
+        labelConfirmar: 'OK',
+        onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
+      });
+    }
   };
 
   const handlePresencaMembro = async (membroId, status) => {
-    await api.post(`/membros/giras/${id}/presenca-membros/${membroId}`, { status });
-    setMembrosPresenca(prev => prev.map(m =>
-      m.membro_id === membroId ? { ...m, status } : m
-    ));
+    try {
+      await updatePresencaMembro(id, membroId, status);
+      setMembrosPresenca(prev => prev.map(m =>
+        m.membro_id === membroId ? { ...m, status } : m
+      ));
+    }
+    catch (err) {
+      const msg = handleApiError(err, 'Atualizar presença do membro');
+      setModal({
+        aberto: true,
+        titulo: 'Erro ao atualizar presença do membro',
+        mensagem: msg,
+        apenasOk: true,
+        tipoBotao: 'perigo',
+        labelConfirmar: 'OK',
+        onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
+      });
+    }
   };
 
   const copyLink = async () => {
@@ -356,27 +385,41 @@ export default function GiraDetalhe() {
       labelConfirmar: 'Cancelar inscrição',
       onConfirmar: async () => {
         fecharModal();
-        const res = await cancelarInscricao(inscricaoId);
-        const resultado = res.data;
+        try {
+          const res = await cancelarInscricao(inscricaoId);
+          const resultado = res.data;
 
-        setInscricoes(prev => prev.map(i =>
-          i.id === inscricaoId ? { ...i, status: 'cancelado' } : i
-        ));
-
-        if (resultado?.promovido) {
-          const { nome, telefone, posicao } = resultado.promovido;
-          setInscricoes(prev => prev.map(i => {
-            if (i.consulente_telefone === telefone && i.status === 'lista_espera') {
-              return { ...i, status: 'confirmado' };
-            }
-            return i;
-          }));
-          const mensagemWA = (
-            `Olá ${nome}! Uma vaga foi liberada na gira "${gira.titulo}". ` +
-            `Você estava na lista de espera e agora está confirmado(a)! 🎉`
-          );
-          window.open(linkWhatsApp(telefone, mensagemWA), '_blank', 'noopener,noreferrer');
-          setPromovido({ nome, telefone, posicao });
+          setInscricoes(prev => prev.map(i =>
+            i.id === inscricaoId ? { ...i, status: 'cancelado' } : i
+          ));
+          
+          if (resultado?.promovido) {
+            const { nome, telefone, posicao } = resultado.promovido;
+            setInscricoes(prev => prev.map(i => {
+              if (i.consulente_telefone === telefone && i.status === 'lista_espera') {
+                return { ...i, status: 'confirmado' };
+              }
+              return i;
+            }));
+            const mensagemWA = (
+              `Olá ${nome}! Uma vaga foi liberada na gira "${gira.titulo}". ` +
+              `Você estava na lista de espera e agora está confirmado(a)! 🎉`
+            );
+            window.open(linkWhatsApp(telefone, mensagemWA), '_blank', 'noopener,noreferrer');
+            setPromovido({ nome, telefone, posicao });
+          }
+        }
+        catch (err) {
+          const msg = handleApiError(err, 'Cancelar inscrição');
+          setModal({
+            aberto: true,
+            titulo: 'Erro ao cancelar',
+            mensagem: msg,
+            apenasOk: true,
+            tipoBotao: 'perigo',
+            labelConfirmar: 'OK',
+            onConfirmar: fecharModal,
+          });
         }
       },
     });

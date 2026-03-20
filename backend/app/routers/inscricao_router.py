@@ -51,7 +51,7 @@ def list_inscricoes(
 def update_presenca(
     inscricao_id: UUID,
     data: PresencaUpdate,
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
     """Atualiza status de presença (compareceu / faltou)."""
@@ -61,7 +61,7 @@ def update_presenca(
 @router.delete("/inscricao/{inscricao_id}")
 def cancelar_inscricao(
     inscricao_id: UUID,
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
     """Cancela inscrição. Promove automaticamente o próximo da fila de espera."""
