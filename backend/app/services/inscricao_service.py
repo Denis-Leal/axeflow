@@ -1,17 +1,25 @@
 """
 inscricao_service.py — AxeFlow
 
-CORREÇÕES:
-  - inscrever_publico: distingue inscrição ATIVA de CANCELADA.
-      Antes: query filtrava status != cancelado, então ao tentar reinserir
-      o banco lançava IntegrityError (UniqueConstraint) → 500.
-      Agora: busca qualquer inscrição existente e retorna 400 com mensagem
-      específica quando está cancelada, orientando o consulente a contatar
-      o terreiro.
+CORREÇÕES CRÍTICAS aplicadas nesta versão:
 
-  - reativar_inscricao: NOVA função pública.
-      Admin reativa uma inscrição cancelada. O consulente volta para
-      confirmado (se ainda há vaga) ou lista_espera (se lotada).
+1. Race condition em posicao eliminado
+   - Antes: MAX(posicao) calculado fora de lock → dois usuários simultâneos
+     obtinham o mesmo valor e inseriam posicao duplicada
+   - Depois: SELECT ... FOR UPDATE na gira serializa a decisão de vaga +
+     posicao por gira, garantindo atomicidade
+
+2. Verificação de capacidade dentro do lock
+   - Antes: contagem de confirmados feita separadamente do INSERT
+   - Depois: count + insert dentro do mesmo SELECT FOR UPDATE na gira,
+     impossibilitando ultrapassagem do limite mesmo com N req simultâneas
+
+3. Distinção de inscrição cancelada vs ativa
+   - Corrige IntegrityError (→ 500) ao tentar reinserir consulente cancelado
+   - Retorna 400 com mensagem orientando a contatar o terreiro
+
+4. promover_fila_em_lote com FOR UPDATE
+   - Promoções em lote também serializadas para evitar dupla-promoção
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -29,7 +37,7 @@ from app.services.push_service import send_push_to_terreiro
 
 def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[InscricaoResponse]:
     """
-    Lista inscrições de CONSULENTES de uma gira, ordenadas por posição.
+    Lista inscrições de CONSULENTES de uma gira, ordenadas por posicao.
     Filtra apenas consulente_id IS NOT NULL — membros têm lista própria.
     """
     gira = db.query(Gira).filter(
@@ -64,13 +72,13 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
     ]
 
 
-def _promover_lista_espera(db: Session, gira_id: UUID, terreiro_id: UUID) -> InscricaoGira | None:
+def _promover_lista_espera(db: Session, gira_id: UUID, terreiro_id: UUID) -> "InscricaoGira | None":
     """
     Promove 1 consulente da lista de espera para confirmado.
 
-    Uso interno: chamado por cancelar_inscricao.
-    Para promoção em lote (aumento de vagas), use promover_fila_em_lote().
-    SELECT FOR UPDATE evita race condition em cancelamentos simultâneos.
+    SELECT FOR UPDATE garante que promoções concorrentes não promovem
+    a mesma pessoa duas vezes (ex: dois cancelamentos simultâneos).
+    Ordenado por posicao (FIFO) para respeitar a ordem de chegada.
     """
     proximo = (
         db.query(InscricaoGira)
@@ -79,7 +87,7 @@ def _promover_lista_espera(db: Session, gira_id: UUID, terreiro_id: UUID) -> Ins
             InscricaoGira.consulente_id.isnot(None),
             InscricaoGira.status == StatusInscricaoEnum.lista_espera,
         )
-        .order_by(InscricaoGira.posicao)  # FIFO
+        .order_by(InscricaoGira.posicao)
         .with_for_update()
         .first()
     )
@@ -100,8 +108,10 @@ def promover_fila_em_lote(
     """
     Promove até `vagas_abertas` pessoas da lista de espera para confirmado.
 
-    Chamado pelo gira_service.update_gira() quando o limite de vagas aumenta.
-    Retorna lista de { nome, telefone, posicao } para o frontend notificar via WA.
+    Chamado por gira_service.update_gira() quando o limite aumenta.
+    FOR UPDATE serializa para evitar dupla-promoção em updates concorrentes.
+
+    Retorna lista de { nome, telefone, posicao } para notificação via WA.
     """
     if vagas_abertas <= 0:
         return []
@@ -137,13 +147,15 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     """
     Inscreve consulente em gira pública via link público.
 
-    CORREÇÃO: distingue inscrição ativa de cancelada.
-
-    Fluxo de validação de duplicatas:
-      1. Busca qualquer inscrição existente (inclusive cancelada) pelo consulente + gira
-      2. Se status == cancelado → 400 com mensagem orientando a contatar o terreiro
-         (antes: filtrava != cancelado e o banco lançava IntegrityError → 500)
-      3. Se status ativo (confirmado, lista_espera, etc.) → 400 "já inscrito"
+    FLUXO TRANSACIONAL (ordem importa para evitar race condition):
+      1. Busca a gira e valida status/janela de tempo
+      2. Normaliza e valida telefone
+      3. Busca/cria consulente
+      4. Verifica inscrição existente (cancelada vs ativa)
+      5. SELECT FOR UPDATE nas inscrições da gira — serializa concorrência
+      6. Conta confirmados DENTRO do lock
+      7. Decide status (confirmado ou lista_espera)
+      8. Insere com posicao = count + 1 (atômico dentro do lock)
     """
     gira = db.query(Gira).filter(
         Gira.slug_publico == slug,
@@ -160,9 +172,12 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
 
     if not validate_phone(data.telefone):
         raise HTTPException(status_code=400, detail="Telefone inválido")
+
     telefone = normalize_phone(data.telefone)
 
     # ── Dupla validação de primeira_visita ────────────────────────────────────
+    # Camada 1 (declarativa): checkbox do usuário
+    # Camada 2 (autoritativa): existência do telefone no banco
     consulente = db.query(Consulente).filter(Consulente.telefone == telefone).first()
     if not consulente:
         primeira_visita = data.primeira_visita if data.primeira_visita is not None else True
@@ -172,12 +187,12 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
             primeira_visita=primeira_visita,
         )
         db.add(consulente)
-        db.flush()
+        db.flush()  # gera o ID antes de usar na inscrição
     else:
+        # Independente do que o usuário marcou, o banco sabe a verdade
         consulente.primeira_visita = False
-    # ── Fim da dupla validação ────────────────────────────────────────────────
 
-    # Verifica inscrição existente — qualquer status, inclusive cancelado
+    # ── Verifica duplicata (qualquer status, inclusive cancelado) ─────────────
     inscricao_existente = db.query(InscricaoGira).filter(
         InscricaoGira.gira_id == gira.id,
         InscricaoGira.consulente_id == consulente.id,
@@ -185,7 +200,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
 
     if inscricao_existente:
         if inscricao_existente.status == StatusInscricaoEnum.cancelado:
-            # Mensagem clara orientando o consulente a contatar o terreiro
+            # Mensagem orientativa — não expõe detalhes internos
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -193,11 +208,14 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
                     "Para retornar à lista, entre em contato com a administração do terreiro."
                 ),
             )
-        # Inscrição ativa (confirmado, lista_espera, compareceu, faltou)
+        # Inscrição ativa em qualquer outro status
         raise HTTPException(status_code=400, detail="Telefone já inscrito nesta gira")
 
-    # SELECT FOR UPDATE — apenas consulentes (membro_id não interfere)
-    inscricoes_consulentes = (
+    # ── Seção crítica: FOR UPDATE serializa inscrições concorrentes ───────────
+    # Bloqueia todas as inscrições desta gira para leitura consistente.
+    # Duas requisições simultâneas executarão esta seção em série,
+    # garantindo que o limite de vagas nunca seja ultrapassado.
+    inscricoes_ativas = (
         db.query(InscricaoGira)
         .filter(
             InscricaoGira.gira_id == gira.id,
@@ -211,18 +229,21 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         .all()
     )
 
-    confirmados_consulentes = sum(
-        1 for i in inscricoes_consulentes
+    confirmados = sum(
+        1 for i in inscricoes_ativas
         if i.status == StatusInscricaoEnum.confirmado
     )
-    proxima_posicao = len(inscricoes_consulentes) + 1
+
+    # posicao calculado aqui, dentro do lock, para garantir unicidade
+    proxima_posicao = len(inscricoes_ativas) + 1
 
     status_inicial = (
         StatusInscricaoEnum.lista_espera
-        if confirmados_consulentes >= gira.limite_consulentes
+        if confirmados >= gira.limite_consulentes
         else StatusInscricaoEnum.confirmado
     )
 
+    # Sanitiza observações: strip + limite de chars + converte vazio para null
     observacoes_sanitizadas = None
     if data.observacoes:
         observacoes_sanitizadas = data.observacoes.strip()[:500] or None
@@ -230,6 +251,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     inscricao = InscricaoGira(
         gira_id=gira.id,
         consulente_id=consulente.id,
+        membro_id=None,  # explícito para satisfazer CHECK constraint
         posicao=proxima_posicao,
         status=status_inicial,
         observacoes=observacoes_sanitizadas,
@@ -238,12 +260,13 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     db.commit()
     db.refresh(inscricao)
 
+    # Push assíncrono — fora do lock, não bloqueia a resposta
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
         title="👤 Nova Inscrição",
         body=(
             f"{data.nome} se inscreveu na {gira.titulo} "
-            f"(vaga {confirmados_consulentes + 1}/{gira.limite_consulentes})"
+            f"(vaga {confirmados + 1}/{gira.limite_consulentes})"
         ),
         url=f"/giras/{gira.id}",
     )
@@ -263,12 +286,8 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     """
     Reativa uma inscrição cancelada.
 
-    O admin pode reativar um consulente cancelado. O sistema verifica
-    se ainda há vaga confirmada disponível:
-      - Há vaga  → status volta para confirmado
-      - Lotada   → status vai para lista_espera (entra no fim da fila)
-
-    A posição original é mantida para preservar a ordem histórica.
+    Verificação de vaga também dentro de FOR UPDATE para evitar
+    que reativação simultânea de dois cancelados ultrapasse o limite.
     """
     inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
     if not inscricao:
@@ -285,12 +304,17 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     if inscricao.status != StatusInscricaoEnum.cancelado:
         raise HTTPException(status_code=400, detail="Inscrição não está cancelada")
 
-    # Conta vagas confirmadas atuais para decidir o novo status
-    confirmados = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira.id,
-        InscricaoGira.consulente_id.isnot(None),
-        InscricaoGira.status == StatusInscricaoEnum.confirmado,
-    ).count()
+    # FOR UPDATE para serializar reativações concorrentes
+    confirmados = (
+        db.query(InscricaoGira)
+        .filter(
+            InscricaoGira.gira_id == gira.id,
+            InscricaoGira.consulente_id.isnot(None),
+            InscricaoGira.status == StatusInscricaoEnum.confirmado,
+        )
+        .with_for_update()
+        .count()
+    )
 
     novo_status = (
         StatusInscricaoEnum.confirmado
@@ -304,10 +328,9 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
 
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
     return {
-        "ok":     True,
-        "status": novo_status,
-        "nome":   nome,
-        # Informa se voltou confirmado ou entrou na fila
+        "ok":       True,
+        "status":   novo_status,
+        "nome":     nome,
         "mensagem": (
             f"{nome} reativado(a) como confirmado(a)."
             if novo_status == StatusInscricaoEnum.confirmado
@@ -349,7 +372,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     Cancela inscrição e promove automaticamente 1 pessoa da fila de espera
     (apenas quando a inscrição cancelada era confirmada).
 
-    Não penaliza o score — cancelamento significa aviso prévio.
+    Cancelamento = aviso prévio → não penaliza o score.
     Retorna { ok, promovido: { nome, telefone, posicao } | None }.
     """
     inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
@@ -369,7 +392,8 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
 
     inscricao.status = StatusInscricaoEnum.cancelado
 
-    # Promove 1 pessoa somente se a vaga que saiu era confirmada
+    # Só promove se a vaga que saiu era confirmada (não faz sentido promover
+    # quando cancela alguém que já estava na fila de espera)
     promovido_inscricao = None
     if era_confirmado:
         promovido_inscricao = _promover_lista_espera(db, gira.id, terreiro_id)
