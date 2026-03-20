@@ -14,6 +14,7 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import api from '../services/api';
+import { getMe, changePassword } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 import { logout } from '../services/logout';
 
@@ -29,7 +30,7 @@ export default function Configuracoes() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    api.get('/auth/me')
+    getMe()
       .then(r => setUser(r.data))
       .catch(err => {
         if (err.response?.status === 401) {
@@ -50,14 +51,14 @@ export default function Configuracoes() {
     setSaving(true);
     setMsg({ tipo: '', texto: '' });
     try {
-      await api.patch('/auth/senha', {
+      await changePassword({
         senha_atual: formSenha.senha_atual,
         nova_senha:  formSenha.nova_senha,
       });
       setMsg({ tipo: 'ok', texto: 'Senha alterada com sucesso!' });
       setFormSenha({ senha_atual: '', nova_senha: '', confirmar: '' });
     } catch (err) {
-      setMsg({ tipo: 'erro', texto: err.response?.data?.detail || 'Erro ao alterar senha' });
+      handleApiError(err, setMsg);
     } finally {
       setSaving(false);
     }

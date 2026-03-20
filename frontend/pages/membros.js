@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import api from '../services/api';
+import { getMe, listMembros, createMembro, updateMembro } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 
 const ROLES = { admin: 'Admin', operador: 'Operador', membro: 'Membro' };
@@ -26,12 +27,12 @@ export default function Membros() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    api.get('/auth/me').then(r => {
+    getMe().then(r => {
       setMe(r.data);
-      return api.get(`/membros`);
+      return listMembros();
     }).then(r => setMembros(r.data))
       .catch(() => {
-        api.get('/auth/me').then(r => setMembros([r.data]));
+        getMe().then(r => setMembros([r.data]));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -41,10 +42,10 @@ export default function Membros() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/membros', form);
+      await createMembro(form);
       setShowModal(false);
       setForm({ nome: '', email: '', senha: '', telefone: '', role: 'membro' });
-      const r = await api.get('/membros');
+      const r = await listMembros();
       setMembros(r.data);
     } catch (err) {
       setError(handleApiError(err, 'Membros'));
@@ -67,9 +68,9 @@ export default function Membros() {
     try {
       const payload = { ...editForm };
       if (!payload.senha) delete payload.senha; // só envia senha se preenchida
-      await api.put(`/membros/${membroEditando.id}`, payload);
+      await updateMembro(membroEditando.id, payload);
       setShowEditModal(false);
-      const r = await api.get('/membros');
+      const r = await listMembros();
       setMembros(r.data);
     } catch (err) {
       setEditError(handleApiError(err, 'Membros'));

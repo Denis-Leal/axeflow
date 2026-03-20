@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import Link from 'next/link';
 import api from '../services/api';
+import { getRankingConsulentes } from '../services/api';
 
 const COR_SCORE = {
   verde:    { bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.35)',  text: '#10b981' },
@@ -39,7 +40,7 @@ export default function Consulentes() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
-    api.get('/consulentes/ranking')
+    getRankingConsulentes()
       .then(res => setConsulentes(res.data))
       .catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } })
       .finally(() => setLoading(false));

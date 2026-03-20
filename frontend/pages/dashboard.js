@@ -17,7 +17,7 @@ import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import NotificationButton from '../components/NotificationButton';
-import { listGiras, getMe } from '../services/api';
+import { listGiras, getMe, getPresencaMembros, getPresencaMembrosPublica, confirmarPresencaMembro, confirmarPresencaMembroPublica } from '../services/api';
 import api from '../services/api';
 
 export default function Dashboard() {
@@ -87,7 +87,7 @@ export default function Dashboard() {
   function carregarPresencasFechadas(girasLista, userId) {
     Promise.all(
       girasLista.map(g =>
-        api.get(`/membros/giras/${g.id}/presenca-membros`)
+        getPresencaMembros(g.id)
           .then(r => ({ giraId: g.id, membros: r.data, userId }))
           .catch(() => null)
       )
@@ -108,7 +108,7 @@ export default function Dashboard() {
   function carregarPresencasPublicas(girasLista, userId) {
     Promise.all(
       girasLista.map(g =>
-        api.get(`/membros/giras/${g.id}/presenca-membros-publica`)
+        getPresencaMembrosPublica(g.id)
           .then(r => ({ giraId: g.id, membros: r.data, userId }))
           .catch(() => null)
       )
@@ -142,7 +142,7 @@ export default function Dashboard() {
 
     setConfirmandoFechada(prev => ({ ...prev, [giraId]: true }));
     try {
-      const { data } = await api.post(`/membros/giras/${giraId}/confirmar-presenca`);
+      const { data } = await confirmarPresencaMembro(giraId);
       setMinhasPresencas(prev => ({ ...prev, [giraId]: data.status }));
     } catch (err) {
       console.error('[Dashboard] Erro ao confirmar presença (fechada):', err);
@@ -161,7 +161,7 @@ export default function Dashboard() {
 
     setConfirmandoPublica(prev => ({ ...prev, [giraId]: true }));
     try {
-      const { data } = await api.post(`/membros/giras/${giraId}/confirmar-presenca-publica`);
+      const { data } = await confirmarPresencaMembroPublica(giraId);
 
       // Atualiza status do usuário nesta gira
       setMinhasPresencasPublicas(prev => ({ ...prev, [giraId]: data.status }));
