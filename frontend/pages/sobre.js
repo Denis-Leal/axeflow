@@ -408,9 +408,9 @@ export default function Sobre() {
                     </div>
 
                     {[
-                      { href: '/contato',                    icon: 'bi-chat-dots',  label: 'Enviar feedback ao desenvolvedor', externo: false },
-                      { href: APP_INFO.site,                 icon: 'bi-globe',      label: 'Site do AxeFlow',                 externo: true },
-                      { href: `${APP_INFO.site}/docs`,       icon: 'bi-book',       label: 'Documentação da API',             externo: true },
+                      { href: '/contato',   icon: 'bi-chat-dots',  label: 'Enviar feedback ao desenvolvedor', externo: false },
+                      { href: '/api-docs',  icon: 'bi-code-slash', label: 'API & Integrações',                externo: false },
+                      { href: APP_INFO.site, icon: 'bi-globe',     label: 'Site do AxeFlow',                 externo: true  },
                     ].map(link => (
                       link.externo ? (
                         <a
