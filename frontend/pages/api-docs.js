@@ -16,7 +16,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
-import api from '../services/api';
+import { getMe, listApiKeys, createApiKey, deleteApiKey } from '../services/api';
 
 // ── Constante: URL base da API ────────────────────────────────────────────────
 const API_BASE = 'https://axeflow-backend.onrender.com';
@@ -310,7 +310,7 @@ export default function ApiDocs() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    Promise.all([api.get('/auth/me'), api.get('/api-keys')])
+    Promise.all([getMe(), listApiKeys()])
       .then(([meRes, chavesRes]) => {
         setUser(meRes.data);
         setChaves(chavesRes.data);
@@ -327,7 +327,7 @@ export default function ApiDocs() {
     setCriando(true);
     setErroCriar('');
     try {
-      const res = await api.post('/api-keys', {
+      const res = await createApiKey({
         nome:      formNome,
         descricao: formDesc || null,
         scopes:    scopesSel,
@@ -349,7 +349,7 @@ export default function ApiDocs() {
     if (!confirm(`Revogar a chave "${nome}"? Esta ação não pode ser desfeita.`)) return;
     setRevogando(prev => ({ ...prev, [keyId]: true }));
     try {
-      await api.delete(`/api-keys/${keyId}`);
+      await deleteApiKey(keyId);
       setChaves(prev => prev.map(k =>
         k.id === keyId ? { ...k, ativa: false, revoked_at: new Date().toISOString() } : k
       ));

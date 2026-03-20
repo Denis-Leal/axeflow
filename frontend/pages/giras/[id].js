@@ -28,7 +28,7 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import ConfirmModal from '../../components/ConfirmModal';
-import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao } from '../../services/api';
+import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao } from '../../services/api';
 import api from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
 
@@ -435,7 +435,7 @@ export default function GiraDetalhe() {
       labelConfirmar: 'Reativar',
       onConfirmar: async () => {
         fecharModal();
-        const res = await api.post(`/inscricao/${inscricaoId}/reativar`);
+        const res = await reativarInscricao(inscricaoId);
         const { status, mensagem } = res.data;
         setInscricoes(prev => prev.map(i =>
           i.id === inscricaoId ? { ...i, status } : i

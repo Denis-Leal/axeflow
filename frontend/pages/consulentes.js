@@ -4,7 +4,6 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import Link from 'next/link';
-import api from '../services/api';
 import { getRankingConsulentes } from '../services/api';
 
 const COR_SCORE = {

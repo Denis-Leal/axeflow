@@ -16,6 +16,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import axios from 'axios';
+import { handleApiError } from '../services/errorHandler';
 
 export default function RedefinirSenha() {
   const router = useRouter();
@@ -60,11 +61,11 @@ export default function RedefinirSenha() {
     e.preventDefault();
 
     if (!senhaValida) {
-      setErro('A senha deve ter pelo menos 6 caracteres.');
+      setErro(handleApiError({ response: { data: { detail: 'A senha deve ter no mínimo 6 caracteres.' } } }, 'Redefinir Senha'));
       return;
     }
     if (!senhasIguais) {
-      setErro('As senhas não coincidem.');
+      setErro(handleApiError({ response: { data: { detail: 'As senhas não coincidem.' } } }, 'Redefinir Senha'));
       return;
     }
 
@@ -82,11 +83,11 @@ export default function RedefinirSenha() {
       const detalhe = err?.response?.data?.detail;
 
       if (status === 400) {
-        setErro(detalhe || 'Link inválido ou expirado. Solicite um novo.');
+        setErro(handleApiError({ response: { data: { detail: detalhe || 'Link inválido ou expirado. Solicite um novo.' } } }, 'Redefinir Senha'));
       } else if (status === 429) {
-        setErro('Muitas tentativas. Aguarde alguns minutos.');
+        setErro(handleApiError({ response: { data: { detail: 'Muitas tentativas. Aguarde alguns minutos.' } } }, 'Redefinir Senha'));
       } else {
-        setErro('Erro ao redefinir a senha. Tente novamente.');
+        setErro(handleApiError({ response: { data: { detail: 'Erro ao redefinir a senha. Tente novamente.' } } }, 'Redefinir Senha'));
       }
     } finally {
       setLoading(false);

@@ -18,7 +18,6 @@ import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import NotificationButton from '../components/NotificationButton';
 import { listGiras, getMe, getPresencaMembros, getPresencaMembrosPublica, confirmarPresencaMembro, confirmarPresencaMembroPublica } from '../services/api';
-import api from '../services/api';
 
 export default function Dashboard() {
   const router = useRouter();

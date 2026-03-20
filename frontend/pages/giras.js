@@ -1,3 +1,21 @@
+/**
+ * pages/giras.js — AxeFlow
+ *
+ * CORREÇÃO: removida a validação de permissão via query param (?erro=sem-permissao).
+ *
+ * Antes: editar/[id].js redirecionava para /giras?erro=sem-permissao e esta
+ *   página construía um erro falso manualmente para exibir a mensagem.
+ *   Isso era frágil, expunha estado na URL e duplicava lógica de permissão.
+ *
+ * Agora: o backend retorna 403 quando necessário → o errorHandler traduz →
+ *   o catch exibe a mensagem diretamente. Sem parâmetros de URL, sem
+ *   construção manual de objetos de erro.
+ *
+ * A verificação de role no frontend (podeGerenciar, podeExcluir) serve
+ * apenas para ocultar botões irrelevantes — não é uma barreira de segurança.
+ * A segurança real está nas permissões do backend (require_role).
+ */
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -6,6 +24,7 @@ import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import ConfirmModal from '../components/ConfirmModal';
 import { listGiras, deleteGira, getMe } from '../services/api';
+import { handleApiError } from '../services/errorHandler';
 
 export default function Giras() {
   const router = useRouter();
@@ -21,11 +40,6 @@ export default function Giras() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    if (router.query.erro === 'sem-permissao') {
-      setErro('Sem permissão para acessar essa página. Apenas administradores e operadores podem criar ou editar giras.');
-      setTimeout(() => setErro(''), 6000);
-    }
-
     Promise.all([listGiras(), getMe()])
       .then(([girasRes, meRes]) => {
         setGiras(girasRes.data);
@@ -38,8 +52,9 @@ export default function Giras() {
         }
       })
       .finally(() => setLoading(false));
-  }, [router.query]);
+  }, []);
 
+  // Controla visibilidade de botões — puramente UX, não segurança
   const podeGerenciar = ['admin', 'operador'].includes(userRole);
   const podeExcluir   = userRole === 'admin';
 
@@ -58,11 +73,8 @@ export default function Giras() {
           await deleteGira(id);
           setGiras(prev => prev.filter(g => g.id !== id));
         } catch (err) {
-          if (err.response?.status === 403) {
-            setErro('Sem permissão para excluir giras. Apenas administradores podem fazer isso.');
-          } else {
-            setErro('Erro ao excluir a gira. Tente novamente.');
-          }
+          // 403 do backend é traduzido pelo handleApiError para mensagem legível
+          setErro(handleApiError(err, 'Excluir Gira'));
           setTimeout(() => setErro(''), 5000);
         }
       },

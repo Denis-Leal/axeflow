@@ -1,12 +1,21 @@
 /**
  * pages/giras/editar/[id].js — AxeFlow
  *
- * ALTERAÇÃO: ao salvar edição que aumenta vagas, o backend promove
- * automaticamente quem estava na lista de espera, mas o WhatsApp
- * NÃO é aberto automaticamente. Em vez disso, um painel aparece
- * com botões manuais para o admin notificar cada promovido.
+ * CORREÇÃO: removida a validação de permissão no frontend via redirecionamento.
  *
- * WhatsApp automático só ocorre no cancelamento de inscrição (giras/[id].js).
+ * Antes:
+ *   getMe() verificava o role e redirecionava para /giras?erro=sem-permissao
+ *   se o usuário não fosse admin ou operador. Isso era desnecessário porque:
+ *     1. O backend já protege o PUT /giras/{id} com require_role("admin","operador")
+ *     2. O errorHandler já traduz 403 para mensagem legível
+ *     3. Redirecionar com estado na URL é frágil e cria acoplamento
+ *
+ * Agora:
+ *   - O useEffect só verifica autenticação (token presente) e carrega os dados
+ *   - Se o usuário não tiver permissão e tentar salvar, o backend retorna 403
+ *   - O handleApiError captura e exibe "Você não tem permissão para realizar esta ação."
+ *   - Os botões de edição já ficam ocultos na listagem para quem não tem role
+ *     (puramente UX — não é uma barreira de segurança)
  */
 
 import { useState, useEffect } from 'react';
@@ -15,31 +24,22 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
-import { getGira, getMe } from '../../../services/api';
+import { getGira, listMembros, updateGira } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
-import api from '../../../services/api';
+import ConfirmModal from '../../../components/ConfirmModal';
 
-// ── Helper: monta link wa.me com mensagem pré-preenchida ────────────────────
-
+// ── Helper: monta link wa.me com mensagem pré-preenchida ──────────────────────
 function linkWhatsApp(telefone, mensagem) {
   const digitos = String(telefone).replace(/\D/g, '');
   return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
 }
 
-// ── Painel de promovidos: aparece após salvar quando há promoções ────────────
-
-/**
- * Exibe cards para cada consulente promovido da fila de espera.
- * O admin clica no botão WhatsApp de cada um manualmente.
- * Ao clicar em "Continuar", redireciona para a página da gira.
- */
+// ── Painel de promovidos: aparece após salvar quando há promoções da fila ──────
 function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
-  // Rastreia quais botões já foram clicados para feedback visual
   const [notificados, setNotificados] = useState({});
 
-  const marcarNotificado = (telefone) => {
+  const marcarNotificado = (telefone) =>
     setNotificados(prev => ({ ...prev, [telefone]: true }));
-  };
 
   const todosNotificados = promovidos.every(p => notificados[p.telefone]);
 
@@ -51,7 +51,6 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
       padding: '1.25rem',
       marginBottom: '1.5rem',
     }}>
-      {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
         <span style={{ fontSize: '1.3rem' }}>🎉</span>
         <div>
@@ -64,61 +63,36 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
         </div>
       </div>
 
-      {/* Card de cada promovido */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-        {promovidos.map((p) => {
+        {promovidos.map(p => {
           const jaNotificado = notificados[p.telefone];
-          const mensagemWA = (
-            `Olá ${p.nome}! Uma vaga foi liberada na gira "${giraTitulo}". ` +
-            `Você estava na lista de espera e agora está confirmado(a)! 🎉`
-          );
-
+          const mensagemWA   = `Olá ${p.nome}! Uma vaga foi liberada na gira "${giraTitulo}". Você estava na lista de espera e agora está confirmado(a)! 🎉`;
           return (
             <div key={p.telefone} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0.65rem 0.85rem', borderRadius: '10px', gap: '0.75rem', flexWrap: 'wrap',
               background: jaNotificado ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
               border: `1px solid ${jaNotificado ? 'rgba(16,185,129,0.3)' : 'var(--cor-borda)'}`,
-              gap: '0.75rem',
-              flexWrap: 'wrap',
             }}>
               <div>
-                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>
-                  {p.nome}
-                </span>
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
-                  #{p.posicao} na fila
-                </span>
+                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{p.nome}</span>
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>#{p.posicao} na fila</span>
                 {jaNotificado && (
-                  <span style={{
-                    marginLeft: '0.5rem', fontSize: '0.7rem',
-                    color: '#10b981', fontWeight: 600,
-                  }}>
-                    ✓ Notificado
-                  </span>
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>✓ Notificado</span>
                 )}
               </div>
-
               <a
                 href={linkWhatsApp(p.telefone, mensagemWA)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => marcarNotificado(p.telefone)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                   background: jaNotificado ? 'rgba(37,211,102,0.08)' : 'rgba(37,211,102,0.15)',
                   border: `1px solid ${jaNotificado ? 'rgba(37,211,102,0.2)' : 'rgba(37,211,102,0.45)'}`,
                   color: jaNotificado ? 'rgba(37,211,102,0.5)' : '#25d366',
-                  borderRadius: '8px',
-                  padding: '0.35rem 0.85rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.82rem',
+                  borderRadius: '8px', padding: '0.35rem 0.85rem',
+                  textDecoration: 'none', fontWeight: 600, fontSize: '0.82rem',
                   pointerEvents: jaNotificado ? 'none' : 'auto',
                 }}
               >
@@ -130,12 +104,7 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
         })}
       </div>
 
-      {/* Botão continuar */}
-      <button
-        onClick={onContinuar}
-        className="btn-gold w-100"
-        style={{ padding: '0.65rem' }}
-      >
+      <button onClick={onContinuar} className="btn-gold w-100" style={{ padding: '0.65rem' }}>
         {todosNotificados
           ? <><i className="bi bi-check-lg me-2"></i>Todos notificados — Continuar</>
           : <><i className="bi bi-arrow-right me-2"></i>Continuar sem notificar todos</>
@@ -145,38 +114,32 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
   );
 }
 
-// ── Página principal ─────────────────────────────────────────────────────────
-
+// ── Página principal ──────────────────────────────────────────────────────────
 export default function EditarGira() {
   const router = useRouter();
   const { id } = router.query;
 
-  const [form, setForm]           = useState(null);
-  const [membros, setMembros]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState('');
-  // Lista de promovidos retornada pelo backend após salvar
+  const [form, setForm]             = useState(null);
+  const [membros, setMembros]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
   const [promovidos, setPromovidos] = useState([]);
-  // Título da gira para montar a mensagem de WA
   const [giraTitulo, setGiraTitulo] = useState('');
+  const [modal, setModal]       = useState({
+    aberto: false, titulo: '', mensagem: '', onConfirmar: null,
+  });
 
   useEffect(() => {
     if (!id) return;
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    getMe()
-      .then(meRes => {
-        if (!['admin', 'operador'].includes(meRes.data.role)) {
-          router.push('/giras?erro=sem-permissao');
-          return Promise.reject('sem-permissao');
-        }
-        return Promise.all([getGira(id), api.get('/membros')]);
-      })
-      .then(results => {
-        if (!results) return;
-        const [giraRes, membrosRes] = results;
+    // Carrega gira e membros em paralelo — sem verificar role aqui.
+    // Se o usuário não tiver permissão para editar, o backend retornará 403
+    // quando o formulário for submetido, e o handleApiError exibirá a mensagem.
+    Promise.all([getGira(id), listMembros()])
+      .then(([giraRes, membrosRes]) => {
         const g = giraRes.data;
         setGiraTitulo(g.titulo || '');
         setForm({
@@ -194,57 +157,76 @@ export default function EditarGira() {
         });
         setMembros(membrosRes.data);
       })
-      .catch(err => { if (err !== 'sem-permissao') router.push('/giras'); })
+      .catch(() => router.push('/giras'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const fecharModal = () => setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
 
-    try {
-      const payload = {
-        titulo:  form.titulo,
-        tipo:    form.tipo,
-        acesso:  form.acesso,
-        data:    form.data,
-        horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
-        status:  form.status,
-      };
+    setModal({
+      aberto: true,
+      titulo: 'Confirmar edição',
+      mensagem: 'Tem certeza que deseja salvar as alterações nesta gira?',
+      tipoBotao: 'perigo',
+      labelConfirmar: 'Sim, salvar',
+      onConfirmar: async () => {
+        fecharModal();
+        try {
+          const payload = {
+            titulo:  form.titulo,
+            tipo:    form.tipo,
+            acesso:  form.acesso,
+            data:    form.data,
+            horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
+            status:  form.status,
+          };
 
-      if (form.acesso === 'fechada') {
-        payload.limite_membros       = parseInt(form.limite_membros);
-        payload.abertura_lista       = null;
-        payload.fechamento_lista     = null;
-        payload.responsavel_lista_id = null;
-        payload.limite_consulentes   = null;
-      } else {
-        payload.limite_consulentes   = parseInt(form.limite_consulentes);
-        payload.limite_membros       = null;
-        payload.abertura_lista       = form.abertura_lista || null;
-        payload.fechamento_lista     = form.fechamento_lista || null;
-        payload.responsavel_lista_id = form.responsavel_lista_id || null;
-      }
+          if (form.acesso === 'fechada') {
+            payload.limite_membros       = parseInt(form.limite_membros);
+            payload.abertura_lista       = null;
+            payload.fechamento_lista     = null;
+            payload.responsavel_lista_id = null;
+            payload.limite_consulentes   = null;
+          } else {
+            payload.limite_consulentes   = parseInt(form.limite_consulentes);
+            payload.limite_membros       = null;
+            payload.abertura_lista       = form.abertura_lista || null;
+            payload.fechamento_lista     = form.fechamento_lista || null;
+            payload.responsavel_lista_id = form.responsavel_lista_id || null;
+          }
 
-      const res = await api.put(`/giras/${id}`, payload);
-      const resultado = res.data;
+          const res = await updateGira(id, payload);
+          const resultado = res.data;
+          const listaPromovidos = resultado.promovidos_fila || [];
 
-      const listaPromovidos = resultado.promovidos_fila || [];
-
-      if (listaPromovidos.length > 0) {
-        // Há promovidos — exibe o painel manual antes de redirecionar
-        setGiraTitulo(resultado.titulo || form.titulo);
-        setPromovidos(listaPromovidos);
-      } else {
-        // Sem promovidos — redireciona direto
-        router.push(`/giras/${id}`);
-      }
-    } catch (err) {
-      setError(handleApiError(err, 'EditarGira'));
-    } finally {
-      setSaving(false);
-    }
+          if (listaPromovidos.length > 0) {
+            setGiraTitulo(resultado.titulo || form.titulo);
+            setPromovidos(listaPromovidos);
+          } else {
+            router.push(`/giras/${id}`);
+          }
+        } catch (err) {
+          // handleApiError traduz 403 → "Você não tem permissão para realizar esta ação."
+          // e qualquer outro erro HTTP para mensagem legível em português
+          const msg = handleApiError(err, 'Editar Gira');
+          setModal({
+            aberto: true,
+            titulo: 'Erro ao salvar',
+            mensagem: msg,
+            tipoBotao: 'primary',
+            labelConfirmar: 'Fechar',
+            onConfirmar: fecharModal,
+          });
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
@@ -284,7 +266,6 @@ export default function EditarGira() {
                   </div>
                 )}
 
-                {/* Painel de promovidos — aparece após salvar, substitui o formulário */}
                 {promovidos.length > 0 ? (
                   <PainelPromovidos
                     promovidos={promovidos}
@@ -295,7 +276,6 @@ export default function EditarGira() {
                   <form onSubmit={handleSubmit}>
                     <div className="row g-3">
 
-                      {/* Tipo de acesso */}
                       <div className="col-12">
                         <label className="form-label-custom">Tipo de Gira</label>
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -406,7 +386,8 @@ export default function EditarGira() {
                           style={{ padding: '0.65rem 2rem' }}>
                           {saving
                             ? <><span className="spinner-border spinner-border-sm me-2"></span>Salvando...</>
-                            : <><i className="bi bi-check-lg me-2"></i>Salvar alterações</>}
+                            : <><i className="bi bi-check-lg me-2"></i>Salvar alterações</>
+                          }
                         </button>
                         <Link href={`/giras/${id}`} className="btn-outline-gold"
                           style={{ padding: '0.65rem 1.5rem', textDecoration: 'none' }}>
@@ -424,6 +405,16 @@ export default function EditarGira() {
         </div>
       </div>
       <BottomNav />
+
+      <ConfirmModal
+        aberto={modal.aberto}
+        titulo={modal.titulo}
+        mensagem={modal.mensagem}
+        tipoBotao={modal.tipoBotao || 'perigo'}
+        labelConfirmar={modal.labelConfirmar || 'Confirmar'}
+        onConfirmar={modal.onConfirmar}
+        onCancelar={fecharModal}
+      />
     </>
   );
 }
