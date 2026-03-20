@@ -1,11 +1,13 @@
 """
 inscricao_router.py — AxeFlow
+Endpoints de inscrição com auditoria completa.
 
-ALTERAÇÃO:
-  - POST /inscricao/{id}/reativar: novo endpoint para admin reativar
-    inscrição cancelada. Volta para confirmado (se há vaga) ou lista_espera.
+Eventos registrados:
+  PRESENCA_UPDATED    — presença marcada (INFO)
+  INSCRICAO_CANCELADA — inscrição cancelada (WARNING)
+  INSCRICAO_REATIVADA — inscrição reativada (INFO)
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -13,13 +15,13 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.schemas.inscricao_schema import PresencaUpdate
 from app.services import inscricao_service
+from app.services import audit_service
 from app.services.presenca_service import get_scores_para_gira, get_ranking_consulentes
 from app.models.usuario import Usuario
-from app.models.inscricao import InscricaoGira
+from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.consulente import Consulente
 from app.models.gira import Gira
 from app.services.presenca_service import get_score_consulente
-from fastapi import HTTPException
 
 router = APIRouter(tags=["inscricoes"])
 
@@ -30,14 +32,14 @@ def list_inscricoes(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lista inscrições de CONSULENTES com score de presença histórico."""
+    """Lista inscrições de consulentes com score de presença histórico."""
     inscricoes = inscricao_service.list_inscricoes(db, gira_id, user.terreiro_id)
     scores = get_scores_para_gira(db, gira_id, user.terreiro_id)
 
     result = []
     for i in inscricoes:
         item = i.model_dump() if hasattr(i, "model_dump") else dict(i)
-        insc = db.query(InscricaoGira).filter(InscricaoGira.id == i.id).first()
+        insc = db.query(InscricaoConsulente).filter(InscricaoConsulente.id == i.id).first()
         score = None
         if insc and insc.consulente_id:
             score = scores.get(str(insc.consulente_id))
@@ -51,36 +53,64 @@ def list_inscricoes(
 def update_presenca(
     inscricao_id: UUID,
     data: PresencaUpdate,
+    request: Request,
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    """Atualiza status de presença (compareceu / faltou)."""
-    return inscricao_service.update_presenca(db, inscricao_id, data, user.terreiro_id)
+    result = inscricao_service.update_presenca(db, inscricao_id, data, user.terreiro_id)
+
+    audit_service.log(
+        db, request,
+        context = "inscricao",
+        action  = "PRESENCA_UPDATED",
+        level   = "INFO",
+        user_id = user.id,
+        status  = 200,
+        message = f"Presença atualizada: inscricao={inscricao_id} status={data.status}",
+    )
+    return result
 
 
 @router.delete("/inscricao/{inscricao_id}")
 def cancelar_inscricao(
     inscricao_id: UUID,
+    request: Request,
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    """Cancela inscrição. Promove automaticamente o próximo da fila de espera."""
-    return inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id)
+    result = inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id)
+
+    audit_service.log(
+        db, request,
+        context = "inscricao",
+        action  = "INSCRICAO_CANCELADA",
+        level   = "WARNING",
+        user_id = user.id,
+        status  = 200,
+        message = f"Inscrição cancelada: {inscricao_id}",
+    )
+    return result
 
 
 @router.post("/inscricao/{inscricao_id}/reativar")
 def reativar_inscricao(
     inscricao_id: UUID,
+    request: Request,
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    """
-    Reativa inscrição cancelada (admin/operador).
+    result = inscricao_service.reativar_inscricao(db, inscricao_id, user.terreiro_id)
 
-    Volta para confirmado se há vaga disponível, ou lista_espera se lotada.
-    Retorna { ok, status, nome, mensagem }.
-    """
-    return inscricao_service.reativar_inscricao(db, inscricao_id, user.terreiro_id)
+    audit_service.log(
+        db, request,
+        context = "inscricao",
+        action  = "INSCRICAO_REATIVADA",
+        level   = "INFO",
+        user_id = user.id,
+        status  = 200,
+        message = f"Inscrição reativada: {inscricao_id} → {result.get('status')}",
+    )
+    return result
 
 
 @router.get("/consulentes/ranking")
@@ -88,7 +118,6 @@ def ranking_presenca(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Ranking de confiabilidade de todos os consulentes do terreiro."""
     return get_ranking_consulentes(db, user.terreiro_id)
 
 
@@ -98,7 +127,10 @@ def perfil_consulente(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Perfil completo do consulente com histórico de visitas e score."""
+    """Perfil completo do consulente com histórico e score."""
+    from datetime import date
+    from app.models.inscricao_consulente import InscricaoConsulente
+
     c = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
@@ -112,22 +144,21 @@ def perfil_consulente(
     }
 
     inscricoes = (
-        db.query(InscricaoGira)
+        db.query(InscricaoConsulente)
         .filter(
-            InscricaoGira.consulente_id == consulente_id,
-            InscricaoGira.gira_id.in_(gira_ids.keys()),
+            InscricaoConsulente.consulente_id == consulente_id,
+            InscricaoConsulente.gira_id.in_(gira_ids.keys()),
         )
-        .order_by(InscricaoGira.created_at.desc())
+        .order_by(InscricaoConsulente.created_at.desc())
         .all()
     )
 
     historico = []
-    ultima_presenca = None
     for i in inscricoes:
         gira = gira_ids.get(str(i.gira_id))
         if not gira:
             continue
-        entrada = {
+        historico.append({
             "inscricao_id": str(i.id),
             "gira_id":      str(gira.id),
             "gira_titulo":  gira.titulo,
@@ -137,10 +168,7 @@ def perfil_consulente(
             "status":       i.status,
             "inscrito_em":  i.created_at.isoformat(),
             "observacoes":  i.observacoes,
-        }
-        historico.append(entrada)
-        if i.status == "compareceu" and ultima_presenca is None:
-            ultima_presenca = gira.data.isoformat()
+        })
 
     nao_cancelados  = [i for i in inscricoes if i.status != "cancelado"]
     comparecimentos = [i for i in inscricoes if i.status == "compareceu"]
@@ -174,15 +202,14 @@ def perfil_consulente(
         "faltas":          len(faltas),
         "status_retorno": (
             "nunca_compareceu" if not datas_presenca
-            else "ativo"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 60)
-            else "morno"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 180)
+            else "ativo"       if (date.today() - datas_presenca[-1]).days <= 60
+            else "morno"       if (date.today() - datas_presenca[-1]).days <= 180
             else "inativo"
         ),
         "ultima_visita":  datas_presenca[-1].isoformat() if datas_presenca else None,
         "primeira_data":  datas_presenca[0].isoformat()  if datas_presenca else None,
         "dias_ausente": (
-            (__import__("datetime").date.today() - datas_presenca[-1]).days
-            if datas_presenca else None
+            (date.today() - datas_presenca[-1]).days if datas_presenca else None
         ),
         "tipos_favoritos": tipos_ordenados[:3],
         "stats": {
@@ -190,9 +217,6 @@ def perfil_consulente(
             "comparecimentos":  len(comparecimentos),
             "faltas":           len(faltas),
             "cancelamentos":    len(cancelamentos),
-            "primeira_presenca": datas_presenca[0].isoformat() if datas_presenca else None,
-            "ultima_presenca":   datas_presenca[-1].isoformat() if datas_presenca else None,
-            "tipos_favoritos":   tipos_ordenados[:3],
         },
         "historico": historico,
     }

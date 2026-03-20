@@ -12,3 +12,5 @@ python-multipart==0.0.12
 slowapi==0.1.9
 pywebpush==2.0.0
 httpx==0.27.2
+# Job de limpeza periódica de audit_logs (roda dentro do processo FastAPI)
+apscheduler==3.10.4

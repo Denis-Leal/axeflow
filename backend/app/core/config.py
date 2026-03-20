@@ -26,16 +26,19 @@ class Settings(BaseSettings):
     VAPID_EMAIL: str       = "mailto:admin@axeflow.app"
 
     # ── Email (Brevo) ──────────────────────────────────────────────────────────
-    # Obter em: https://app.brevo.com/settings/keys/api
     BREVO_API_KEY: str = ""
-    # Sender verificado no Brevo (Settings → Senders)
-    GMAIL_USER: str = ""
+    GMAIL_USER: str    = ""
 
     # ── App ────────────────────────────────────────────────────────────────────
     APP_URL: str = "https://axeflow.vercel.app"
 
+    # ── Retenção de logs de auditoria ──────────────────────────────────────────
+    # Registros mais antigos que este valor (em dias) são removidos diariamente.
+    # Sobrescreva com AUDIT_LOG_RETENTION_DAYS=180 no .env para aumentar o período.
+    AUDIT_LOG_RETENTION_DAYS: int = 90
+
     class Config:
-        env_file = ".env"  # carrega .env automaticamente em desenvolvimento local
+        env_file = ".env"
 
     @property
     def database_url_fixed(self) -> str:

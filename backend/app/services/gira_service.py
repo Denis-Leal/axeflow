@@ -1,23 +1,16 @@
 """
 gira_service.py — AxeFlow
 
-CORREÇÕES aplicadas nesta versão:
-
-1. create_gira: INSERT de membro_id=None explícito para satisfazer CHECK constraint
-   (garante que a constraint do banco não seja violada ao criar inscrição de membro)
-
-2. update_gira: promoção em lote com FOR UPDATE (já delegado a promover_fila_em_lote)
-   - Sem isso, dois updates simultâneos que aumentam vagas podem promover
-     a mesma pessoa da fila duas vezes
-
-3. Docstrings e comentários alinhados com as correções do inscricao_service
+CORREÇÃO: _count_inscritos agora usa InscricaoMembro para giras fechadas
+e InscricaoConsulente para giras públicas, em vez de InscricaoGira para ambas.
 """
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
 from app.models.gira import Gira
 from app.models.usuario import Usuario
-from app.models.inscricao import InscricaoGira
+from app.models.inscricao_consulente import InscricaoConsulente
+from app.models.inscricao_membro import InscricaoMembro
 from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse, GiraUpdateResponse, PromovdoFila
 from app.utils.slug import generate_gira_slug
 from app.services.push_service import send_push_to_terreiro
@@ -27,25 +20,22 @@ from datetime import datetime
 
 def _count_inscritos(db: Session, gira: Gira) -> int:
     """
-    Conta inscrições ativas por tipo de acesso da gira.
+    Conta inscrições ativas por tipo de acesso.
 
-    Públicas  → consulentes externos (consulente_id IS NOT NULL)
-    Fechadas  → membros do terreiro (membro_id IS NOT NULL)
+    Públicas  → InscricaoConsulente (consulentes externos)
+    Fechadas  → InscricaoMembro (membros do terreiro)
 
-    Pools separados garantem que confirmação de membro não afeta
-    vagas de consulentes e vice-versa.
+    Pools completamente separados — um não interfere no outro.
     """
     if gira.acesso == "fechada":
-        return db.query(InscricaoGira).filter(
-            InscricaoGira.gira_id == gira.id,
-            InscricaoGira.membro_id.isnot(None),
-            InscricaoGira.status != "cancelado",
+        return db.query(InscricaoMembro).filter(
+            InscricaoMembro.gira_id == gira.id,
+            InscricaoMembro.status != "cancelado",
         ).count()
     else:
-        return db.query(InscricaoGira).filter(
-            InscricaoGira.gira_id == gira.id,
-            InscricaoGira.consulente_id.isnot(None),
-            InscricaoGira.status != "cancelado",
+        return db.query(InscricaoConsulente).filter(
+            InscricaoConsulente.gira_id == gira.id,
+            InscricaoConsulente.status != "cancelado",
         ).count()
 
 
@@ -125,13 +115,7 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
 def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID) -> GiraUpdateResponse:
     """
     Atualiza campos da gira.
-
-    Promoção em lote ao aumentar vagas:
-      Se limite_consulentes subir em N, até N pessoas da lista de espera
-      são promovidas (FIFO) dentro de FOR UPDATE para evitar race condition.
-      A lista retorna ao frontend para abertura dos WhatsApps.
-
-    Push de mudança de status enviado quando status muda explicitamente.
+    Promoção em lote ao aumentar vagas — delegada ao inscricao_service com FOR UPDATE.
     """
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
@@ -143,16 +127,13 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     campos_alterados = data.model_dump(exclude_unset=True)
 
-    # Guarda limite anterior para calcular vagas novas criadas
     limite_anterior = gira.limite_consulentes or 0
     novo_limite     = campos_alterados.get("limite_consulentes", limite_anterior)
     vagas_abertas   = max(0, (novo_limite or 0) - limite_anterior)
 
-    # Aplica as alterações
     for field, value in campos_alterados.items():
         setattr(gira, field, value)
 
-    # Valida e limpa campos inconsistentes após aplicar mudanças
     if gira.acesso == "fechada":
         if not gira.limite_membros:
             raise HTTPException(400, "Gira fechada precisa de limite_membros")
@@ -160,13 +141,11 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         gira.abertura_lista       = None
         gira.fechamento_lista     = None
         gira.responsavel_lista_id = None
-
     elif gira.acesso == "publica":
         if not gira.limite_consulentes:
             raise HTTPException(400, "Gira pública precisa de limite_consulentes")
         gira.limite_membros = None
 
-    # Promoção em lote — delegada a inscricao_service que usa FOR UPDATE
     promovidos: list[dict] = []
     if vagas_abertas > 0 and gira.acesso == "publica":
         promovidos = promover_fila_em_lote(db, gira.id, vagas_abertas)
@@ -174,7 +153,6 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
     db.commit()
     db.refresh(gira)
 
-    # Push de mudança de status
     if "status" in campos_alterados:
         msgs = {
             "aberta":    ("📋 Lista Aberta",    f"A lista da gira {gira.titulo} está aberta!"),
@@ -190,7 +168,6 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
                 url=f"/giras/{gira.id}",
             )
 
-    # Push informando promoções em lote
     if promovidos:
         nomes = ", ".join(p["nome"] for p in promovidos)
         send_push_to_terreiro(
@@ -201,7 +178,6 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         )
 
     base = _enrich(gira, db, _count_inscritos(db, gira))
-
     return GiraUpdateResponse(
         **base.model_dump(),
         promovidos_fila=[PromovdoFila(**p) for p in promovidos],
@@ -209,10 +185,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
 
 def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
-    """
-    Soft delete: preenche deleted_at em vez de remover fisicamente.
-    Preserva histórico de inscrições e presença para analytics.
-    """
+    """Soft delete: preenche deleted_at em vez de remover fisicamente."""
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
         Gira.terreiro_id == terreiro_id,
