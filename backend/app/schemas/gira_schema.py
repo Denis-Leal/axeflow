@@ -1,7 +1,19 @@
+"""
+gira_schema.py — AxeFlow
+Schemas Pydantic para criação, atualização e resposta de giras.
+
+ALTERAÇÃO:
+  - GiraUpdateResponse: novo schema para o PUT /giras/{id}.
+      Estende GiraResponse adicionando `promovidos_fila`, que contém
+      a lista de consulentes promovidos da lista de espera quando o
+      limite de vagas aumenta. O frontend usa essa lista para abrir
+      os WhatsApps em sequência.
+"""
 from pydantic import BaseModel, model_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime, date, time
+
 
 class GiraCreate(BaseModel):
     titulo: str
@@ -10,10 +22,11 @@ class GiraCreate(BaseModel):
     data: date
     horario: time
     limite_consulentes: int
-    limite_membros: Optional[int] = None  # apenas para giras fechadas
-    abertura_lista: Optional[datetime] = None   # não obrigatório para giras fechadas
+    limite_membros: Optional[int] = None
+    abertura_lista: Optional[datetime] = None
     fechamento_lista: Optional[datetime] = None
     responsavel_lista_id: Optional[UUID] = None
+
 
 class GiraUpdate(BaseModel):
     titulo: Optional[str] = None
@@ -27,19 +40,17 @@ class GiraUpdate(BaseModel):
     fechamento_lista: Optional[datetime] = None
     status: Optional[str] = None
     responsavel_lista_id: Optional[UUID] = None
-    
+
     @model_validator(mode="after")
     def validar_consistencia(self):
-        # só valida se acesso está sendo alterado
         if self.acesso == "fechada":
             if self.limite_membros is None:
                 raise ValueError("Gira fechada precisa de limite_membros")
-
         if self.acesso == "publica":
             if self.limite_consulentes is None:
                 raise ValueError("Gira pública precisa de limite_consulentes")
-
         return self
+
 
 class GiraResponse(BaseModel):
     id: UUID
@@ -62,3 +73,24 @@ class GiraResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PromovdoFila(BaseModel):
+    """Dados de um consulente promovido da lista de espera."""
+    nome:     str
+    telefone: str
+    posicao:  int
+
+
+class GiraUpdateResponse(GiraResponse):
+    """
+    Resposta do PUT /giras/{id}.
+
+    Estende GiraResponse com `promovidos_fila`: lista de consulentes
+    que foram promovidos automaticamente da lista de espera porque o
+    limite de vagas aumentou. Lista vazia quando não houve promoções.
+
+    O frontend (editar/[id].js) usa essa lista para abrir os WhatsApps
+    em sequência notificando cada promovido.
+    """
+    promovidos_fila: list[PromovdoFila] = []

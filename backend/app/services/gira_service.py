@@ -9,6 +9,11 @@ IMPORTANTE sobre total_inscritos:
   Para giras PÚBLICAS → conta apenas inscrições de consulentes (consulente_id IS NOT NULL).
   Para giras FECHADAS → conta apenas inscrições de membros (membro_id IS NOT NULL).
   As duas categorias usam pools de vagas distintos e não se misturam.
+
+ALTERAÇÃO em update_gira:
+  Quando limite_consulentes aumenta, chama promover_fila_em_lote() para promover
+  automaticamente as pessoas da lista de espera que agora cabem nas vagas novas.
+  A lista de promovidos é retornada na resposta para o frontend abrir os WhatsApps.
 """
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -16,9 +21,10 @@ from uuid import UUID
 from app.models.gira import Gira
 from app.models.usuario import Usuario
 from app.models.inscricao import InscricaoGira
-from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse
+from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse, GiraUpdateResponse, PromovdoFila
 from app.utils.slug import generate_gira_slug
 from app.services.push_service import send_push_to_terreiro
+from app.services.inscricao_service import promover_fila_em_lote
 from datetime import datetime
 
 
@@ -29,18 +35,15 @@ def _count_inscritos(db: Session, gira: Gira) -> int:
     Públicas  → consulentes externos (consulente_id IS NOT NULL)
     Fechadas  → membros do terreiro (membro_id IS NOT NULL)
 
-    Garante que a confirmação de membros nunca afeta o contador de
-    vagas de consulentes e vice-versa.
+    Garante que confirmação de membros não afeta vagas de consulentes.
     """
     if gira.acesso == "fechada":
-        # Giras fechadas: contar presenças de membros
         return db.query(InscricaoGira).filter(
             InscricaoGira.gira_id == gira.id,
             InscricaoGira.membro_id.isnot(None),
             InscricaoGira.status != "cancelado",
         ).count()
     else:
-        # Giras públicas: contar inscrições de consulentes externos
         return db.query(InscricaoGira).filter(
             InscricaoGira.gira_id == gira.id,
             InscricaoGira.consulente_id.isnot(None),
@@ -64,20 +67,17 @@ def list_giras(db: Session, terreiro_id: UUID):
         db.query(Gira)
         .filter(
             Gira.terreiro_id == terreiro_id,
-            Gira.deleted_at.is_(None),  # soft delete: exclui giras "deletadas"
+            Gira.deleted_at.is_(None),
         )
         .order_by(Gira.data.desc())
         .all()
     )
-
     return [_enrich(g, db, _count_inscritos(db, g)) for g in giras]
 
 
 def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     """Cria nova gira. Giras públicas recebem slug único com hash."""
     is_publica = data.acesso != "fechada"
-
-    # Slug apenas para giras públicas (fechadas não têm página pública)
     slug = generate_gira_slug(data.titulo, data.data) if is_publica else None
 
     gira = Gira(
@@ -98,9 +98,8 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     db.commit()
     db.refresh(gira)
 
-    # Notificar membros sobre nova gira
-    data_fmt     = gira.data.strftime("%d/%m/%Y")
-    horario_fmt  = gira.horario.strftime("%H:%M")
+    data_fmt    = gira.data.strftime("%d/%m/%Y")
+    horario_fmt = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
@@ -121,12 +120,21 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-
     return _enrich(gira, db, _count_inscritos(db, gira))
 
 
 def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID) -> GiraResponse:
-    """Atualiza campos da gira. Envia push se status mudou."""
+    """
+    Atualiza campos da gira.
+
+    NOVO — Promoção em lote ao aumentar vagas:
+      Se limite_consulentes aumentar em N, até N pessoas da lista de espera
+      são promovidas automaticamente para confirmado (ordem FIFO).
+      A lista de promovidos é incluída na resposta para o frontend
+      abrir os WhatsApps em sequência.
+
+    Envia push se status mudou explicitamente.
+    """
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
         Gira.terreiro_id == terreiro_id,
@@ -136,28 +144,40 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     campos_alterados = data.model_dump(exclude_unset=True)
-    # aplica alterações
+
+    # ── Detectar aumento de vagas ANTES de aplicar as mudanças ───────────────
+    # Guarda o limite anterior para calcular quantas vagas novas foram criadas
+    limite_anterior = gira.limite_consulentes or 0
+    novo_limite = campos_alterados.get("limite_consulentes", limite_anterior)
+    vagas_abertas = max(0, (novo_limite or 0) - limite_anterior)
+
+    # Aplica as alterações
     for field, value in campos_alterados.items():
         setattr(gira, field, value)
 
-    # Valida e limpa campos inconsistentes após a atualização
+    # Valida e limpa campos inconsistentes após atualização
     if gira.acesso == "fechada":
         if gira.limite_membros == 0:
             raise HTTPException(400, "Gira fechada precisa de limite_membros")
-        gira.limite_consulentes  = 0
-        gira.abertura_lista      = None
-        gira.fechamento_lista    = None
+        gira.limite_consulentes   = 0
+        gira.abertura_lista       = None
+        gira.fechamento_lista     = None
         gira.responsavel_lista_id = None
-
     elif gira.acesso == "publica":
         if gira.limite_consulentes == 0:
             raise HTTPException(400, "Gira pública precisa de limite_consulentes")
         gira.limite_membros = None
 
+    # ── Promoção em lote ──────────────────────────────────────────────────────
+    # Só faz sentido para giras públicas (fechadas não têm lista_espera de consulentes)
+    promovidos: list[dict] = []
+    if vagas_abertas > 0 and gira.acesso == "publica":
+        promovidos = promover_fila_em_lote(db, gira.id, vagas_abertas)
+
     db.commit()
     db.refresh(gira)
 
-    # Push apenas quando status muda explicitamente
+    # Push de mudança de status (comportamento existente)
     if "status" in campos_alterados:
         msgs = {
             "aberta":    ("📋 Lista Aberta",    f"A lista da gira {gira.titulo} está aberta!"),
@@ -174,7 +194,24 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
                 url=f"/giras/{gira.id}",
             )
 
-    return _enrich(gira, db, _count_inscritos(db, gira))
+    # Push informando promoções em lote (quando houve)
+    if promovidos:
+        nomes = ", ".join(p["nome"] for p in promovidos)
+        send_push_to_terreiro(
+            terreiro_id=gira.terreiro_id,
+            title="🎉 Vagas Abertas — Fila Promovida",
+            body=f"{len(promovidos)} pessoa(s) promovida(s) da espera: {nomes}",
+            url=f"/giras/{gira.id}",
+        )
+
+    base = _enrich(gira, db, _count_inscritos(db, gira))
+
+    # Retorna GiraUpdateResponse — estende GiraResponse com promovidos_fila,
+    # garantindo que o FastAPI não descarte o campo ao serializar a resposta.
+    return GiraUpdateResponse(
+        **base.model_dump(),
+        promovidos_fila=[PromovdoFila(**p) for p in promovidos],
+    )
 
 
 def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
@@ -191,7 +228,7 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     titulo = gira.titulo
-    gira.deleted_at = datetime.utcnow()  # soft delete — dado preservado no banco
+    gira.deleted_at = datetime.utcnow()
     db.commit()
 
     send_push_to_terreiro(
