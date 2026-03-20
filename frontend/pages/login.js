@@ -2,6 +2,9 @@
 // login.js — AxeFlow
 // Página de autenticação do usuário.
 //
+// ALTERAÇÃO: adicionado link "Esqueci minha senha"
+//   abaixo do campo de senha, aponta para /esqueci-senha.
+//
 // CORREÇÃO MULTI-TENANT (push notifications):
 //   Após o login bem-sucedido, além do token JWT,
 //   salvamos o terreiro_id do usuário no localStorage.
@@ -13,6 +16,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { login, getMe } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 
@@ -58,6 +62,8 @@ export default function Login() {
       <Head><title>Login | AxeFlow</title></Head>
       <div className="login-wrapper">
         <div className="login-card">
+
+          {/* ── Logo ── */}
           <div className="login-logo">
             <div className="symbol">☽✦☾</div>
             <h1>AxeFlow</h1>
@@ -66,6 +72,7 @@ export default function Login() {
             </p>
           </div>
 
+          {/* ── Mensagem de erro ── */}
           {error && (
             <div className="alert-custom alert-danger-custom">
               <i className="bi bi-exclamation-circle me-2"></i>{error}
@@ -73,6 +80,8 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit}>
+
+            {/* Email */}
             <div className="mb-3">
               <label className="form-label-custom">Email</label>
               <input
@@ -82,10 +91,29 @@ export default function Login() {
                 onChange={e => setForm({ ...form, email: e.target.value })}
                 placeholder="seu@email.com"
                 required
+                autoComplete="email"
               />
             </div>
+
+            {/* Senha + link "Esqueci minha senha" */}
             <div className="mb-4">
-              <label className="form-label-custom">Senha</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
+                <label className="form-label-custom" style={{ margin: 0 }}>Senha</label>
+                {/* Link discreto de recuperação — alinhado à direita do label */}
+                <Link
+                  href="/esqueci-senha"
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--cor-texto-suave)',
+                    textDecoration: 'none',
+                    transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={e => e.target.style.color = 'var(--cor-acento)'}
+                  onMouseLeave={e => e.target.style.color = 'var(--cor-texto-suave)'}
+                >
+                  Esqueci minha senha
+                </Link>
+              </div>
               <input
                 type="password"
                 className="form-control-custom"
@@ -93,8 +121,11 @@ export default function Login() {
                 onChange={e => setForm({ ...form, senha: e.target.value })}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
+
+            {/* Botão de login */}
             <button
               type="submit"
               className="btn-gold w-100"
@@ -108,11 +139,12 @@ export default function Login() {
             </button>
           </form>
 
+          {/* ── Divisor e link de registro ── */}
           <div className="divider-ornamental mt-4">
             <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>ou</span>
           </div>
 
-          <a
+          <Link
             href="/registro"
             style={{
               display: 'block',
@@ -123,7 +155,8 @@ export default function Login() {
             }}
           >
             Criar novo terreiro
-          </a>
+          </Link>
+
         </div>
       </div>
     </>

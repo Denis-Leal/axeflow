@@ -25,3 +25,6 @@ from app.models.audit_log import AuditLog
 
 # ApiKey — autenticação de integrações externas
 from app.models.api_key import ApiKey
+
+# Recuperação de senha
+from app.models.password_reset_token import PasswordResetToken
