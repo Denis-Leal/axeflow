@@ -1,22 +1,16 @@
 """
 inscricao_router.py — AxeFlow
-Gerenciamento de inscrições de consulentes e presenças de membros.
 
-ADIÇÃO:
-  - Endpoint /consulentes/{id}/perfil: campo `observacoes` incluído
-    em cada item do histórico, para exibir a mensagem deixada pelo
-    consulente na inscrição daquela gira específica.
-
-CORREÇÃO: list_inscricoes filtra apenas consulentes externos
-(consulente_id IS NOT NULL), evitando que confirmações de membros
-apareçam misturadas na lista de consulentes.
+ALTERAÇÃO:
+  - POST /inscricao/{id}/reativar: novo endpoint para admin reativar
+    inscrição cancelada. Volta para confirmado (se há vaga) ou lista_espera.
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_role
 from app.schemas.inscricao_schema import PresencaUpdate
 from app.services import inscricao_service
 from app.services.presenca_service import get_scores_para_gira, get_ranking_consulentes
@@ -36,26 +30,17 @@ def list_inscricoes(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Lista inscrições de CONSULENTES da gira com score de presença histórico.
-
-    Filtra apenas inscrições onde consulente_id IS NOT NULL.
-    Confirmações de membros (membro_id IS NOT NULL) são retornadas pelo
-    endpoint /giras/{id}/presenca-membros e NÃO devem aparecer aqui.
-    """
+    """Lista inscrições de CONSULENTES com score de presença histórico."""
     inscricoes = inscricao_service.list_inscricoes(db, gira_id, user.terreiro_id)
     scores = get_scores_para_gira(db, gira_id, user.terreiro_id)
 
     result = []
     for i in inscricoes:
         item = i.model_dump() if hasattr(i, "model_dump") else dict(i)
-
-        # Busca score pelo consulente_id da inscrição
         insc = db.query(InscricaoGira).filter(InscricaoGira.id == i.id).first()
         score = None
         if insc and insc.consulente_id:
             score = scores.get(str(insc.consulente_id))
-
         item["score_presenca"] = score
         result.append(item)
 
@@ -69,7 +54,7 @@ def update_presenca(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Atualiza status de presença de uma inscrição (compareceu / faltou)."""
+    """Atualiza status de presença (compareceu / faltou)."""
     return inscricao_service.update_presenca(db, inscricao_id, data, user.terreiro_id)
 
 
@@ -79,8 +64,23 @@ def cancelar_inscricao(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Cancela inscrição de um consulente."""
+    """Cancela inscrição. Promove automaticamente o próximo da fila de espera."""
     return inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id)
+
+
+@router.post("/inscricao/{inscricao_id}/reativar")
+def reativar_inscricao(
+    inscricao_id: UUID,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
+    """
+    Reativa inscrição cancelada (admin/operador).
+
+    Volta para confirmado se há vaga disponível, ou lista_espera se lotada.
+    Retorna { ok, status, nome, mensagem }.
+    """
+    return inscricao_service.reativar_inscricao(db, inscricao_id, user.terreiro_id)
 
 
 @router.get("/consulentes/ranking")
@@ -98,18 +98,11 @@ def perfil_consulente(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Perfil completo do consulente — CRM espiritual.
-    Retorna histórico completo de visitas, frequência, padrões e score.
-
-    ADIÇÃO: cada item do histórico inclui `observacoes`, que é a mensagem
-    deixada pelo próprio consulente no momento da inscrição naquela gira.
-    """
+    """Perfil completo do consulente com histórico de visitas e score."""
     c = db.query(Consulente).filter(Consulente.id == consulente_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
 
-    # Apenas giras deste terreiro (sem soft-deleted)
     gira_ids = {
         str(g.id): g
         for g in db.query(Gira).filter(
@@ -128,7 +121,6 @@ def perfil_consulente(
         .all()
     )
 
-    # Histórico detalhado de cada visita — inclui observacoes da inscrição
     historico = []
     ultima_presenca = None
     for i in inscricoes:
@@ -144,21 +136,17 @@ def perfil_consulente(
             "posicao":      i.posicao,
             "status":       i.status,
             "inscrito_em":  i.created_at.isoformat(),
-            # Observação deixada pelo consulente na hora da inscrição
-            # None quando não preenchida (campo opcional no formulário público)
             "observacoes":  i.observacoes,
         }
         historico.append(entrada)
         if i.status == "compareceu" and ultima_presenca is None:
             ultima_presenca = gira.data.isoformat()
 
-    # Estatísticas gerais
     nao_cancelados  = [i for i in inscricoes if i.status != "cancelado"]
     comparecimentos = [i for i in inscricoes if i.status == "compareceu"]
     faltas          = [i for i in inscricoes if i.status == "faltou"]
     cancelamentos   = [i for i in inscricoes if i.status == "cancelado"]
 
-    # Tipos de gira que mais frequentou (baseado em comparecimentos)
     tipos: dict[str, int] = {}
     for i in comparecimentos:
         g = gira_ids.get(str(i.gira_id))
@@ -166,7 +154,6 @@ def perfil_consulente(
         tipos[tipo] = tipos.get(tipo, 0) + 1
     tipos_ordenados = sorted(tipos.items(), key=lambda x: x[1], reverse=True)
 
-    # Primeira e última presença confirmada
     datas_presenca = sorted([
         gira_ids[str(i.gira_id)].data
         for i in comparecimentos
@@ -181,17 +168,10 @@ def perfil_consulente(
         "telefone":        c.telefone,
         "primeira_visita": c.primeira_visita,
         "cadastrado_em":   c.created_at.isoformat(),
-        # Notas internas do terreiro sobre o consulente
         "notas":           c.notas,
-
-        # Score de confiabilidade
-        "score": score,
-
-        # Contadores para os cards de métricas
+        "score":           score,
         "comparecimentos": len(comparecimentos),
         "faltas":          len(faltas),
-
-        # Status de retorno baseado na última presença
         "status_retorno": (
             "nunca_compareceu" if not datas_presenca
             else "ativo"       if ((__import__("datetime").date.today() - datas_presenca[-1]).days <= 60)
@@ -205,8 +185,6 @@ def perfil_consulente(
             if datas_presenca else None
         ),
         "tipos_favoritos": tipos_ordenados[:3],
-
-        # Estatísticas completas
         "stats": {
             "total_inscricoes": len(nao_cancelados),
             "comparecimentos":  len(comparecimentos),
@@ -216,7 +194,5 @@ def perfil_consulente(
             "ultima_presenca":   datas_presenca[-1].isoformat() if datas_presenca else None,
             "tipos_favoritos":   tipos_ordenados[:3],
         },
-
-        # Histórico completo — cada item inclui observacoes da inscrição
         "historico": historico,
     }

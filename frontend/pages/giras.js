@@ -4,19 +4,23 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
+import ConfirmModal from '../components/ConfirmModal';
 import { listGiras, deleteGira, getMe } from '../services/api';
 
 export default function Giras() {
   const router = useRouter();
-  const [giras, setGiras] = useState([]);
+  const [giras, setGiras]       = useState([]);
   const [userRole, setUserRole] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
+  const [erro, setErro]         = useState('');
+  const [modal, setModal]       = useState({
+    aberto: false, titulo: '', mensagem: '', onConfirmar: null,
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    // Mostra mensagem se veio redirecionado por falta de permissão
     if (router.query.erro === 'sem-permissao') {
       setErro('Sem permissão para acessar essa página. Apenas administradores e operadores podem criar ou editar giras.');
       setTimeout(() => setErro(''), 6000);
@@ -27,33 +31,49 @@ export default function Giras() {
         setGiras(girasRes.data);
         setUserRole(meRes.data.role);
       })
-      .catch(err => { if (err.response?.status === 401) { localStorage.removeItem('token'); router.push('/login'); } })
+      .catch(err => {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+        }
+      })
       .finally(() => setLoading(false));
   }, [router.query]);
 
   const podeGerenciar = ['admin', 'operador'].includes(userRole);
   const podeExcluir   = userRole === 'admin';
 
-  const [erro, setErro] = useState('');
+  const fecharModal = () => setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
 
-  const handleDelete = async (id) => {
-    if (!confirm('Confirmar exclusão desta gira?')) return;
-    try {
-      await deleteGira(id);
-      setGiras(prev => prev.filter(g => g.id !== id));
-    } catch (err) {
-      if (err.response?.status === 403) {
-        setErro('Sem permissão para excluir giras. Apenas administradores podem fazer isso.');
-      } else {
-        setErro('Erro ao excluir a gira. Tente novamente.');
-      }
-      setTimeout(() => setErro(''), 5000);
-    }
+  const handleDelete = (id) => {
+    setModal({
+      aberto: true,
+      titulo: 'Excluir gira',
+      mensagem: 'Confirmar exclusão desta gira?\n\nTodos os dados relacionados serão removidos permanentemente.',
+      tipoBotao: 'perigo',
+      labelConfirmar: 'Excluir',
+      onConfirmar: async () => {
+        fecharModal();
+        try {
+          await deleteGira(id);
+          setGiras(prev => prev.filter(g => g.id !== id));
+        } catch (err) {
+          if (err.response?.status === 403) {
+            setErro('Sem permissão para excluir giras. Apenas administradores podem fazer isso.');
+          } else {
+            setErro('Erro ao excluir a gira. Tente novamente.');
+          }
+          setTimeout(() => setErro(''), 5000);
+        }
+      },
+    });
   };
 
-  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
-
-  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}><div className="spinner-gold"></div></div>;
+  if (loading) return (
+    <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+      <div className="spinner-gold"></div>
+    </div>
+  );
 
   return (
     <>
@@ -72,16 +92,18 @@ export default function Giras() {
               </Link>
             )}
           </div>
+
           <div className="page-content">
             {erro && (
               <div style={{
                 background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
                 borderRadius: '10px', padding: '0.85rem 1.2rem', marginBottom: '1rem',
-                color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem',
               }}>
                 <i className="bi bi-exclamation-triangle-fill"></i> {erro}
               </div>
             )}
+
             <div className="card-custom">
               <div style={{ overflowX: 'auto' }}>
                 <table className="table-custom">
@@ -105,23 +127,11 @@ export default function Giras() {
                         <td>{g.horario}</td>
                         <td>
                           {g.acesso === 'fechada' ? (
-                            <span
-                              style={{
-                                color: g.total_inscritos >= g.limite_membros
-                                  ? '#ef4444'
-                                  : 'var(--cor-sucesso)'
-                              }}
-                            >
+                            <span style={{ color: g.total_inscritos >= g.limite_membros ? '#ef4444' : 'var(--cor-sucesso)' }}>
                               {g.total_inscritos}/{g.limite_membros}
                             </span>
                           ) : (
-                            <span
-                              style={{
-                                color: g.total_inscritos >= g.limite_consulentes
-                                  ? '#ef4444'
-                                  : 'var(--cor-sucesso)'
-                              }}
-                            >
+                            <span style={{ color: g.total_inscritos >= g.limite_consulentes ? '#ef4444' : 'var(--cor-sucesso)' }}>
                               {g.total_inscritos}/{g.limite_consulentes}
                             </span>
                           )}
@@ -129,22 +139,31 @@ export default function Giras() {
                         <td><span className={`badge-status badge-${g.status}`}>{g.status}</span></td>
                         <td>
                           <div className="d-flex gap-1">
-                            <Link href={`/giras/${g.id}`} className="btn-outline-gold" title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                            <Link href={`/giras/${g.id}`} className="btn-outline-gold"
+                              title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                               <i className="bi bi-list-ul"></i>
                             </Link>
                             {podeGerenciar && (
-                              <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold" title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                              <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold"
+                                title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                                 <i className="bi bi-pencil"></i>
                               </Link>
                             )}
                             {g.slug_publico && (
-                              <a href={`/public/${g.slug_publico}`} target="_blank" className="btn-outline-gold" title="Página pública" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                              <a href={`/public/${g.slug_publico}`} target="_blank"
+                                className="btn-outline-gold" title="Página pública"
+                                style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                                 <i className="bi bi-share"></i>
                               </a>
                             )}
                             {podeExcluir && (
                               <button onClick={() => handleDelete(g.id)} title="Excluir"
-                                style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                style={{
+                                  background: 'transparent',
+                                  border: '1px solid rgba(239,68,68,0.4)',
+                                  color: '#ef4444', borderRadius: '8px',
+                                  padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
+                                }}>
                                 <i className="bi bi-trash"></i>
                               </button>
                             )}
@@ -168,9 +187,18 @@ export default function Giras() {
           </div>
         </div>
       </div>
+
       <BottomNav />
+
+      <ConfirmModal
+        aberto={modal.aberto}
+        titulo={modal.titulo}
+        mensagem={modal.mensagem}
+        tipoBotao={modal.tipoBotao || 'perigo'}
+        labelConfirmar={modal.labelConfirmar || 'Confirmar'}
+        onConfirmar={modal.onConfirmar}
+        onCancelar={fecharModal}
+      />
     </>
   );
 }
-
-// NOTE: ver também /giras/[id].js para detalhes e presença
