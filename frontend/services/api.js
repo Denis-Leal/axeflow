@@ -82,6 +82,8 @@ export const getPresencaMembrosPublica = (giraId) => api.get(`/membros/giras/${g
 export const confirmarPresencaMembro = (giraId) => api.post(`/membros/giras/${giraId}/confirmar-presenca`);
 export const confirmarPresencaMembroPublica = (giraId) => api.post(`/membros/giras/${giraId}/confirmar-presenca-publica`);
 export const cancelarInscricao = (inscricaoId)         => api.delete(`/inscricao/${inscricaoId}`);
+export const reativarInscricao = (inscricaoId)         => api.post(`/inscricao/${inscricaoId}/reativar`);
+
 
 // ── Consulentes ───────────────────────────────────────
 export const listConsulentes   = ()           => api.get('/consulentes');
@@ -114,5 +116,13 @@ export const unregisterPushSubscription = () => api.post('/push/unregister');
 
 // ── Auditoria ───────────────────────────────────────────
 export const listAuditoria = () => api.get('/auditoria');
+
+// ── API Keys ───────────────────────────────────────────
+export const listApiKeys = () => api.get('/api-keys');
+export const createApiKey = (data) => api.post('/api-keys', data);
+export const deleteApiKey = (id) => api.delete(`/api-keys/${id}`);
+
+// ── Health Check ───────────────────────────────────────
+export const healthCheck = () => api.get('/health')
 
 // (Outros endpoints podem ser adicionados aqui conforme necessário)

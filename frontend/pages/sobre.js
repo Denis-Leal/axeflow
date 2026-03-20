@@ -15,7 +15,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
-import api from '../services/api';
+import { healthCheck } from '../services/api';
 
 // ── Metadados do app ──────────────────────────────────────────────────────────
 const APP_INFO = {
@@ -108,7 +108,7 @@ export default function Sobre() {
     if (!token) { router.push('/login'); return; }
 
     // Carrega status do backend para exibir na tela Sobre
-    api.get('/health')
+    healthCheck()
       .then(r => setHealthInfo(r.data))
       .catch(() => setHealthInfo(null))
       .finally(() => setLoading(false));

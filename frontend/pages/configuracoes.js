@@ -13,7 +13,6 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
-import api from '../services/api';
 import { getMe, changePassword } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 import { logout } from '../services/logout';
