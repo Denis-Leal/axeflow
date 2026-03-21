@@ -15,6 +15,15 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+status_enum = postgresql.ENUM(
+    'confirmado',
+    'lista_espera',
+    'compareceu',
+    'faltou',
+    name='statusinscricaoenum'
+)
+
+status_enum.create(op.get_bind(), checkfirst=True)
 
 def tabela_existe(nome: str) -> bool:
     from sqlalchemy import inspect
@@ -121,9 +130,19 @@ def upgrade() -> None:
             sa.Column("membro_id", postgresql.UUID(as_uuid=True),
                       sa.ForeignKey("usuarios.id"), nullable=True),
             sa.Column("posicao", sa.Integer, nullable=False),
-            sa.Column("status", sa.String(50), default="confirmado"),
-            sa.Column("created_at", sa.DateTime),
-        )
+            sa.Column(
+            "status",
+            sa.Enum(
+                'confirmado',
+                'lista_espera',
+                'compareceu',
+                'faltou',
+                name='statusinscricaoenum'
+            ),
+            server_default='confirmado'
+        ),
+                    sa.Column("created_at", sa.DateTime),
+                )
     else:
         if not coluna_existe("inscricoes_gira", "membro_id"):
             op.add_column("inscricoes_gira",
