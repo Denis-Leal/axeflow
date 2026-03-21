@@ -50,13 +50,12 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
+    # ANTES: db.query(InscricaoGira)
+    # AGORA: db.query(InscricaoConsulente)
     inscricoes = (
-        db.query(InscricaoGira)
-        .filter(
-            InscricaoGira.gira_id == gira_id,
-            InscricaoGira.consulente_id.isnot(None),
-        )
-        .order_by(InscricaoGira.posicao)
+        db.query(InscricaoConsulente)
+        .filter(InscricaoConsulente.gira_id == gira_id)
+        .order_by(InscricaoConsulente.posicao)
         .all()
     )
 
@@ -74,22 +73,21 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
     ]
 
 
-def _promover_lista_espera(db: Session, gira_id: UUID, terreiro_id: UUID) -> "InscricaoGira | None":
+def _promover_lista_espera_novo(
+    db: Session,
+    gira_id: UUID,
+) -> "InscricaoConsulente | None":
     """
-    Promove 1 consulente da lista de espera para confirmado.
-
-    SELECT FOR UPDATE garante que promoções concorrentes não promovem
-    a mesma pessoa duas vezes (ex: dois cancelamentos simultâneos).
-    Ordenado por posicao (FIFO) para respeitar a ordem de chegada.
+    Versão do promotor usando InscricaoConsulente (nova tabela).
+    FOR UPDATE na nova tabela para serializar promoções concorrentes.
     """
     proximo = (
-        db.query(InscricaoGira)
+        db.query(InscricaoConsulente)
         .filter(
-            InscricaoGira.gira_id == gira_id,
-            InscricaoGira.consulente_id.isnot(None),
-            InscricaoGira.status == StatusInscricaoEnum.lista_espera,
+            InscricaoConsulente.gira_id == gira_id,
+            InscricaoConsulente.status == StatusNovo.lista_espera,
         )
-        .order_by(InscricaoGira.posicao)
+        .order_by(InscricaoConsulente.posicao)
         .with_for_update()
         .first()
     )
@@ -97,7 +95,16 @@ def _promover_lista_espera(db: Session, gira_id: UUID, terreiro_id: UUID) -> "In
     if not proximo:
         return None
 
-    proximo.status = StatusInscricaoEnum.confirmado
+    # Promove na nova tabela
+    proximo.status = StatusNovo.confirmado
+
+    # Sincroniza com legado
+    legado = db.query(InscricaoGira).filter(
+        InscricaoGira.id == proximo.id
+    ).first()
+    if legado:
+        legado.status = StatusInscricaoEnum.confirmado
+
     db.flush()
     return proximo
 
@@ -119,13 +126,13 @@ def promover_fila_em_lote(
         return []
 
     proximos = (
-        db.query(InscricaoGira)
+        db.query(InscricaoConsulente)
         .filter(
-            InscricaoGira.gira_id == gira_id,
-            InscricaoGira.consulente_id.isnot(None),
-            InscricaoGira.status == StatusInscricaoEnum.lista_espera,
+            InscricaoConsulente.gira_id == gira_id,
+            InscricaoConsulente.consulente_id.isnot(None),
+            InscricaoConsulente.status == StatusNovo.lista_espera,
         )
-        .order_by(InscricaoGira.posicao)
+        .order_by(InscricaoConsulente.posicao)
         .limit(vagas_abertas)
         .with_for_update()
         .all()
@@ -133,7 +140,7 @@ def promover_fila_em_lote(
 
     promovidos = []
     for inscricao in proximos:
-        inscricao.status = StatusInscricaoEnum.confirmado
+        inscricao.status = StatusNovo.confirmado
         db.flush()
         if inscricao.consulente:
             promovidos.append({
@@ -195,13 +202,13 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         consulente.primeira_visita = False
 
     # ── Verifica duplicata (qualquer status, inclusive cancelado) ─────────────
-    inscricao_existente = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira.id,
-        InscricaoGira.consulente_id == consulente.id,
+    inscricao_existente = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.gira_id == gira.id,
+        InscricaoConsulente.consulente_id == consulente.id,
     ).first()
 
     if inscricao_existente:
-        if inscricao_existente.status == StatusInscricaoEnum.cancelado:
+        if inscricao_existente.status == StatusNovo.cancelado:
             # Mensagem orientativa — não expõe detalhes internos
             raise HTTPException(
                 status_code=400,
@@ -321,7 +328,7 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     Verificação de vaga também dentro de FOR UPDATE para evitar
     que reativação simultânea de dois cancelados ultrapasse o limite.
     """
-    inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
+    inscricao = db.query(InscricaoConsulente).filter(InscricaoConsulente.id == inscricao_id).first()
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
 
@@ -338,11 +345,11 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
 
     # FOR UPDATE para serializar reativações concorrentes
     confirmados = (
-        db.query(InscricaoGira)
+        db.query(InscricaoConsulente)
         .filter(
-            InscricaoGira.gira_id == gira.id,
-            InscricaoGira.consulente_id.isnot(None),
-            InscricaoGira.status == StatusInscricaoEnum.confirmado,
+            InscricaoConsulente.gira_id == gira.id,
+            InscricaoConsulente.consulente_id.isnot(None),
+            InscricaoConsulente.status == StatusNovo.confirmado,
         )
         .with_for_update()
         .count()
@@ -378,7 +385,14 @@ def update_presenca(
     terreiro_id: UUID,
 ) -> dict:
     """Atualiza status de presença (compareceu / faltou)."""
-    inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
+    """
+    MUDANÇA: atualiza InscricaoConsulente + InscricaoGira (dupla escrita).
+    Garante consistência durante o período de transição.
+    """
+    # Busca na nova tabela (fonte de verdade)
+    inscricao = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.id == inscricao_id
+    ).first()
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
 
@@ -393,9 +407,17 @@ def update_presenca(
     if data.status not in ("compareceu", "faltou"):
         raise HTTPException(status_code=400, detail="Status inválido")
 
+    # Atualiza a nova tabela
     inscricao.status = data.status
+
+    # Atualiza o legado também (mantém sincronismo durante transição)
+    inscricao_legado = db.query(InscricaoGira).filter(
+        InscricaoGira.id == inscricao_id
+    ).first()
+    if inscricao_legado:
+        inscricao_legado.status = data.status
+
     db.commit()
-    db.refresh(inscricao)
     return {"ok": True, "status": inscricao.status}
 
 
@@ -407,7 +429,15 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     Cancelamento = aviso prévio → não penaliza o score.
     Retorna { ok, promovido: { nome, telefone, posicao } | None }.
     """
-    inscricao = db.query(InscricaoGira).filter(InscricaoGira.id == inscricao_id).first()
+    """
+    MUDANÇA: cancela em InscricaoConsulente (fonte de verdade).
+    Promove da fila usando InscricaoConsulente.
+    Mantém sincronismo com legado.
+    """
+    # Busca na nova tabela
+    inscricao = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.id == inscricao_id
+    ).first()
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
 
@@ -420,20 +450,26 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
         raise HTTPException(status_code=403, detail="Acesso negado")
 
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
-    era_confirmado = inscricao.status == StatusInscricaoEnum.confirmado
+    era_confirmado = inscricao.status == StatusNovo.confirmado
 
-    inscricao.status = StatusInscricaoEnum.cancelado
+    # Cancela na nova tabela
+    inscricao.status = StatusNovo.cancelado
 
-    # Só promove se a vaga que saiu era confirmada (não faz sentido promover
-    # quando cancela alguém que já estava na fila de espera)
+    # Sincroniza com legado
+    inscricao_legado = db.query(InscricaoGira).filter(
+        InscricaoGira.id == inscricao_id
+    ).first()
+    if inscricao_legado:
+        inscricao_legado.status = StatusInscricaoEnum.cancelado
+
+    # Promoção da fila — agora usa InscricaoConsulente
     promovido_inscricao = None
     if era_confirmado:
-        promovido_inscricao = _promover_lista_espera(db, gira.id, terreiro_id)
+        promovido_inscricao = _promover_lista_espera_novo(db, gira.id)
 
     db.commit()
 
     resultado: dict = {"ok": True, "promovido": None}
-
     if promovido_inscricao and promovido_inscricao.consulente:
         resultado["promovido"] = {
             "nome":     promovido_inscricao.consulente.nome,
@@ -451,5 +487,4 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
         body=corpo_push,
         url=f"/giras/{gira.id}",
     )
-
     return resultado
