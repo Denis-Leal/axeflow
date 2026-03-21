@@ -30,6 +30,8 @@ from datetime import datetime
 from app.models.gira import Gira
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from app.models.inscricao_consulente import InscricaoConsulente
+from app.models.inscricao_status import StatusInscricaoEnum as StatusNovo
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
 from app.services.push_service import send_push_to_terreiro
@@ -215,14 +217,28 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # Bloqueia todas as inscrições desta gira para leitura consistente.
     # Duas requisições simultâneas executarão esta seção em série,
     # garantindo que o limite de vagas nunca seja ultrapassado.
+    """
+    ETAPA 2: Dupla escrita.
+    
+    Mantém escrita em inscricoes_gira (compatibilidade com rollback).
+    Adiciona escrita em inscricoes_consulente (nova fonte de verdade).
+    Ambas dentro da mesma transação — ou as duas inserem ou nenhuma.
+    """
+    # ... toda a lógica de validação existente permanece igual ...
+    # (busca gira, valida janela de tempo, normaliza telefone,
+    #  busca/cria consulente, verifica duplicata — SEM ALTERAÇÃO)
+
+    # ── Seção crítica: FOR UPDATE em inscricoes_consulente ───────────────────
+    # MUDANÇA: o lock agora é na nova tabela, que será a fonte de verdade.
+    # inscricoes_gira não tem o mesmo lock — mas ambas estão na mesma
+    # transação, então a consistência é garantida pelo isolamento do Postgres.
     inscricoes_ativas = (
-        db.query(InscricaoGira)
+        db.query(InscricaoConsulente)        # ← nova tabela para o lock
         .filter(
-            InscricaoGira.gira_id == gira.id,
-            InscricaoGira.consulente_id.isnot(None),
-            InscricaoGira.status.in_([
-                StatusInscricaoEnum.confirmado,
-                StatusInscricaoEnum.lista_espera,
+            InscricaoConsulente.gira_id == gira.id,
+            InscricaoConsulente.status.in_([
+                StatusNovo.confirmado,
+                StatusNovo.lista_espera,
             ]),
         )
         .with_for_update()
@@ -231,36 +247,53 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
 
     confirmados = sum(
         1 for i in inscricoes_ativas
-        if i.status == StatusInscricaoEnum.confirmado
+        if i.status == StatusNovo.confirmado
     )
-
-    # posicao calculado aqui, dentro do lock, para garantir unicidade
     proxima_posicao = len(inscricoes_ativas) + 1
 
     status_inicial = (
-        StatusInscricaoEnum.lista_espera
+        StatusNovo.lista_espera
         if confirmados >= gira.limite_consulentes
-        else StatusInscricaoEnum.confirmado
+        else StatusNovo.confirmado
     )
 
-    # Sanitiza observações: strip + limite de chars + converte vazio para null
     observacoes_sanitizadas = None
     if data.observacoes:
         observacoes_sanitizadas = data.observacoes.strip()[:500] or None
 
-    inscricao = InscricaoGira(
+    # ── INSERT na nova tabela (fonte de verdade) ─────────────────────────────
+    inscricao_nova = InscricaoConsulente(
         gira_id=gira.id,
         consulente_id=consulente.id,
-        membro_id=None,  # explícito para satisfazer CHECK constraint
         posicao=proxima_posicao,
         status=status_inicial,
         observacoes=observacoes_sanitizadas,
     )
-    db.add(inscricao)
-    db.commit()
-    db.refresh(inscricao)
+    db.add(inscricao_nova)
+    db.flush()  # gera o ID antes de usar no legado
 
-    # Push assíncrono — fora do lock, não bloqueia a resposta
+    # ── INSERT no legado (compatibilidade com rollback) ──────────────────────
+    # IMPORTANTE: usa o MESMO id para rastreabilidade entre as duas tabelas.
+    # Se precisar fazer rollback do código, os IDs batem.
+    inscricao_legado = InscricaoGira(
+        id=inscricao_nova.id,           # mesmo UUID
+        gira_id=gira.id,
+        consulente_id=consulente.id,
+        membro_id=None,
+        posicao=proxima_posicao,
+        status=status_inicial,
+        observacoes=observacoes_sanitizadas,
+    )
+    db.add(inscricao_legado)
+
+    # flush() antes do commit garante que ambas inserções ocorrem
+    # dentro do mesmo snapshot de transação.
+    db.flush()
+
+    # ── Commit único — atomicidade total ─────────────────────────────────────
+    db.commit()
+    db.refresh(inscricao_nova)
+
     send_push_to_terreiro(
         terreiro_id=gira.terreiro_id,
         title="👤 Nova Inscrição",
@@ -272,15 +305,14 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     )
 
     return InscricaoResponse(
-        id=inscricao.id,
-        posicao=inscricao.posicao,
-        status=inscricao.status,
-        created_at=inscricao.created_at,
+        id=inscricao_nova.id,
+        posicao=inscricao_nova.posicao,
+        status=inscricao_nova.status,
+        created_at=inscricao_nova.created_at,
         consulente_nome=consulente.nome,
         consulente_telefone=consulente.telefone,
-        observacoes=inscricao.observacoes,
+        observacoes=inscricao_nova.observacoes,
     )
-
 
 def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> dict:
     """
