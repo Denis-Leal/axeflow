@@ -8,7 +8,7 @@ const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
     // Só ativa o proxy local se não estiver no Vercel
-    if (process.env.VERCEL) return [];
+    // if (process.env.VERCEL) return [];
     return [
       {
         source: '/api/:path*',
