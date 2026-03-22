@@ -28,3 +28,6 @@ from app.models.api_key import ApiKey
 
 # Recuperação de senha
 from app.models.password_reset_token import PasswordResetToken
+
+# Ajeum — gestão de seleções e confirmações
+from app.models.ajeum import Ajeum, AjeumItem, AjeumSelecao

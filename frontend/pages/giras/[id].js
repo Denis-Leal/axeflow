@@ -1,24 +1,21 @@
 /**
  * pages/giras/[id].js — AxeFlow
  *
- * ALTERAÇÕES nesta versão:
+ * CORREÇÕES aplicadas nesta versão:
  *
- * 1. handleCancelar — recebe o retorno do backend com `promovido`:
- *    - Atualiza o status do cancelado para 'cancelado' no estado local
- *    - Atualiza o status do promovido para 'confirmado' no estado local
- *    - Abre o WhatsApp AUTOMATICAMENTE com mensagem pré-preenchida
- *    - Exibe um toast de confirmação informando que o WA foi aberto
+ * Bug 1 — AjeumPanel dentro do PainelPresencaMembros (REMOVIDO):
+ *   O componente estava no return do PainelPresencaMembros, que não recebe
+ *   `userRole` nem `gira` como props — causava ReferenceError em runtime.
+ *   Movido para o lugar correto: após PainelPresencaMembros em ambos os
+ *   branches (gira fechada e pública).
  *
- * 2. ToastPromovido — componente de notificação inline:
- *    - Aparece após a promoção confirmando que o WhatsApp foi aberto
- *    - Botão secundário para reabrir o WhatsApp caso o admin feche por engano
- *    - Fecha automaticamente em 20s ou manualmente
+ * Bug 2 — handleFecharToast não declarado:
+ *   Era referenciado no ToastPromovido mas nunca declarado.
+ *   Substituído por arrow function inline, igual ao padrão do restante.
  *
- * 3. Badge lista_espera — estilo visual adicionado (estava sem cor definida)
- *
- * 4. Botão WhatsApp inline — na linha de cada inscrição com status lista_espera:
- *    - Ícone 📱 que abre wa.me com mensagem pré-preenchida
- *    - Permite o admin contatar manualmente sem sair da página
+ * Bug 3 — userRole não lido corretamente:
+ *   A variável existia mas não era passada para AjeumPanel.
+ *   Adicionado isAdmin derivado de userRole no escopo correto.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -28,7 +25,8 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import ConfirmModal from '../../components/ConfirmModal';
-import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao } from '../../services/api';
+import AjeumPanel from '../../components/AjeumPanel';
+import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao, getMe } from '../../services/api';
 import api from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
 
@@ -43,25 +41,13 @@ const COR_SCORE = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Formata telefone E.164 (sem '+') para link wa.me.
- * Ex: "5511999999999" → "https://wa.me/5511999999999?text=..."
- */
 function linkWhatsApp(telefone, mensagem) {
-  // Remove qualquer não-dígito que possa ter vindo do banco
   const digitos = String(telefone).replace(/\D/g, '');
   return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
 }
 
 // ── Componente: toast de promoção automática ──────────────────────────────────
-
-/**
- * Exibido após promoção automática, confirmando que o WhatsApp já foi aberto.
- * Fecha automaticamente em 20 segundos.
- * Inclui botão para REABRIR o WhatsApp caso o admin tenha fechado por engano.
- */
 function ToastPromovido({ promovido, giraTitulo, onClose }) {
-  // Fecha automaticamente após 20s (ação já foi feita, não precisa de muito tempo)
   useEffect(() => {
     const timer = setTimeout(onClose, 20_000);
     return () => clearTimeout(timer);
@@ -94,25 +80,16 @@ function ToastPromovido({ promovido, giraTitulo, onClose }) {
         <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem', marginTop: '3px' }}>
           A mensagem de confirmação de vaga foi enviada para {promovido.nome}.
         </div>
-
-        {/* Botão para REABRIR o WhatsApp caso o admin tenha fechado por engano */}
         <a
           href={linkWhatsApp(promovido.telefone, mensagemWA)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            marginTop: '0.6rem',
-            background: 'rgba(37,211,102,0.10)',
-            border: '1px solid rgba(37,211,102,0.3)',
-            color: '#25d366',
-            borderRadius: '8px',
-            padding: '0.3rem 0.75rem',
-            textDecoration: 'none',
-            fontWeight: 600,
-            fontSize: '0.78rem',
+            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+            marginTop: '0.6rem', background: 'rgba(37,211,102,0.10)',
+            border: '1px solid rgba(37,211,102,0.3)', color: '#25d366',
+            borderRadius: '8px', padding: '0.3rem 0.75rem',
+            textDecoration: 'none', fontWeight: 600, fontSize: '0.78rem',
           }}
         >
           <i className="bi bi-whatsapp"></i>
@@ -120,24 +97,16 @@ function ToastPromovido({ promovido, giraTitulo, onClose }) {
         </a>
       </div>
 
-      {/* Fechar toast */}
       <button
         onClick={onClose}
-        style={{
-          background: 'none', border: 'none',
-          color: 'var(--cor-texto-suave)', cursor: 'pointer',
-          fontSize: '1rem', lineHeight: 1, padding: '0',
-        }}
+        style={{ background: 'none', border: 'none', color: 'var(--cor-texto-suave)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0' }}
         title="Fechar"
-      >
-        ×
-      </button>
+      >×</button>
     </div>
   );
 }
 
 // ── Componentes auxiliares ────────────────────────────────────────────────────
-
 function ScoreBadge({ score }) {
   if (!score) return null;
   const c = COR_SCORE[score.cor] || COR_SCORE.cinza;
@@ -181,11 +150,8 @@ function ObservacaoBadge({ texto }) {
       style={{
         display: 'flex', alignItems: 'flex-start', gap: '4px',
         marginTop: '4px',
-        background: 'rgba(212,175,55,0.07)',
-        border: '1px solid rgba(212,175,55,0.2)',
-        borderRadius: '6px',
-        padding: '3px 7px',
-        maxWidth: '260px',
+        background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)',
+        borderRadius: '6px', padding: '3px 7px', maxWidth: '260px',
       }}
     >
       <i className="bi bi-chat-left-text" style={{ fontSize: '0.65rem', color: '#d4af37', marginTop: '2px', flexShrink: 0 }}></i>
@@ -201,6 +167,10 @@ function ObservacaoBadge({ texto }) {
 }
 
 // ── Painel de presença de membros ─────────────────────────────────────────────
+// IMPORTANTE: este componente NÃO inclui o AjeumPanel.
+// O AjeumPanel é renderizado pelo componente pai (GiraDetalhe),
+// após este painel, porque precisa de `userRole` e `gira` que
+// só existem no escopo de GiraDetalhe.
 function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro }) {
   const confirmados = membrosPresenca.filter(m => m.status === 'compareceu').length;
   const confirmando = membrosPresenca.filter(m => m.status === 'confirmado').length;
@@ -254,12 +224,18 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
                 <span style={{ marginLeft: '0.75rem', fontSize: '0.72rem', color: statusCor.text, fontWeight: 600 }}>{statusCor.label}</span>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <button onClick={() => onUpdateMembro(m.membro_id, m.status === 'compareceu' ? 'pendente' : 'compareceu')} title="Marcar compareceu"
-                  style={{ background: m.status === 'compareceu' ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.08)', border: `1px solid ${m.status === 'compareceu' ? 'rgba(16,185,129,0.6)' : 'rgba(16,185,129,0.2)'}`, color: '#10b981', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}>
+                <button
+                  onClick={() => onUpdateMembro(m.membro_id, m.status === 'compareceu' ? 'pendente' : 'compareceu')}
+                  title="Marcar compareceu"
+                  style={{ background: m.status === 'compareceu' ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.08)', border: `1px solid ${m.status === 'compareceu' ? 'rgba(16,185,129,0.6)' : 'rgba(16,185,129,0.2)'}`, color: '#10b981', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}
+                >
                   <i className="bi bi-check-lg"></i>
                 </button>
-                <button onClick={() => onUpdateMembro(m.membro_id, m.status === 'faltou' ? 'pendente' : 'faltou')} title="Marcar faltou"
-                  style={{ background: m.status === 'faltou' ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.06)', border: `1px solid ${m.status === 'faltou' ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.15)'}`, color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}>
+                <button
+                  onClick={() => onUpdateMembro(m.membro_id, m.status === 'faltou' ? 'pendente' : 'faltou')}
+                  title="Marcar faltou"
+                  style={{ background: m.status === 'faltou' ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.06)', border: `1px solid ${m.status === 'faltou' ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.15)'}`, color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}
+                >
                   <i className="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -272,7 +248,6 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
 }
 
 // ── Página principal ──────────────────────────────────────────────────────────
-
 export default function GiraDetalhe() {
   const router = useRouter();
   const { id } = router.query;
@@ -280,19 +255,21 @@ export default function GiraDetalhe() {
   const [gira, setGira]                       = useState(null);
   const [inscricoes, setInscricoes]           = useState([]);
   const [membrosPresenca, setMembrosPresenca] = useState([]);
+  const [userRole, setUserRole]               = useState('');  // lido via getMe()
   const [loading, setLoading]                 = useState(true);
   const [filtro, setFiltro]                   = useState('todos');
   const [ordenar, setOrdenar]                 = useState('posicao');
   const [linkCopiado, setLinkCopiado]         = useState(false);
-  // Estado do toast de promoção automática — null = oculto
   const [promovido, setPromovido]             = useState(null);
-  // Estado do modal de confirmação/alerta
   const [modal, setModal] = useState({
     aberto: false, titulo: '', mensagem: '',
     apenasOk: false, tipoBotao: 'perigo',
     labelConfirmar: 'Confirmar',
     onConfirmar: null,
   });
+
+  // isAdmin derivado de userRole no escopo correto para passar ao AjeumPanel
+  const isAdmin = ['admin'].includes(userRole);
 
   // ── Carregamento inicial ────────────────────────────────────────────────────
   useEffect(() => {
@@ -301,11 +278,13 @@ export default function GiraDetalhe() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    Promise.all([getGira(id), listInscricoes(id)])
-      .then(([giraRes, inscRes]) => {
+    // Inclui getMe() para obter userRole — necessário para o AjeumPanel
+    Promise.all([getGira(id), listInscricoes(id), getMe()])
+      .then(([giraRes, inscRes, meRes]) => {
         const g = giraRes.data;
         setGira(g);
         setInscricoes(inscRes.data);
+        setUserRole(meRes.data.role);
 
         const endpoint = g.acesso === 'fechada'
           ? `/membros/giras/${id}/presenca-membros`
@@ -318,21 +297,15 @@ export default function GiraDetalhe() {
   }, [id]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-
   const handlePresenca = async (inscricaoId, status) => {
     try {
-    await updatePresenca(inscricaoId, status);
-    setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
-    }
-    catch (err) {
+      await updatePresenca(inscricaoId, status);
+      setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
+    } catch (err) {
       const msg = handleApiError(err, 'Atualizar presença');
       setModal({
-        aberto: true,
-        titulo: 'Erro ao atualizar presença',
-        mensagem: msg,
-        apenasOk: true,
-        tipoBotao: 'perigo',
-        labelConfirmar: 'OK',
+        aberto: true, titulo: 'Erro ao atualizar presença', mensagem: msg,
+        apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
         onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
       });
     }
@@ -344,16 +317,11 @@ export default function GiraDetalhe() {
       setMembrosPresenca(prev => prev.map(m =>
         m.membro_id === membroId ? { ...m, status } : m
       ));
-    }
-    catch (err) {
+    } catch (err) {
       const msg = handleApiError(err, 'Atualizar presença do membro');
       setModal({
-        aberto: true,
-        titulo: 'Erro ao atualizar presença do membro',
-        mensagem: msg,
-        apenasOk: true,
-        tipoBotao: 'perigo',
-        labelConfirmar: 'OK',
+        aberto: true, titulo: 'Erro ao atualizar presença do membro', mensagem: msg,
+        apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
         onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
       });
     }
@@ -370,7 +338,6 @@ export default function GiraDetalhe() {
     }
   };
 
-  /** Fecha o modal e limpa o estado */
   const fecharModal = useCallback(() => {
     setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
   }, []);
@@ -380,9 +347,7 @@ export default function GiraDetalhe() {
       aberto: true,
       titulo: 'Cancelar inscrição',
       mensagem: `Tem certeza que deseja cancelar a inscrição de "${nomeConsulente}"?\n\nEsta ação não pode ser desfeita.`,
-      apenasOk: false,
-      tipoBotao: 'perigo',
-      labelConfirmar: 'Cancelar inscrição',
+      apenasOk: false, tipoBotao: 'perigo', labelConfirmar: 'Cancelar inscrição',
       onConfirmar: async () => {
         fecharModal();
         try {
@@ -392,7 +357,7 @@ export default function GiraDetalhe() {
           setInscricoes(prev => prev.map(i =>
             i.id === inscricaoId ? { ...i, status: 'cancelado' } : i
           ));
-          
+
           if (resultado?.promovido) {
             const { nome, telefone, posicao } = resultado.promovido;
             setInscricoes(prev => prev.map(i => {
@@ -408,16 +373,11 @@ export default function GiraDetalhe() {
             window.open(linkWhatsApp(telefone, mensagemWA), '_blank', 'noopener,noreferrer');
             setPromovido({ nome, telefone, posicao });
           }
-        }
-        catch (err) {
+        } catch (err) {
           const msg = handleApiError(err, 'Cancelar inscrição');
           setModal({
-            aberto: true,
-            titulo: 'Erro ao cancelar',
-            mensagem: msg,
-            apenasOk: true,
-            tipoBotao: 'perigo',
-            labelConfirmar: 'OK',
+            aberto: true, titulo: 'Erro ao cancelar', mensagem: msg,
+            apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
             onConfirmar: fecharModal,
           });
         }
@@ -430,9 +390,7 @@ export default function GiraDetalhe() {
       aberto: true,
       titulo: 'Reativar inscrição',
       mensagem: `Reativar a inscrição de "${nomeConsulente}"?\n\nSe ainda houver vaga, voltará como confirmado. Se lotada, entrará na fila de espera.`,
-      apenasOk: false,
-      tipoBotao: 'sucesso',
-      labelConfirmar: 'Reativar',
+      apenasOk: false, tipoBotao: 'sucesso', labelConfirmar: 'Reativar',
       onConfirmar: async () => {
         fecharModal();
         const res = await reativarInscricao(inscricaoId);
@@ -440,15 +398,12 @@ export default function GiraDetalhe() {
         setInscricoes(prev => prev.map(i =>
           i.id === inscricaoId ? { ...i, status } : i
         ));
-        // Exibe resultado como alerta no padrão visual
         setModal({
           aberto: true,
           titulo: status === 'confirmado' ? '✅ Inscrição reativada' : '⏳ Adicionado à fila',
-          mensagem,
-          apenasOk: true,
+          mensagem, apenasOk: true,
           tipoBotao: status === 'confirmado' ? 'sucesso' : 'padrao',
-          labelConfirmar: 'OK',
-          onConfirmar: fecharModal,
+          labelConfirmar: 'OK', onConfirmar: fecharModal,
         });
       },
     });
@@ -513,8 +468,7 @@ export default function GiraDetalhe() {
             </div>
             <div className="d-flex gap-2 align-items-center flex-wrap">
               <span className={`badge-status badge-${gira.status}`}>{gira.status}</span>
-              <Link href={`/giras/editar/${id}`} className="btn-outline-gold"
-                style={{ fontSize: '0.85rem', textDecoration: 'none' }}>
+              <Link href={`/giras/editar/${id}`} className="btn-outline-gold" style={{ fontSize: '0.85rem', textDecoration: 'none' }}>
                 <i className="bi bi-pencil me-1"></i> Editar
               </Link>
               {gira.acesso !== 'fechada' && (
@@ -569,7 +523,6 @@ export default function GiraDetalhe() {
               </div>
               <div className="col-6 col-md-3">
                 <div className="stat-card">
-                  {/* Mostra fila de espera se houver, senão mostra alertas */}
                   {naFila > 0 ? (
                     <>
                       <div className="stat-value" style={{ color: '#f59e0b' }}>{naFila}</div>
@@ -619,12 +572,21 @@ export default function GiraDetalhe() {
               </div>
             )}
 
-            {/* ── Painel de membros (FECHADA: único | PÚBLICA: complementar) ── */}
+            {/* ── Branch: gira FECHADA ── */}
             {gira.acesso === 'fechada' ? (
-              <PainelPresencaMembros
-                giraId={id} acesso={gira.acesso}
-                membrosPresenca={membrosPresenca} onUpdateMembro={handlePresencaMembro}
-              />
+              <>
+                <PainelPresencaMembros
+                  giraId={id} acesso={gira.acesso}
+                  membrosPresenca={membrosPresenca} onUpdateMembro={handlePresencaMembro}
+                />
+
+                {/* AjeumPanel após o painel de membros — no escopo correto */}
+                <AjeumPanel
+                  giraId={id}
+                  isAdmin={isAdmin}
+                  giraStatus={gira.status}
+                />
+              </>
             ) : (
               <>
                 {/* ── GIRA PÚBLICA: lista de consulentes ── */}
@@ -634,12 +596,10 @@ export default function GiraDetalhe() {
                       ✦ Lista de Consulentes
                     </span>
 
-                    {/* Badge: fila de espera — visível apenas quando há pessoas aguardando */}
                     {naFila > 0 && (
                       <span style={{
                         fontSize: '0.72rem', color: '#f59e0b',
-                        background: 'rgba(245,158,11,0.1)',
-                        border: '1px solid rgba(245,158,11,0.3)',
+                        background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
                         borderRadius: '20px', padding: '1px 8px',
                       }}>
                         ⏳ {naFila} na fila de espera
@@ -649,8 +609,7 @@ export default function GiraDetalhe() {
                     {comObservacao > 0 && (
                       <span style={{
                         fontSize: '0.72rem', color: '#d4af37',
-                        background: 'rgba(212,175,55,0.1)',
-                        border: '1px solid rgba(212,175,55,0.25)',
+                        background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)',
                         borderRadius: '20px', padding: '1px 8px',
                       }}>
                         <i className="bi bi-chat-left-text me-1"></i>
@@ -667,9 +626,7 @@ export default function GiraDetalhe() {
                             color: filtro === f ? 'var(--cor-acento)' : 'var(--cor-texto-suave)',
                             borderRadius: '6px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.72rem',
                           }}>
-                            {f === 'todos'       ? 'Todos'
-                             : f === 'lista_espera' ? '⏳ Fila'
-                             : f.charAt(0).toUpperCase() + f.slice(1)}
+                            {f === 'todos' ? 'Todos' : f === 'lista_espera' ? '⏳ Fila' : f.charAt(0).toUpperCase() + f.slice(1)}
                           </button>
                         ))}
                       </div>
@@ -686,13 +643,13 @@ export default function GiraDetalhe() {
                     </div>
                   </div>
 
-                  {/* ── Toast de promoção automática ── */}
+                  {/* Toast de promoção automática */}
                   {promovido && (
                     <div style={{ padding: '0.75rem 1rem 0' }}>
                       <ToastPromovido
                         promovido={promovido}
                         giraTitulo={gira.titulo}
-                        onClose={handleFecharToast}
+                        onClose={() => setPromovido(null)}
                       />
                     </div>
                   )}
@@ -713,8 +670,6 @@ export default function GiraDetalhe() {
                         {filtradas.map(i => {
                           const sc = i.score_presenca;
                           const eListaEspera = i.status === 'lista_espera';
-
-                          // Mensagem padrão para WhatsApp de quem está na fila
                           const mensagemWA = (
                             `Olá ${i.consulente_nome}! Uma vaga foi liberada na gira "${gira.titulo}". ` +
                             `Você estava na fila de espera e agora está confirmado(a)! 🎉`
@@ -724,20 +679,11 @@ export default function GiraDetalhe() {
                             <tr key={i.id} style={{
                               background: sc?.alerta
                                 ? 'rgba(239,68,68,0.04)'
-                                : eListaEspera
-                                  ? 'rgba(245,158,11,0.03)'  // fundo levíssimo para fila
-                                  : 'transparent',
+                                : eListaEspera ? 'rgba(245,158,11,0.03)' : 'transparent',
                             }}>
-
-                              {/* Posição na fila */}
-                              <td style={{
-                                color: eListaEspera ? '#f59e0b' : 'var(--cor-acento)',
-                                fontFamily: 'Cinzel', fontWeight: 700,
-                              }}>
+                              <td style={{ color: eListaEspera ? '#f59e0b' : 'var(--cor-acento)', fontFamily: 'Cinzel', fontWeight: 700 }}>
                                 {i.posicao}º
                               </td>
-
-                              {/* Nome + telefone + observação inline */}
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                   <strong>{i.consulente_nome}</strong>
@@ -748,8 +694,6 @@ export default function GiraDetalhe() {
                                 </div>
                                 <ObservacaoBadge texto={i.observacoes} />
                               </td>
-
-                              {/* Score de histórico */}
                               <td>
                                 {sc ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -768,17 +712,13 @@ export default function GiraDetalhe() {
                                   <span style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>—</span>
                                 )}
                               </td>
-
-                              {/* Status badge */}
                               <td>
                                 {eListaEspera ? (
-                                  /* Badge customizado para lista_espera (cor âmbar) */
                                   <span style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '4px',
                                     padding: '0.3rem 0.7rem', borderRadius: '20px',
                                     fontSize: '0.75rem', fontWeight: 600,
-                                    background: 'rgba(245,158,11,0.15)',
-                                    color: '#f59e0b',
+                                    background: 'rgba(245,158,11,0.15)', color: '#f59e0b',
                                     border: '1px solid rgba(245,158,11,0.3)',
                                   }}>
                                     ⏳ fila de espera
@@ -787,30 +727,19 @@ export default function GiraDetalhe() {
                                   <span className={`badge-status badge-${i.status}`}>{i.status}</span>
                                 )}
                               </td>
-
-                              {/* Data de inscrição */}
                               <td className="d-none d-md-table-cell" style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem' }}>
                                 {new Date(i.created_at).toLocaleString('pt-BR')}
                               </td>
-
-                              {/* Ações */}
                               <td>
                                 {i.status === 'cancelado' ? (
-                                  /* Inscrição cancelada — apenas botão reativar */
                                   <button
                                     onClick={() => handleReativar(i.id, i.consulente_nome || 'este consulente')}
                                     title="Reativar inscrição"
                                     style={{
-                                      background: 'rgba(212,175,55,0.1)',
-                                      border: '1px solid rgba(212,175,55,0.35)',
-                                      color: 'var(--cor-acento)',
-                                      borderRadius: '6px',
-                                      padding: '0.25rem 0.6rem',
-                                      cursor: 'pointer',
-                                      fontSize: '0.78rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.3rem',
+                                      background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)',
+                                      color: 'var(--cor-acento)', borderRadius: '6px', padding: '0.25rem 0.6rem',
+                                      cursor: 'pointer', fontSize: '0.78rem',
+                                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                                     }}
                                   >
                                     <i className="bi bi-arrow-counterclockwise"></i>
@@ -818,26 +747,21 @@ export default function GiraDetalhe() {
                                   </button>
                                 ) : (
                                   <div className="d-flex gap-1">
-                                    {/* Botão WhatsApp — apenas para quem está na fila de espera */}
                                     {eListaEspera && i.consulente_telefone && (
                                       <a
                                         href={linkWhatsApp(i.consulente_telefone, mensagemWA)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        target="_blank" rel="noopener noreferrer"
                                         title="Avisar via WhatsApp que a vaga foi liberada"
                                         style={{
                                           display: 'inline-flex', alignItems: 'center',
-                                          background: 'rgba(37,211,102,0.12)',
-                                          border: '1px solid rgba(37,211,102,0.35)',
+                                          background: 'rgba(37,211,102,0.12)', border: '1px solid rgba(37,211,102,0.35)',
                                           color: '#25d366', borderRadius: '6px',
-                                          padding: '0.25rem 0.5rem', fontSize: '0.85rem',
-                                          textDecoration: 'none',
+                                          padding: '0.25rem 0.5rem', fontSize: '0.85rem', textDecoration: 'none',
                                         }}
                                       >
                                         <i className="bi bi-whatsapp"></i>
                                       </a>
                                     )}
-                                    {/* Marcar presença — irrelevante para lista_espera, mas disponível */}
                                     {!eListaEspera && (
                                       <>
                                         <button onClick={() => handlePresenca(i.id, 'compareceu')} title="Marcar presença"
@@ -850,7 +774,6 @@ export default function GiraDetalhe() {
                                         </button>
                                       </>
                                     )}
-                                    {/* Cancelar — disponível para todos ativos */}
                                     <button
                                       onClick={() => handleCancelar(i.id, i.consulente_nome || 'este consulente')}
                                       title="Cancelar inscrição"
@@ -903,10 +826,17 @@ export default function GiraDetalhe() {
                   </div>
                 </div>
 
-                {/* ── Painel de membros (complementar em giras públicas) ── */}
+                {/* Painel de presença dos membros (complementar em giras públicas) */}
                 <PainelPresencaMembros
                   giraId={id} acesso={gira.acesso}
                   membrosPresenca={membrosPresenca} onUpdateMembro={handlePresencaMembro}
+                />
+
+                {/* AjeumPanel após o painel de membros — no escopo correto */}
+                <AjeumPanel
+                  giraId={id}
+                  isAdmin={isAdmin}
+                  giraStatus={gira.status}
                 />
               </>
             )}
@@ -916,7 +846,6 @@ export default function GiraDetalhe() {
       </div>
       <BottomNav />
 
-      {/* Modal de confirmação/alerta — cobre todos os window.confirm e window.alert */}
       <ConfirmModal
         aberto={modal.aberto}
         titulo={modal.titulo}

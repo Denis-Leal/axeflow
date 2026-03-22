@@ -75,6 +75,11 @@ class Gira(Base):
         back_populates="gira",
         cascade="all, delete-orphan",
     )
+    ajeum = relationship(
+        "Ajeum", 
+        back_populates="gira", 
+        uselist=False,
+    )
 
     __table_args__ = (
         Index("ix_giras_terreiro_data", "terreiro_id", "data"),
