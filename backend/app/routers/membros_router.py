@@ -113,7 +113,7 @@ def create_membro(
             senha_provisoria=data.senha,
             terreiro_nome=terreiro_nome,
             convidado_por=user.nome,
-            app_url=settings.APP_URL,
+            app_url=settings.app_url_resolved,
         )
         if not enviado:
             logger.warning(

@@ -280,7 +280,7 @@ def enviar_reset(
     db.commit()
 
     # Envia email — falha silenciosa para não revelar existência do usuário
-    link = f"{settings.APP_URL}/redefinir-senha?token={token_raw}"
+    link = f"{settings.app_url_resolved}/redefinir-senha?token={token_raw}"
     try:
         enviado = _send(
             to      = usuario.email,

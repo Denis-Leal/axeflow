@@ -33,6 +33,8 @@ from app.models.push_subscription import PushSubscription
 
 from app.services.cleanup_service import start_scheduler, stop_scheduler
 
+from app.core.config import settings
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -72,12 +74,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://axeflow.vercel.app",
-        "https://axeflow-git-staging-dbl-tech.vercel.app", # staging
-        "https://axeflow-*.vercel.app",  # previews de PR
-        "http://localhost:3000",
-    ],
+    allow_origins     = settings.cors_origins,  # varia por ENVIRONMENT
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
