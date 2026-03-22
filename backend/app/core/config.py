@@ -11,6 +11,9 @@ from typing import Optional
 
 
 class Settings(BaseSettings):
+    # Ambiente de execução — afeta comportamentos específicos (ex: logs, debug)
+    ENVIRONMENT: str = "staging"  # "staging" | "production"
+    
     # ── Banco ──────────────────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql://terreiro:terreiro123@postgres:5432/axeflow"
 
@@ -28,6 +31,7 @@ class Settings(BaseSettings):
     # ── Email (Brevo) ──────────────────────────────────────────────────────────
     BREVO_API_KEY: str = "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"
     GMAIL_USER: str    = "axeflow777@gmail.com"
+    DEV_EMAIL: str    = "denis.leal07@gmail.com"  # Para onde os emails vão em staging
 
     # ── App ────────────────────────────────────────────────────────────────────
     APP_URL: str = "https://axeflow.vercel.app"

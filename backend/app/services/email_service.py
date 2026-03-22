@@ -13,6 +13,12 @@ BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def _send(to: str, subject: str, html: str) -> bool:
+  
+    if settings.ENVIRONMENT == "staging":
+        logger.info("[Email] (STAGING) Simulando envio para %s — %s", to, subject)
+        to = settings.DEV_EMAIL
+        subject = f"(STAGING) {subject}"
+        
     """Envia um email via Brevo API. Retorna True se enviado com sucesso."""
     if not settings.BREVO_API_KEY:
         logger.warning("[Email] BREVO_API_KEY não configurada — email não enviado para %s", to)

@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import Base, engine, get_db
 from app.routers import (
     auth_router, gira_router, inscricao_router,
-    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router
+    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router, ajeum_router
 )
 
 # Models importados para o Alembic autogenerate detectar as tabelas
@@ -74,6 +74,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://axeflow.vercel.app",
+        "https://axeflow-git-staging-dbl-tech.vercel.app", # staging
         "https://axeflow-*.vercel.app",  # previews de PR
         "http://localhost:3000",
     ],
@@ -92,6 +93,7 @@ app.include_router(audit_router.router)
 app.include_router(contato_router.router)
 app.include_router(api_key_router.router)
 app.include_router(password_reset_router.router)
+app.include_router(ajeum_router.router)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
