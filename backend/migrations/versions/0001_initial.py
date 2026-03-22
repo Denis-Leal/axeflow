@@ -15,16 +15,6 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-status_enum = postgresql.ENUM(
-    'confirmado',
-    'lista_espera',
-    'compareceu',
-    'faltou',
-    name='statusinscricaoenum'
-)
-
-status_enum.create(op.get_bind(), checkfirst=True)
-
 def tabela_existe(nome: str) -> bool:
     from sqlalchemy import inspect
     bind = op.get_bind()
