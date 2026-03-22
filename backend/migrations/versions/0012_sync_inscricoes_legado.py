@@ -75,21 +75,9 @@ def _contar_pendentes(bind) -> dict:
 def upgrade() -> None:
     bind = op.get_bind()
 
-    # ── Validação inicial ────────────────────────────────────────────────────
-    pendentes_antes = _contar_pendentes(bind)
-    logger.info(
-        "[0012] Pendentes antes da sync: consulentes=%d membros=%d",
-        pendentes_antes["consulentes_pendentes"],
-        pendentes_antes["membros_pendentes"],
-    )
-
-    # ── Sincronizar inscricoes_consulente em lotes ────────────────────────────
-    # ON CONFLICT DO NOTHING: seguro para reexecução
-    # O status é copiado como texto — o enum aceita os valores existentes
-    # COALESCE em created_at: garante NOT NULL mesmo para registros antigos
-    total_consulentes = 0
-    while True:
-        result = bind.execute(text("""
+    try:
+        # ── CONSULENTES ─────────────────────────────
+        bind.execute(text("""
             INSERT INTO inscricoes_consulente
                 (id, gira_id, consulente_id, posicao, status, observacoes,
                  created_at, updated_at)
@@ -98,7 +86,7 @@ def upgrade() -> None:
                 ig.gira_id,
                 ig.consulente_id,
                 ig.posicao,
-                ig.status::text,
+                CAST(ig.status AS TEXT),
                 ig.observacoes,
                 COALESCE(ig.created_at, NOW()),
                 ig.updated_at
@@ -110,23 +98,11 @@ def upgrade() -> None:
                 WHERE ic.gira_id = ig.gira_id
                   AND ic.consulente_id = ig.consulente_id
               )
-            LIMIT 500
             ON CONFLICT (gira_id, consulente_id) DO NOTHING
         """))
 
-        lote = result.rowcount
-        total_consulentes += lote
-
-        # Para quando não há mais registros a inserir
-        if lote < 500:
-            break
-
-    logger.info("[0012] Consulentes sincronizados: %d", total_consulentes)
-
-    # ── Sincronizar inscricoes_membro em lotes ────────────────────────────────
-    total_membros = 0
-    while True:
-        result = bind.execute(text("""
+        # ── MEMBROS ─────────────────────────────
+        bind.execute(text("""
             INSERT INTO inscricoes_membro
                 (id, gira_id, membro_id, posicao, status,
                  created_at, updated_at)
@@ -135,7 +111,7 @@ def upgrade() -> None:
                 ig.gira_id,
                 ig.membro_id,
                 ig.posicao,
-                ig.status::text,
+                CAST(ig.status AS TEXT),
                 COALESCE(ig.created_at, NOW()),
                 ig.updated_at
             FROM inscricoes_gira ig
@@ -146,65 +122,12 @@ def upgrade() -> None:
                 WHERE im.gira_id = ig.gira_id
                   AND im.membro_id = ig.membro_id
               )
-            LIMIT 500
             ON CONFLICT (gira_id, membro_id) DO NOTHING
         """))
 
-        lote = result.rowcount
-        total_membros += lote
-
-        if lote < 500:
-            break
-
-    logger.info("[0012] Membros sincronizados: %d", total_membros)
-
-    # ── Validação pós-sync ───────────────────────────────────────────────────
-    pendentes_depois = _contar_pendentes(bind)
-
-    if pendentes_depois["consulentes_pendentes"] > 0:
-        # Registros com ambos NULL ou ambos preenchidos — foram
-        # removidos pela 0006, mas podem ter sido inseridos com bug.
-        # Não bloqueia a migration, mas registra o aviso.
-        warnings.warn(
-            f"[0012] ATENÇÃO: {pendentes_depois['consulentes_pendentes']} "
-            "registros de consulentes não puderam ser sincronizados. "
-            "Verifique registros com constraint violada em inscricoes_gira.",
-            stacklevel=2,
-        )
-
-    if pendentes_depois["membros_pendentes"] > 0:
-        warnings.warn(
-            f"[0012] ATENÇÃO: {pendentes_depois['membros_pendentes']} "
-            "registros de membros não puderam ser sincronizados.",
-            stacklevel=2,
-        )
-
-    # ── Atualizar baseline ───────────────────────────────────────────────────
-    # Registra resultado da sync para auditoria futura
-    try:
-        bind.execute(text("""
-            INSERT INTO _migration_baseline (
-                capturado_em,
-                ig_consulentes, ig_membros,
-                ic_total, im_total,
-                ig_confirmados, ig_fila,
-                ig_compareceu, ig_faltou
-            )
-            SELECT
-                NOW(),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE consulente_id IS NOT NULL),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE membro_id IS NOT NULL),
-                (SELECT COUNT(*) FROM inscricoes_consulente),
-                (SELECT COUNT(*) FROM inscricoes_membro),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE status = 'confirmado' AND consulente_id IS NOT NULL),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE status = 'lista_espera'),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE status = 'compareceu'),
-                (SELECT COUNT(*) FROM inscricoes_gira WHERE status = 'faltou')
-        """))
-    except Exception:
-        # _migration_baseline pode não existir se a Etapa 0 foi pulada.
-        # Não bloqueia a migration.
-        pass
+    except Exception as e:
+        print("ERRO REAL DA MIGRATION:", str(e))
+        raise
 
 
 def downgrade() -> None:

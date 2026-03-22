@@ -41,39 +41,30 @@ def _indice_existe(nome: str) -> bool:
 
 
 def upgrade() -> None:
-    if _tabela_existe("password_reset_tokens"):
-        return  # idempotente
-
-    op.create_table(
-        "password_reset_tokens",
-        # ── Identidade ────────────────────────────────────────────────────────
-        sa.Column("id",          postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id",     postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("terreiro_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("terreiros.id", ondelete="CASCADE"), nullable=False),
-
-        # ── Token (nunca armazenar o valor real) ──────────────────────────────
-        # SHA-256 hexdigest do token gerado com secrets.token_urlsafe(32)
-        sa.Column("token_hash", sa.String(64), nullable=False, unique=True),
-
-        # ── Controle de validade ──────────────────────────────────────────────
-        # Token expira em 1 hora após criação
-        sa.Column("expires_at", sa.DateTime, nullable=False),
-        # Preenchido quando o token é usado — impede reutilização
-        sa.Column("used_at",    sa.DateTime, nullable=True),
-
-        # ── Timestamps ────────────────────────────────────────────────────────
-        sa.Column("created_at", sa.DateTime, nullable=False,
-                  server_default=sa.text("NOW()")),
-    )
+    if not _tabela_existe("password_reset_tokens"):
+        op.create_table(
+            "password_reset_tokens",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column("user_id", postgresql.UUID(as_uuid=True),
+                      sa.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False),
+            sa.Column("terreiro_id", postgresql.UUID(as_uuid=True),
+                      sa.ForeignKey("terreiros.id", ondelete="CASCADE"), nullable=False),
+            sa.Column("token_hash", sa.String(64), nullable=False, unique=True),
+            sa.Column("expires_at", sa.DateTime, nullable=False),
+            sa.Column("used_at", sa.DateTime, nullable=True),
+            sa.Column("created_at", sa.DateTime, nullable=False,
+                      server_default=sa.text("NOW()")),
+        )
 
     # Lookup rápido por hash na validação do token (caminho crítico)
-    op.create_index("ix_prt_token_hash",   "password_reset_tokens", ["token_hash"])
+    if not _indice_existe("ix_prt_token_hash"):
+        op.create_index("ix_prt_token_hash",   "password_reset_tokens", ["token_hash"])
     # Limpeza periódica de tokens expirados e não usados
-    op.create_index("ix_prt_expires_at",   "password_reset_tokens", ["expires_at"])
+    if not _indice_existe("ix_prt_expires_at"):
+        op.create_index("ix_prt_expires_at",   "password_reset_tokens", ["expires_at"])
     # Consulta de tokens por usuário (para invalidar anteriores)
-    op.create_index("ix_prt_user_id",      "password_reset_tokens", ["user_id"])
+    if not _indice_existe("ix_prt_user_id"):
+        op.create_index("ix_prt_user_id",      "password_reset_tokens", ["user_id"])
 
 
 def downgrade() -> None:
