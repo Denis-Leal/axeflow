@@ -423,7 +423,9 @@ def get_ajeum_da_gira(
         sel_rows = db.execute(
             text("""
                 SELECT
+                    s.id        AS selecao_id,
                     s.item_id,
+                    s.version,
                     u.nome,
                     s.status
                 FROM ajeum_selecao s
@@ -440,8 +442,10 @@ def get_ajeum_da_gira(
             iid = str(sel.item_id)
             if iid in selecionadores_por_item:
                 selecionadores_por_item[iid].append({
-                    "nome":   sel.nome,
-                    "status": sel.status,
+                    "selecao_id": str(sel.selecao_id),
+                    "nome":       sel.nome,
+                    "status":     sel.status,
+                    "version":    sel.version,
                 })
 
     itens_enriquecidos = [

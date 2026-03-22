@@ -476,23 +476,52 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
     );
   };
 
-  // ── Botões de confirmação admin (pós-gira) ────────────────────────────────
+  // ── Painel de confirmação admin (pós-gira) ───────────────────────────────
+  // Exibe uma linha por membro que selecionou o item.
+  // Admin confirma ✓ Entregou ou ✗ Não entregou para cada um individualmente.
+  // Membros com status terminal (confirmado/nao_entregue) mostram badge fixo.
   const renderBotoesAdmin = () => {
-    if (!isAdmin || !giraConcluida || !minha_selecao_id) return null;
-    if (meu_status === 'confirmado' || meu_status === 'nao_entregue') return null;
+    if (!isAdmin || !giraConcluida) return null;
+    // Só selecionadores com status 'selecionado' precisam de ação
+    const pendentes = (item.selecionadores || []).filter(s => s.status === 'selecionado');
+    if (pendentes.length === 0) return null;
 
     return (
-      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
-        <button
-          onClick={() => handleAcao(() => onConfirmar(minha_selecao_id, 'confirmado', minha_version))}
-          disabled={carregando}
-          style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', borderRadius: '6px', padding: '0.25rem 0.75rem', cursor: 'pointer', fontSize: '0.78rem' }}
-        >✓ Entregou</button>
-        <button
-          onClick={() => handleAcao(() => onConfirmar(minha_selecao_id, 'nao_entregue', minha_version))}
-          disabled={carregando}
-          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.75rem', cursor: 'pointer', fontSize: '0.78rem' }}
-        >✗ Não entregou</button>
+      <div style={{
+        marginTop: '0.75rem',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        paddingTop: '0.6rem',
+        display: 'flex', flexDirection: 'column', gap: '0.4rem',
+      }}>
+        <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.1rem' }}>
+          Confirmar entrega
+        </div>
+        {pendentes.map(sel => (
+          <div key={sel.selecao_id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: '0.5rem', flexWrap: 'wrap',
+          }}>
+            {/* Nome do membro */}
+            <span style={{ fontSize: '0.82rem', color: 'var(--cor-texto)', fontWeight: 500 }}>
+              {sel.nome}
+            </span>
+            {/* Botões de confirmação */}
+            <div style={{ display: 'flex', gap: '0.3rem' }}>
+              <button
+                onClick={() => handleAcao(() => onConfirmar(sel.selecao_id, 'confirmado', sel.version))}
+                disabled={carregando}
+                title={`${sel.nome} entregou`}
+                style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', borderRadius: '6px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              >✓ Entregou</button>
+              <button
+                onClick={() => handleAcao(() => onConfirmar(sel.selecao_id, 'nao_entregue', sel.version))}
+                disabled={carregando}
+                title={`${sel.nome} não entregou`}
+                style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.28)', color: '#ef4444', borderRadius: '6px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              >✗ Não entregou</button>
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
