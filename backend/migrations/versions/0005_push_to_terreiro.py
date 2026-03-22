@@ -37,6 +37,7 @@ def upgrade():
             sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True)
         )
 
+    # 2. Cria FKs
     if not fk_existe('push_subscriptions', 'fk_push_user'):
         op.create_foreign_key(
             'fk_push_user',
@@ -51,25 +52,14 @@ def upgrade():
             sa.Column('terreiro_id', postgresql.UUID(as_uuid=True), nullable=True)
         )
 
+    # 2. Cria FKs
     if not fk_existe('push_subscriptions', 'fk_push_terreiro'):
         op.create_foreign_key(
             'fk_push_terreiro',
             'push_subscriptions', 'terreiros',
             ['terreiro_id'], ['id']
         )
-        
-    # 2. Cria FKs
-    op.create_foreign_key(
-        'fk_push_user',
-        'push_subscriptions', 'usuarios',
-        ['user_id'], ['id']
-    )
 
-    op.create_foreign_key(
-        'fk_push_terreiro',
-        'push_subscriptions', 'terreiros',
-        ['terreiro_id'], ['id']
-    )
 
     # ⚠️ 3. (OPCIONAL) Popular dados aqui se necessário
 
