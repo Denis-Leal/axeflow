@@ -22,6 +22,12 @@ def coluna_existe(tabela: str, coluna: str) -> bool:
     cols = [c["name"] for c in insp.get_columns(tabela)]
     return coluna in cols
 
+def fk_existe(tabela: str, nome_fk: str) -> bool:
+    bind = op.get_bind()
+    insp = inspect(bind)
+    fks = insp.get_foreign_keys(tabela)
+    return any(fk["name"] == nome_fk for fk in fks)
+
 def upgrade():
     # 1. Adiciona colunas (nullable TEMPORARIAMENTE)
     # user_id
@@ -31,6 +37,7 @@ def upgrade():
             sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True)
         )
 
+    if not fk_existe('push_subscriptions', 'fk_push_user'):
         op.create_foreign_key(
             'fk_push_user',
             'push_subscriptions', 'usuarios',
@@ -44,12 +51,13 @@ def upgrade():
             sa.Column('terreiro_id', postgresql.UUID(as_uuid=True), nullable=True)
         )
 
+    if not fk_existe('push_subscriptions', 'fk_push_terreiro'):
         op.create_foreign_key(
             'fk_push_terreiro',
             'push_subscriptions', 'terreiros',
             ['terreiro_id'], ['id']
         )
-
+        
     # 2. Cria FKs
     op.create_foreign_key(
         'fk_push_user',
