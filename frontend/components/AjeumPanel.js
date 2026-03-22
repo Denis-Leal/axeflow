@@ -32,7 +32,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '../../services/api';
+import api from '../services/api';
 
 // ── Paleta de cores por estado de seleção ─────────────────────────────────────
 const CORES_STATUS = {
