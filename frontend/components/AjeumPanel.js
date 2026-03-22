@@ -32,7 +32,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import api from '../../services/api';
 
 // ── Paleta de cores por estado de seleção ─────────────────────────────────────
 const CORES_STATUS = {
@@ -621,6 +621,54 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
         )}
       </div>
 
+      {/* Lista de quem vai levar */}
+      {item.selecionadores && item.selecionadores.length > 0 && (
+        <div style={{ marginTop: '0.6rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+          {item.selecionadores.map((sel, idx) => {
+            // Cor do chip varia pelo status da seleção
+            const chipCor = sel.status === 'confirmado'
+              ? { bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.3)',  text: '#10b981' }
+              : sel.status === 'nao_entregue'
+              ? { bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.25)',  text: '#ef4444' }
+              : { bg: 'rgba(212,175,55,0.08)',  border: 'rgba(212,175,55,0.2)',  text: '#d4af37' };
+
+            return (
+              <span
+                key={idx}
+                title={sel.status === 'confirmado' ? 'Entregou ✓' : sel.status === 'nao_entregue' ? 'Não entregou ✗' : 'Vai levar'}
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 500,
+                  background: chipCor.bg,
+                  border: `1px solid ${chipCor.border}`,
+                  color: chipCor.text,
+                  borderRadius: '20px',
+                  padding: '2px 8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {/* Inicial do nome como avatar minimalista */}
+                <span style={{
+                  width: '14px', height: '14px', borderRadius: '50%',
+                  background: chipCor.border,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.6rem', fontWeight: 700, color: chipCor.text,
+                  flexShrink: 0,
+                }}>
+                  {sel.nome.charAt(0).toUpperCase()}
+                </span>
+                {sel.nome.split(' ')[0]}
+                {sel.status === 'confirmado'   && ' ✓'}
+                {sel.status === 'nao_entregue' && ' ✗'}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* Botões de confirmação admin pós-gira */}
       {renderBotoesAdmin()}
     </div>
@@ -756,24 +804,7 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   // ── Render: sem Ajeum ─────────────────────────────────────────────────────
   if (!dados) {
-    if (!isAdmin) {
-      return (
-        <div className="card-custom mb-4">
-          <div className="card-header">
-            <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-              ✦ Ajeum — Lista de Itens
-            </span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
-              Sem lista criada
-            </span>
-          </div>
-          <div style={{ padding: '1rem', fontSize: '0.82rem', color: 'var(--cor-texto-suave)' }}>
-            O dirigente ainda não criou a lista de itens para esta gira.
-            Fique de olho para ajudar a montar a lista e escolher os itens que você pode levar!
-          </div>
-        </div>
-      );
-    }
+    if (!isAdmin) return null; // membro não vê nada sem lista
 
     // Admin vê o formulário de criação
     return (

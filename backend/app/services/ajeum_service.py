@@ -412,17 +412,51 @@ def get_ajeum_da_gira(
         },
     ).fetchall()
 
+    # ── Query 2: quem selecionou cada item ────────────────────────────────────
+    # Uma query busca todos os selecionadores de todos os itens do Ajeum.
+    # Filtra status != cancelado — cancelado significa que desistiu.
+    item_ids = [str(row.id) for row in rows]
+
+    selecionadores_por_item: dict[str, list[dict]] = {iid: [] for iid in item_ids}
+
+    if item_ids:
+        sel_rows = db.execute(
+            text("""
+                SELECT
+                    s.item_id,
+                    u.nome,
+                    s.status
+                FROM ajeum_selecao s
+                JOIN usuarios u ON u.id = s.membro_id
+                WHERE
+                    s.item_id = ANY(:item_ids ::uuid[])
+                    AND s.status != 'cancelado'
+                ORDER BY s.created_at ASC
+            """),
+            {"item_ids": item_ids},
+        ).fetchall()
+
+        for sel in sel_rows:
+            iid = str(sel.item_id)
+            if iid in selecionadores_por_item:
+                selecionadores_por_item[iid].append({
+                    "nome":   sel.nome,
+                    "status": sel.status,
+                })
+
     itens_enriquecidos = [
         {
-            "id":              str(row.id),
-            "descricao":       row.descricao,
-            "limite":          row.limite,
+            "id":               str(row.id),
+            "descricao":        row.descricao,
+            "limite":           row.limite,
             "total_selecionado": int(row.total_selecionado),
-            "vagas_restantes": max(0, row.limite - int(row.total_selecionado)),
-            "lotado":          int(row.total_selecionado) >= row.limite,
-            "meu_status":      row.meu_status,        # None se não selecionou
-            "minha_selecao_id": row.minha_selecao_id, # None se não selecionou
-            "minha_version":   row.minha_version,     # None se não selecionou
+            "vagas_restantes":  max(0, row.limite - int(row.total_selecionado)),
+            "lotado":           int(row.total_selecionado) >= row.limite,
+            "meu_status":       row.meu_status,
+            "minha_selecao_id": row.minha_selecao_id,
+            "minha_version":    row.minha_version,
+            # Lista de quem vai levar — exibida no card abaixo da barra
+            "selecionadores":   selecionadores_por_item.get(str(row.id), []),
         }
         for row in rows
     ]
