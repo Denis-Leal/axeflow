@@ -142,8 +142,8 @@ export default function Consulentes() {
                   </thead>
                   <tbody>
                     {filtrados.map(c => {
-                      const taxa = c.giras > 0
-                        ? Math.round((c.comparecimentos / c.giras) * 100) : 0;
+                      const taxa = c.total_inscricoes > 0
+                        ? Math.round((c.comparecimentos / c.total_inscricoes) * 100) : 0;
                       return (
                         <tr key={c.id} style={{ background: c.alerta ? 'rgba(249,115,22,0.04)' : 'transparent' }}>
                           <td>
@@ -178,7 +178,7 @@ export default function Consulentes() {
                             {c.faltas}
                           </td>
                           <td style={{ textAlign: 'center', color: 'var(--cor-texto-suave)' }}>
-                            {c.giras ?? 0}
+                            {c.total_inscricoes ?? 0}
                           </td>
                           <td style={{ minWidth: '120px' }}>
                             {c.finalizadas > 0 ? (
