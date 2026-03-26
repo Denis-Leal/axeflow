@@ -377,7 +377,7 @@ export default function PerfilConsulente() {
 
               <div className="stat-card">
                 <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', marginBottom: '2px' }}>Primeira visita</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700 }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700,  color: retorno.cor }}>
                   {perfil.primeira_data
                     ? new Date(perfil.primeira_data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
                     : '—'}
@@ -399,7 +399,7 @@ export default function PerfilConsulente() {
                   <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', marginBottom: '6px' }}>Giras preferidas</div>
                   {perfil.tipos_favoritos.slice(0, 3).map(([tipo, qtd]) => (
                     <div key={tipo} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.78rem' }}>{tipo}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--cor-texto)' }}>{tipo}</span>
                       <span style={{ fontSize: '0.72rem', color: 'var(--cor-acento)', fontWeight: 600 }}>{qtd}×</span>
                     </div>
                   ))}
