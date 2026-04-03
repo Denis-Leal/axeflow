@@ -32,7 +32,7 @@ from app.services import api_key_service, audit_service
 from app.services.api_key_service import SCOPES_DISPONIVEIS, autenticar_por_api_key, verificar_scope
 from app.schemas.inscricao_schema import InscricaoPublicaRequest
 from app.services import inscricao_service
-from backend.app.services.presenca_consulente_service import get_ranking_consulentes
+from app.services.presenca_consulente_service import get_ranking_consulentes
 
 logger = logging.getLogger(__name__)
 
