@@ -16,12 +16,12 @@ from app.core.security import get_current_user, require_role
 from app.schemas.inscricao_schema import PresencaUpdate
 from app.services import inscricao_service
 from app.services import audit_service
-from backend.app.services.presenca_consulente_service import get_scores_para_gira, get_ranking_consulentes
+from app.services.presenca_consulente_service import get_scores_para_gira, get_ranking_consulentes
 from app.models.usuario import Usuario
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.consulente import Consulente
 from app.models.gira import Gira
-from backend.app.services.presenca_consulente_service import get_score_consulente
+from app.services.presenca_consulente_service import get_score_consulente
 
 router = APIRouter(tags=["inscricoes"])
 
