@@ -171,9 +171,20 @@ function ObservacaoBadge({ texto }) {
 // O AjeumPanel é renderizado pelo componente pai (GiraDetalhe),
 // após este painel, porque precisa de `userRole` e `gira` que
 // só existem no escopo de GiraDetalhe.
+// ── SUBSTITUIR apenas a função PainelPresencaMembros em giras/[id].js ────────
+// Localizar: "function PainelPresencaMembros(" e substituir até o próximo
+// componente de nível raiz (function GiraDetalhe).
+//
+// MUDANÇA: adicionado indicador visual de status atual em cada linha de membro,
+// similar ao badge de status que existe na tabela de consulentes.
+// O status 'confirmado' (membro vai comparecer) agora fica visível,
+// diferenciando de 'pendente' (ainda não confirmou).
+
 function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro }) {
-  const confirmados = membrosPresenca.filter(m => m.status === 'compareceu').length;
-  const confirmando = membrosPresenca.filter(m => m.status === 'confirmado').length;
+  // Contagens para o header do card
+  const compareceram  = membrosPresenca.filter(m => m.status === 'compareceu').length;
+  const confirmando   = membrosPresenca.filter(m => m.status === 'confirmado').length;
+  const pendentes     = membrosPresenca.filter(m => m.status === 'pendente').length;
 
   return (
     <div className="card-custom mb-4">
@@ -181,13 +192,16 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           {acesso === 'fechada' ? '🔒 Presença dos Membros' : '👥 Confirmação dos Membros'}
         </span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '1rem', fontSize: '0.78rem' }}>
-          <span style={{ color: '#10b981' }}>✓ {confirmados} compareceram</span>
-          <span style={{ color: '#f59e0b' }}>⏳ {confirmando} vão comparecer</span>
+        {/* Contadores resumidos no header */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '1rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
+          <span style={{ color: '#10b981' }}>✓ {compareceram} compareceram</span>
+          <span style={{ color: '#f59e0b' }}>⏳ {confirmando} confirmados</span>
+          <span style={{ color: 'var(--cor-texto-suave)' }}>— {pendentes} pendentes</span>
           <span style={{ color: 'var(--cor-texto-suave)' }}>· {membrosPresenca.length} total</span>
         </div>
       </div>
 
+      {/* Legenda dos status — igual ao padrão que existe em outros painéis */}
       <div style={{
         padding: '0.6rem 1rem',
         background: 'rgba(212,175,55,0.04)',
@@ -195,6 +209,7 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
         fontSize: '0.72rem', color: 'var(--cor-texto-suave)',
         display: 'flex', gap: '1.5rem', flexWrap: 'wrap',
       }}>
+        <span>— <strong style={{ color: 'var(--cor-texto)' }}>Pendente</strong> — ainda não confirmou</span>
         <span>⏳ <strong style={{ color: 'var(--cor-texto)' }}>Confirmado</strong> — membro confirmou presença</span>
         <span>✅ <strong style={{ color: 'var(--cor-texto)' }}>Compareceu</strong> — admin finalizou após a gira</span>
         <span>❌ <strong style={{ color: 'var(--cor-texto)' }}>Faltou</strong> — confirmou mas não apareceu</span>
@@ -204,37 +219,132 @@ function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro
         {membrosPresenca.length === 0 && (
           <div className="empty-state"><p>Nenhum membro encontrado</p></div>
         )}
+
         {membrosPresenca.map(m => {
-          const statusCor = {
-            compareceu: { bg: 'rgba(16,185,129,0.07)',  border: 'rgba(16,185,129,0.2)',  text: '#10b981', label: '✓ Compareceu' },
-            faltou:     { bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.18)',  text: '#ef4444', label: '✗ Faltou' },
-            confirmado: { bg: 'rgba(245,158,11,0.07)',  border: 'rgba(245,158,11,0.2)',  text: '#f59e0b', label: '⏳ Vai comparecer' },
-            pendente:   { bg: 'rgba(255,255,255,0.02)', border: 'var(--cor-borda)',       text: '#94a3b8', label: '— Pendente' },
-          }[m.status] || { bg: 'transparent', border: 'var(--cor-borda)', text: '#94a3b8', label: '— Pendente' };
+          // Mapeamento completo de status → estilo visual
+          // Cada estado tem: fundo, borda, cor do texto e label exibida
+          const statusCfg = {
+            compareceu: {
+              bg:     'rgba(16,185,129,0.07)',
+              border: 'rgba(16,185,129,0.2)',
+              text:   '#10b981',
+              label:  '✓ Compareceu',
+              // Badge compacto exibido ao lado do nome
+              badgeBg:     'rgba(16,185,129,0.15)',
+              badgeBorder: 'rgba(16,185,129,0.4)',
+            },
+            faltou: {
+              bg:     'rgba(239,68,68,0.06)',
+              border: 'rgba(239,68,68,0.18)',
+              text:   '#ef4444',
+              label:  '✗ Faltou',
+              badgeBg:     'rgba(239,68,68,0.12)',
+              badgeBorder: 'rgba(239,68,68,0.35)',
+            },
+            confirmado: {
+              bg:     'rgba(245,158,11,0.07)',
+              border: 'rgba(245,158,11,0.2)',
+              text:   '#f59e0b',
+              label:  '⏳ Vai comparecer',
+              badgeBg:     'rgba(245,158,11,0.12)',
+              badgeBorder: 'rgba(245,158,11,0.35)',
+            },
+            pendente: {
+              bg:     'rgba(255,255,255,0.02)',
+              border: 'var(--cor-borda)',
+              text:   '#94a3b8',
+              label:  '— Pendente',
+              badgeBg:     'rgba(148,163,184,0.08)',
+              badgeBorder: 'rgba(148,163,184,0.2)',
+            },
+          }[m.status] || {
+            bg: 'transparent', border: 'var(--cor-borda)',
+            text: '#94a3b8', label: '— Pendente',
+            badgeBg: 'rgba(148,163,184,0.08)', badgeBorder: 'rgba(148,163,184,0.2)',
+          };
 
           return (
-            <div key={m.membro_id} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0.6rem 0.75rem', borderRadius: '8px',
-              background: statusCor.bg, border: `1px solid ${statusCor.border}`,
-            }}>
-              <div>
-                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{m.nome}</span>
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--cor-texto-suave)', textTransform: 'capitalize' }}>{m.role}</span>
-                <span style={{ marginLeft: '0.75rem', fontSize: '0.72rem', color: statusCor.text, fontWeight: 600 }}>{statusCor.label}</span>
+            <div
+              key={m.membro_id}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0.65rem 0.75rem', borderRadius: '8px',
+                // Fundo sutil diferenciado por status — feedback visual imediato
+                background: statusCfg.bg,
+                border: `1px solid ${statusCfg.border}`,
+                gap: '0.5rem', flexWrap: 'wrap',
+              }}
+            >
+              {/* Coluna esquerda: nome, role e badge de status */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>
+                    {m.nome}
+                  </span>
+                  {/* Role do membro em texto menor */}
+                  <span style={{
+                    fontSize: '0.68rem', color: 'var(--cor-texto-suave)',
+                    textTransform: 'capitalize',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '4px', padding: '1px 5px',
+                  }}>
+                    {m.role}
+                  </span>
+                </div>
+
+                {/* Badge de status — NOVO: exibe o status atual visualmente */}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  fontSize: '0.72rem', fontWeight: 600,
+                  color: statusCfg.text,
+                  background: statusCfg.badgeBg,
+                  border: `1px solid ${statusCfg.badgeBorder}`,
+                  borderRadius: '20px',
+                  padding: '1px 8px',
+                  // Largura automática — não ocupa a linha toda
+                  alignSelf: 'flex-start',
+                }}>
+                  {statusCfg.label}
+                </span>
               </div>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+
+              {/* Coluna direita: botões de ação (admin marca presença) */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                {/* Botão ✓ Compareceu — toggle: clica novamente para voltar a pendente */}
                 <button
                   onClick={() => onUpdateMembro(m.membro_id, m.status === 'compareceu' ? 'pendente' : 'compareceu')}
-                  title="Marcar compareceu"
-                  style={{ background: m.status === 'compareceu' ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.08)', border: `1px solid ${m.status === 'compareceu' ? 'rgba(16,185,129,0.6)' : 'rgba(16,185,129,0.2)'}`, color: '#10b981', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}
+                  title={m.status === 'compareceu' ? 'Clique para desmarcar' : 'Marcar compareceu'}
+                  style={{
+                    background: m.status === 'compareceu'
+                      ? 'rgba(16,185,129,0.3)'
+                      : 'rgba(16,185,129,0.08)',
+                    border: `1px solid ${m.status === 'compareceu'
+                      ? 'rgba(16,185,129,0.6)'
+                      : 'rgba(16,185,129,0.2)'}`,
+                    color: '#10b981',
+                    borderRadius: '6px', padding: '0.25rem 0.6rem',
+                    cursor: 'pointer', fontSize: '0.82rem',
+                  }}
                 >
                   <i className="bi bi-check-lg"></i>
                 </button>
+
+                {/* Botão ✗ Faltou — toggle: clica novamente para voltar a pendente */}
                 <button
                   onClick={() => onUpdateMembro(m.membro_id, m.status === 'faltou' ? 'pendente' : 'faltou')}
-                  title="Marcar faltou"
-                  style={{ background: m.status === 'faltou' ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.06)', border: `1px solid ${m.status === 'faltou' ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.15)'}`, color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem' }}
+                  title={m.status === 'faltou' ? 'Clique para desmarcar' : 'Marcar faltou'}
+                  style={{
+                    background: m.status === 'faltou'
+                      ? 'rgba(239,68,68,0.25)'
+                      : 'rgba(239,68,68,0.06)',
+                    border: `1px solid ${m.status === 'faltou'
+                      ? 'rgba(239,68,68,0.5)'
+                      : 'rgba(239,68,68,0.15)'}`,
+                    color: '#ef4444',
+                    borderRadius: '6px', padding: '0.25rem 0.6rem',
+                    cursor: 'pointer', fontSize: '0.82rem',
+                  }}
                 >
                   <i className="bi bi-x-lg"></i>
                 </button>

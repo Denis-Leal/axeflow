@@ -513,3 +513,44 @@ def confirmar_presenca_publica(
         url=f"/giras/{gira.id}",
     )
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
+
+# ── Novos endpoints: ranking e perfil de membros ─────────────────────────────
+# Adicionar ANTES do fechamento do arquivo membros_router.py
+# (após o endpoint confirmar_presenca_publica)
+
+@router.get("/ranking")
+def ranking_presenca_membros(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Ranking de presença de todos os membros ativos do terreiro.
+
+    Retorna score, comparecimentos, faltas e alerta para cada membro.
+    Inclui membros sem nenhuma inscrição (score zerado).
+    Ordenado: alertas primeiro, depois por score asc (piores no topo).
+    """
+    from app.services.presenca_membro_service import get_ranking_membros
+    return get_ranking_membros(db, user.terreiro_id)
+
+
+@router.get("/{membro_id}/perfil")
+def perfil_membro(
+    membro_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Perfil completo de um membro: score, métricas e histórico de giras.
+
+    Valida que o membro pertence ao mesmo terreiro do usuário autenticado.
+    Raises 404 se não encontrado ou se pertencer a outro terreiro.
+    """
+    from app.services.presenca_membro_service import get_perfil_membro
+    from fastapi import HTTPException
+
+    perfil = get_perfil_membro(db, membro_id, user.terreiro_id)
+    if not perfil:
+        raise HTTPException(status_code=404, detail="Membro não encontrado")
+
+    return perfil
