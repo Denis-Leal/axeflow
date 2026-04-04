@@ -31,3 +31,10 @@ from app.models.password_reset_token import PasswordResetToken
 
 # Ajeum — gestão de seleções e confirmações
 from app.models.ajeum import Ajeum, AjeumItem, AjeumSelecao
+
+# Inventário e consumo por gira
+from app.models.inventory_item import InventoryItem
+from app.models.inventory_owner import InventoryOwner
+from app.models.inventory_movement import InventoryMovement
+from app.models.inventory_alert import InventoryAlert
+from app.models.gira_item_consumption import GiraItemConsumption

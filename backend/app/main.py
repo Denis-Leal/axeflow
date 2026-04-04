@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import Base, engine, get_db
 from app.routers import (
     auth_router, gira_router, inscricao_router,
-    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router, ajeum_router
+    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router, ajeum_router, inventory_router
 )
 
 # Models importados para o Alembic autogenerate detectar as tabelas
@@ -30,6 +30,13 @@ from app.models.gira import Gira
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira
 from app.models.push_subscription import PushSubscription
+
+#Sistema de inventário e consumo por gira
+from app.models.inventory_owner import InventoryOwner
+from app.models.inventory_item import InventoryItem
+from app.models.inventory_movement import InventoryMovement
+from app.models.gira_item_consumption import GiraItemConsumption
+from app.models.inventory_alert import InventoryAlert, GiraNotification
 
 from app.services.cleanup_service import start_scheduler, stop_scheduler
 
@@ -91,6 +98,7 @@ app.include_router(contato_router.router)
 app.include_router(api_key_router.router)
 app.include_router(password_reset_router.router)
 app.include_router(ajeum_router.router)
+app.include_router(inventory_router.router)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():

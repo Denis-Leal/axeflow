@@ -13,7 +13,7 @@ Remover após a migration 0008 ser aplicada em produção.
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Date, Time, ForeignKey, Enum, Index
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Date, Time, ForeignKey, Enum, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -51,6 +51,10 @@ class Gira(Base):
     created_at           = Column(DateTime, default=datetime.utcnow)
     updated_at           = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at           = Column(DateTime, nullable=True)
+    
+    # Flag de idempotência: True após finalizar_gira() processar o estoque.
+    # SELECT FOR UPDATE nesta linha previne dupla finalização concorrente.
+    estoque_processado   = Column(Boolean, nullable=False, default=False)
 
     terreiro          = relationship("Terreiro", back_populates="giras")
     responsavel_lista = relationship("Usuario", back_populates="giras_responsavel")
@@ -85,3 +89,9 @@ class Gira(Base):
         Index("ix_giras_terreiro_data", "terreiro_id", "data"),
         Index("ix_giras_slug_publico",  "slug_publico"),
     )
+    
+    consumos_inventario = relationship(
+       "GiraItemConsumption",
+       back_populates=None,   # GiraItemConsumption não tem back_populates em Gira
+       # SEM cascade: consumos são históricos e não devem ser deletados com a gira
+   )
