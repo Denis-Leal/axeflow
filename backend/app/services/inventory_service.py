@@ -33,7 +33,7 @@ from app.models.gira_item_consumption import (
     ConsumptionSourceEnum,
     ConsumptionStatusEnum,
 )
-from app.models.inventory_alert_notification import (
+from app.models.inventory_alert import (
     InventoryAlert,
     GiraNotification,
     NotificationTypeEnum,
