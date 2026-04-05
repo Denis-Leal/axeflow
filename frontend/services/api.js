@@ -125,4 +125,20 @@ export const deleteApiKey = (id) => api.delete(`/api-keys/${id}`);
 // ── Health Check ───────────────────────────────────────
 export const healthCheck = () => api.get('/health')
 
+// ── Inventário ────────────────────────────────────────────────────────────────
+// Itens de estoque
+export const listarItens           = (ownerId)             => api.get('/inventory/items', { params: ownerId ? { owner_id: ownerId } : {} });
+export const criarItemTerreiro     = (data)                => api.post('/inventory/items/terreiro', data);
+export const criarItemMedium       = (data)                => api.post('/inventory/items/medium', data);
+export const getSaldoItem          = (itemId)              => api.get(`/inventory/items/${itemId}/stock`);
+export const getHistoricoItem      = (itemId, limit = 20)  => api.get(`/inventory/items/${itemId}/history`, { params: { limit } });
+export const registrarMovimentacao = (itemId, data)        => api.post(`/inventory/items/${itemId}/movements`, data);
+
+// Consumo por gira
+export const listarConsumos        = (giraId)              => api.get(`/giras/${giraId}/consumption`);
+export const registrarConsumo      = (giraId, data)        => api.post(`/giras/${giraId}/consumption`, data);
+export const editarConsumo         = (giraId, cid, data)   => api.patch(`/giras/${giraId}/consumption/${cid}`, data);
+
+// Finalização
+export const finalizarGira         = (giraId)              => api.post(`/giras/${giraId}/finalizar`);
 // (Outros endpoints podem ser adicionados aqui conforme necessário)
