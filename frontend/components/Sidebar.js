@@ -58,7 +58,6 @@ export default function Sidebar() {
         <Link href="/inventario" className={`nav-item-custom ${isActive('/inventario')}`}>
           <i className="bi bi-box-seam"></i> Inventário
         </Link>
-      </nav>
 
         {/* Divisor ornamental */}
         <div className="divider-ornamental" style={{ margin: '1rem 1.5rem' }}>
