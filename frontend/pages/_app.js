@@ -17,9 +17,10 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import '../styles/globals.css';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { GiraProvider } from '../contexts/GiraContext';
 import Head from 'next/head';
 
-export default function App({ Component, pageProps, GiraProvider }) {
+export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
   const swListenerRegistered = useRef(false);
