@@ -19,7 +19,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
-export default function App({ Component, pageProps }) {
+export default function App({ Component, pageProps, GiraProvider }) {
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
   const swListenerRegistered = useRef(false);
