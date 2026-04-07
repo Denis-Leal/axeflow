@@ -130,6 +130,13 @@ export default function App({ Component, pageProps }) {
         <link rel="manifest" href="/manifest.json" />
       </Head>
       <Component {...pageProps} />
+      {/*
+        GiraProvider envolve toda a aplicação para que qualquer página
+        possa ler/escrever a gira ativa via useGiraAtual().
+      */}
+      <GiraProvider>
+        <Component {...pageProps} />
+      </GiraProvider>
     </>
   );
 }

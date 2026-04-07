@@ -1,25 +1,21 @@
 /**
  * pages/inventario.js — AxeFlow
  *
- * Frontend funcional do sistema de inventário.
- *
- * Seções:
- *   1. Config (gira_id para testes)
- *   2. Listagem de itens com saldo e alertas
- *   3. Criar item (terreiro ou médium)
- *   4. Movimentação manual (IN / OUT / ADJUSTMENT)
- *   5. Registrar consumo por gira
- *   6. Listar consumos da gira
- *   7. Finalizar gira + resultado
+ * ALTERAÇÃO: substituído o input manual de UUID pelo GiraContext.
+ *   - Lê giraAtual de useGiraAtual() em vez de localStorage direto
+ *   - Exibe painel com nome e data da gira ativa no topo
+ *   - Bloqueia ações quando não há gira ativa (mostra CTA para /giras)
+ *   - Bloqueia consumo quando gira não está com status 'aberta'
+ *   - Botão "Trocar gira" leva de volta para /giras
  *
  * Padrão do projeto:
- *   - Importa de '../services/api' (mesmo arquivo de todo o projeto)
- *   - Usa classes CSS de globals.css (card-custom, form-control-custom etc.)
- *   - Usa Sidebar + BottomNav
- *   - Usa handleApiError do errorHandler
+ *   - Importa de '../services/api'
+ *   - Usa classes CSS de globals.css
+ *   - Usa Sidebar + BottomNav + handleApiError
  */
 
 import Head from 'next/head';
+import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import {
   listarItens,
@@ -32,11 +28,26 @@ import {
   finalizarGira,
 } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
+import { useGiraAtual } from '../contexts/GiraContext';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 
 // ── Categorias válidas de item ─────────────────────────────────────────────────
 const CATEGORIAS = ['bebida', 'charuto', 'cigarro', 'cigarro_palha', 'pemba', 'vela', 'outros'];
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Formata 'YYYY-MM-DD' em 'DD/MM/YYYY' sem problemas de fuso */
+function formatarData(dataStr) {
+  if (!dataStr) return '';
+  const [y, m, d] = dataStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/** True apenas quando a gira pode receber novos consumos */
+function giraAceita(gira) {
+  return gira?.status === 'aberta';
+}
 
 // ── Badge de saldo com cor contextual ─────────────────────────────────────────
 function BadgeEstoque({ saldo, threshold }) {
@@ -44,63 +55,139 @@ function BadgeEstoque({ saldo, threshold }) {
     return <span className="badge-status badge-cancelado">—</span>;
   }
   const baixo = threshold > 0 && saldo <= threshold;
-  if (baixo)    return <span className="badge-status badge-faltou">{saldo} ⚠</span>;
+  if (baixo)       return <span className="badge-status badge-faltou">{saldo} ⚠</span>;
   if (saldo === 0) return <span className="badge-status badge-cancelado">0</span>;
   return <span className="badge-status badge-compareceu">{saldo}</span>;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 1 — CONFIGURAÇÃO (gira_id)
+// PAINEL DE GIRA ATIVA (substitui SecaoConfig anterior)
 // ══════════════════════════════════════════════════════════════════════════════
-function SecaoConfig({ giraId, setGiraId }) {
-  const [input, setInput] = useState(giraId);
-  const [salvo, setSalvo] = useState(false);
-
-  useEffect(() => { setInput(giraId); }, [giraId]);
-
-  const salvar = () => {
-    const val = input.trim();
-    setGiraId(val);
-    localStorage.setItem('test_gira_id', val);
-    setSalvo(true);
-    setTimeout(() => setSalvo(false), 2000);
-  };
+function PainelGiraAtiva({ giraAtual }) {
+  const corStatus = {
+    aberta:    { bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.35)',  text: '#10b981' },
+    fechada:   { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',   text: '#ef4444' },
+    concluida: { bg: 'rgba(107,33,168,0.15)',  border: 'rgba(107,33,168,0.35)',  text: '#a78bfa' },
+  }[giraAtual.status] || { bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.3)', text: '#94a3b8' };
 
   return (
-    <div className="card-custom mb-4">
-      <div className="card-header">
-        <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-          ⚙️ Configuração
-        </span>
+    <div style={{
+      background: 'rgba(212,175,55,0.06)',
+      border: '1px solid rgba(212,175,55,0.25)',
+      borderRadius: '12px',
+      padding: '1rem 1.25rem',
+      marginBottom: '1.5rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+      flexWrap: 'wrap',
+    }}>
+      {/* Ícone */}
+      <div style={{
+        width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
+        background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--cor-acento)', fontSize: '1.1rem',
+      }}>
+        <i className="bi bi-stars"></i>
       </div>
-      <div className="p-3">
-        <div className="row g-3">
-          <div className="col-md-9">
-            <label className="form-label-custom">Gira ID (UUID)</label>
-            <input
-              className="form-control-custom"
-              style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
-              placeholder="Cole o UUID da gira para consumos e finalização"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-            />
-            <small style={{ color: 'var(--cor-texto-suave)', fontSize: '0.75rem' }}>
-              O token JWT é lido automaticamente do localStorage (faça login normalmente).
-            </small>
-          </div>
-          <div className="col-md-3 d-flex align-items-end">
-            <button className="btn-gold w-100" onClick={salvar}>
-              {salvo ? '✓ Salvo' : 'Salvar'}
-            </button>
-          </div>
+
+      {/* Dados */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+          Gira atual
+        </div>
+        <div style={{ fontWeight: 700, color: 'var(--cor-texto)', fontSize: '0.95rem', fontFamily: 'Cinzel' }}>
+          {giraAtual.titulo}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
+          <i className="bi bi-calendar3 me-1"></i>
+          {formatarData(giraAtual.data)}
         </div>
       </div>
+
+      {/* Badge de status */}
+      <span style={{
+        fontSize: '0.75rem', fontWeight: 600,
+        background: corStatus.bg, border: `1px solid ${corStatus.border}`,
+        color: corStatus.text, borderRadius: '20px', padding: '3px 12px',
+        whiteSpace: 'nowrap',
+      }}>
+        {giraAtual.status}
+      </span>
+
+      {/* Link para trocar de gira */}
+      <Link
+        href="/giras"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+          fontSize: '0.8rem', color: 'var(--cor-texto-suave)',
+          background: 'rgba(255,255,255,0.04)', border: '1px solid var(--cor-borda)',
+          borderRadius: '8px', padding: '0.3rem 0.75rem', textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <i className="bi bi-arrow-left-right"></i>
+        Trocar gira
+      </Link>
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 2 — LISTA DE ITENS
+// AVISO: nenhuma gira selecionada
+// ══════════════════════════════════════════════════════════════════════════════
+function AvisoSemGira() {
+  return (
+    <div style={{
+      background: 'rgba(245,158,11,0.08)',
+      border: '1px solid rgba(245,158,11,0.3)',
+      borderRadius: '14px',
+      padding: '2.5rem',
+      textAlign: 'center',
+      marginBottom: '1.5rem',
+    }}>
+      <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>☽✦☾</div>
+      <h5 style={{ fontFamily: 'Cinzel', color: '#f59e0b', marginBottom: '0.5rem' }}>
+        Nenhuma gira selecionada
+      </h5>
+      <p style={{ color: 'var(--cor-texto-suave)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+        Selecione uma gira para continuar com o controle de estoque.
+      </p>
+      <Link href="/giras" className="btn-gold" style={{ textDecoration: 'none', padding: '0.65rem 2rem' }}>
+        <i className="bi bi-stars me-2"></i>
+        Ir para Giras
+      </Link>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AVISO: gira não está aberta
+// ══════════════════════════════════════════════════════════════════════════════
+function AvisoGiraFechada({ status }) {
+  return (
+    <div style={{
+      background: 'rgba(148,163,184,0.08)',
+      border: '1px solid rgba(148,163,184,0.2)',
+      borderRadius: '10px',
+      padding: '0.85rem 1rem',
+      marginBottom: '1rem',
+      display: 'flex', alignItems: 'center', gap: '0.75rem',
+      fontSize: '0.85rem', color: '#94a3b8',
+    }}>
+      <i className="bi bi-lock" style={{ fontSize: '1rem', flexShrink: 0 }}></i>
+      <span>
+        {status === 'concluida'
+          ? 'Esta gira está concluída. O estoque já foi processado — novos consumos não são permitidos.'
+          : 'Esta gira está fechada. Consumos só podem ser registrados quando a gira estiver aberta.'}
+      </span>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SEÇÃO 1 — LISTA DE ITENS
 // ══════════════════════════════════════════════════════════════════════════════
 function SecaoListaItens({ itens, loading, onRecarregar, onVerHistorico, onMovimentar }) {
   return (
@@ -109,12 +196,8 @@ function SecaoListaItens({ itens, loading, onRecarregar, onVerHistorico, onMovim
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           ✦ Itens de Estoque
         </span>
-        <button
-          className="btn-outline-gold"
-          onClick={onRecarregar}
-          disabled={loading}
-          style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem' }}
-        >
+        <button className="btn-outline-gold" onClick={onRecarregar} disabled={loading}
+          style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem' }}>
           {loading ? 'Carregando...' : '↻ Atualizar'}
         </button>
       </div>
@@ -143,12 +226,8 @@ function SecaoListaItens({ itens, loading, onRecarregar, onVerHistorico, onMovim
               {itens.map(item => (
                 <tr key={item.id}>
                   <td><strong>{item.name}</strong></td>
-                  <td>
-                    <span className="badge-status badge-confirmado">{item.category}</span>
-                  </td>
-                  <td>
-                    <BadgeEstoque saldo={item.current_stock} threshold={item.minimum_threshold} />
-                  </td>
+                  <td><span className="badge-status badge-confirmado">{item.category}</span></td>
+                  <td><BadgeEstoque saldo={item.current_stock} threshold={item.minimum_threshold} /></td>
                   <td style={{ color: 'var(--cor-texto-suave)' }}>{item.minimum_threshold}</td>
                   <td>
                     {item.low_stock
@@ -158,18 +237,12 @@ function SecaoListaItens({ itens, loading, onRecarregar, onVerHistorico, onMovim
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button
-                        className="btn-outline-gold"
-                        onClick={() => onVerHistorico(item)}
-                        style={{ fontSize: '0.78rem', padding: '0.2rem 0.6rem' }}
-                      >
+                      <button className="btn-outline-gold" onClick={() => onVerHistorico(item)}
+                        style={{ fontSize: '0.78rem', padding: '0.2rem 0.6rem' }}>
                         Histórico
                       </button>
-                      <button
-                        className="btn-gold"
-                        onClick={() => onMovimentar(item)}
-                        style={{ fontSize: '0.78rem', padding: '0.2rem 0.6rem' }}
-                      >
+                      <button className="btn-gold" onClick={() => onMovimentar(item)}
+                        style={{ fontSize: '0.78rem', padding: '0.2rem 0.6rem' }}>
                         + Mover
                       </button>
                     </div>
@@ -185,7 +258,7 @@ function SecaoListaItens({ itens, loading, onRecarregar, onVerHistorico, onMovim
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 3 — CRIAR ITEM
+// SEÇÃO 2 — CRIAR ITEM
 // ══════════════════════════════════════════════════════════════════════════════
 function SecaoCriarItem({ onCriado }) {
   const [form, setForm] = useState({
@@ -211,7 +284,7 @@ function SecaoCriarItem({ onCriado }) {
       };
       const fn  = form.owner === 'terreiro' ? criarItemTerreiro : criarItemMedium;
       const res = await fn(payload);
-      setOk(`Item "${payload.name}" criado! ID: ${res.data.id}`);
+      setOk(`Item "${payload.name}" criado!`);
       setForm({ name: '', category: 'vela', minimum_threshold: 0, unit_cost: '', owner: 'terreiro' });
       onCriado();
     } catch (err) {
@@ -231,65 +304,42 @@ function SecaoCriarItem({ onCriado }) {
       <div className="p-3">
         {erro && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2"></i>{erro}</div>}
         {ok  && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2"></i>{ok}</div>}
-
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
             <div className="col-md-4">
               <label className="form-label-custom">Nome *</label>
-              <input
-                className="form-control-custom"
-                value={form.name}
-                placeholder="Ex: Vela branca"
-                onChange={e => set('name', e.target.value)}
-                required
-              />
+              <input className="form-control-custom" value={form.name} required
+                placeholder="Ex: Vela branca" onChange={e => set('name', e.target.value)} />
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Categoria *</label>
-              <select
-                className="form-control-custom"
-                value={form.category}
-                onChange={e => set('category', e.target.value)}
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.category}
+                onChange={e => set('category', e.target.value)} style={{ appearance: 'auto' }}>
                 {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Threshold mínimo</label>
-              <input
-                type="number" min="0" className="form-control-custom"
-                value={form.minimum_threshold}
-                onChange={e => set('minimum_threshold', e.target.value)}
-              />
+              <input type="number" min="0" className="form-control-custom"
+                value={form.minimum_threshold} onChange={e => set('minimum_threshold', e.target.value)} />
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Custo (R$)</label>
-              <input
-                type="number" step="0.01" min="0" className="form-control-custom"
+              <input type="number" step="0.01" min="0" className="form-control-custom"
                 value={form.unit_cost} placeholder="0.00"
-                onChange={e => set('unit_cost', e.target.value)}
-              />
+                onChange={e => set('unit_cost', e.target.value)} />
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Dono</label>
-              <select
-                className="form-control-custom"
-                value={form.owner}
-                onChange={e => set('owner', e.target.value)}
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.owner}
+                onChange={e => set('owner', e.target.value)} style={{ appearance: 'auto' }}>
                 <option value="terreiro">Terreiro</option>
                 <option value="medium">Médium (eu)</option>
               </select>
             </div>
           </div>
-
           <button className="btn-gold mt-3" type="submit" disabled={loading}>
-            {loading
-              ? <span className="spinner-border spinner-border-sm me-2"></span>
-              : <i className="bi bi-plus-lg me-2"></i>
-            }
+            {loading ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-plus-lg me-2"></i>}
             Criar item
           </button>
         </form>
@@ -299,7 +349,7 @@ function SecaoCriarItem({ onCriado }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 4 — MOVIMENTAÇÃO MANUAL
+// SEÇÃO 3 — MOVIMENTAÇÃO MANUAL
 // ══════════════════════════════════════════════════════════════════════════════
 function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
   const [form, setForm] = useState({ item_id: '', type: 'IN', quantity: 1, notes: '' });
@@ -307,7 +357,7 @@ function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
   const [erro, setErro] = useState('');
   const [ok, setOk]     = useState('');
 
-  // Quando o usuário clica "+ Mover" na listagem, pré-seleciona o item
+  // Pré-seleciona item ao clicar "+ Mover" na listagem
   useEffect(() => {
     if (itemSelecionado) {
       setForm(f => ({ ...f, item_id: itemSelecionado.id }));
@@ -349,18 +399,12 @@ function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
       <div className="p-3">
         {erro && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2"></i>{erro}</div>}
         {ok  && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2"></i>{ok}</div>}
-
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
             <div className="col-md-4">
               <label className="form-label-custom">Item *</label>
-              <select
-                className="form-control-custom"
-                value={form.item_id}
-                onChange={e => set('item_id', e.target.value)}
-                required
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.item_id} required
+                onChange={e => set('item_id', e.target.value)} style={{ appearance: 'auto' }}>
                 <option value="">— selecione —</option>
                 {itens.map(i => (
                   <option key={i.id} value={i.id}>
@@ -371,12 +415,8 @@ function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Tipo *</label>
-              <select
-                className="form-control-custom"
-                value={form.type}
-                onChange={e => set('type', e.target.value)}
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.type}
+                onChange={e => set('type', e.target.value)} style={{ appearance: 'auto' }}>
                 <option value="IN">IN — Entrada</option>
                 <option value="OUT">OUT — Saída</option>
                 <option value="ADJUSTMENT">ADJUSTMENT — Ajuste</option>
@@ -384,27 +424,17 @@ function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Quantidade *</label>
-              <input
-                type="number" min="1" className="form-control-custom" required
-                value={form.quantity} onChange={e => set('quantity', e.target.value)}
-              />
+              <input type="number" min="1" className="form-control-custom" required
+                value={form.quantity} onChange={e => set('quantity', e.target.value)} />
             </div>
             <div className="col-md-4">
               <label className="form-label-custom">Observação</label>
-              <input
-                className="form-control-custom"
-                value={form.notes}
-                placeholder="Ex: Compra mercadão"
-                onChange={e => set('notes', e.target.value)}
-              />
+              <input className="form-control-custom" value={form.notes}
+                placeholder="Ex: Compra mercadão" onChange={e => set('notes', e.target.value)} />
             </div>
           </div>
-
           <button className="btn-gold mt-3" type="submit" disabled={loading}>
-            {loading
-              ? <span className="spinner-border spinner-border-sm me-2"></span>
-              : <i className="bi bi-arrow-left-right me-2"></i>
-            }
+            {loading ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-arrow-left-right me-2"></i>}
             Registrar movimentação
           </button>
         </form>
@@ -414,9 +444,9 @@ function SecaoMovimentacao({ itemSelecionado, itens, onMovimentado }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 5 — REGISTRAR CONSUMO NA GIRA
+// SEÇÃO 4 — REGISTRAR CONSUMO
 // ══════════════════════════════════════════════════════════════════════════════
-function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
+function SecaoConsumoGira({ giraId, giraAberta, itens, onConsumoRegistrado }) {
   const [form, setForm] = useState({ item_id: '', source: 'TERREIRO', quantity: 1 });
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
@@ -426,7 +456,6 @@ function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!giraId) { setErro('Configure o Gira ID na seção ⚙️ acima.'); return; }
     setLoading(true);
     setErro('');
     setOk('');
@@ -436,7 +465,7 @@ function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
         source:            form.source,
         quantity:          parseInt(form.quantity),
       });
-      setOk('Consumo registrado (PENDENTE). Será debitado do estoque ao finalizar a gira.');
+      setOk('Consumo registrado (PENDENTE). Será debitado ao finalizar a gira.');
       setForm(f => ({ ...f, quantity: 1 }));
       onConsumoRegistrado();
     } catch (err) {
@@ -452,33 +481,28 @@ function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           ✦ Registrar Consumo na Gira
         </span>
-        {giraId && (
-          <span style={{ marginLeft: '0.75rem', fontSize: '0.72rem', color: 'var(--cor-texto-suave)', fontFamily: 'monospace' }}>
-            {giraId.slice(0, 8)}...
-          </span>
-        )}
       </div>
       <div className="p-3">
-        {!giraId && (
-          <div className="alert-custom alert-danger-custom mb-3">
-            <i className="bi bi-exclamation-triangle me-2"></i>
-            Configure o Gira ID na seção ⚙️ acima.
+        {/* Aviso inline quando a gira não está aberta */}
+        {!giraAberta && (
+          <div style={{
+            background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.2)',
+            color: '#94a3b8', borderRadius: '8px', padding: '0.6rem 0.85rem',
+            fontSize: '0.83rem', marginBottom: '1rem',
+          }}>
+            <i className="bi bi-lock me-2"></i>
+            Consumos só podem ser registrados quando a gira está <strong>aberta</strong>.
           </div>
         )}
         {erro && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2"></i>{erro}</div>}
         {ok  && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2"></i>{ok}</div>}
-
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
             <div className="col-md-5">
               <label className="form-label-custom">Item *</label>
-              <select
-                className="form-control-custom"
-                value={form.item_id}
-                onChange={e => set('item_id', e.target.value)}
-                required
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.item_id} required
+                onChange={e => set('item_id', e.target.value)} style={{ appearance: 'auto' }}
+                disabled={!giraAberta}>
                 <option value="">— selecione —</option>
                 {itens.map(i => (
                   <option key={i.id} value={i.id}>
@@ -489,29 +513,22 @@ function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
             </div>
             <div className="col-md-3">
               <label className="form-label-custom">Source *</label>
-              <select
-                className="form-control-custom"
-                value={form.source}
-                onChange={e => set('source', e.target.value)}
-                style={{ appearance: 'auto' }}
-              >
+              <select className="form-control-custom" value={form.source}
+                onChange={e => set('source', e.target.value)} style={{ appearance: 'auto' }}
+                disabled={!giraAberta}>
                 <option value="TERREIRO">TERREIRO</option>
                 <option value="MEDIUM">MEDIUM (eu)</option>
               </select>
             </div>
             <div className="col-md-2">
               <label className="form-label-custom">Quantidade *</label>
-              <input
-                type="number" min="1" className="form-control-custom" required
+              <input type="number" min="1" className="form-control-custom" required
                 value={form.quantity} onChange={e => set('quantity', e.target.value)}
-              />
+                disabled={!giraAberta} />
             </div>
             <div className="col-md-2 d-flex align-items-end">
-              <button className="btn-gold w-100" type="submit" disabled={loading || !giraId}>
-                {loading
-                  ? <span className="spinner-border spinner-border-sm"></span>
-                  : 'Registrar'
-                }
+              <button className="btn-gold w-100" type="submit" disabled={loading || !giraAberta}>
+                {loading ? <span className="spinner-border spinner-border-sm"></span> : 'Registrar'}
               </button>
             </div>
           </div>
@@ -522,7 +539,7 @@ function SecaoConsumoGira({ giraId, itens, onConsumoRegistrado }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 6 — LISTA DE CONSUMOS DA GIRA
+// SEÇÃO 5 — LISTAR CONSUMOS
 // ══════════════════════════════════════════════════════════════════════════════
 function SecaoListaConsumos({ giraId, refreshTrigger }) {
   const [consumos, setConsumos] = useState([]);
@@ -543,7 +560,6 @@ function SecaoListaConsumos({ giraId, refreshTrigger }) {
     }
   }, [giraId]);
 
-  // Recarrega ao trocar de gira ou ao registrar novo consumo
   useEffect(() => { carregar(); }, [carregar, refreshTrigger]);
 
   return (
@@ -552,22 +568,15 @@ function SecaoListaConsumos({ giraId, refreshTrigger }) {
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           ✦ Consumos da Gira
         </span>
-        <button
-          className="btn-outline-gold"
-          onClick={carregar}
-          disabled={loading}
-          style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem' }}
-        >
+        <button className="btn-outline-gold" onClick={carregar} disabled={loading}
+          style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem' }}>
           ↻ Atualizar
         </button>
       </div>
-
-      {!giraId && <div className="empty-state"><p>Configure o Gira ID acima.</p></div>}
-      {giraId && erro && <div className="alert-custom alert-danger-custom m-3">{erro}</div>}
-      {giraId && !loading && consumos.length === 0 && (
+      {erro && <div className="alert-custom alert-danger-custom m-3">{erro}</div>}
+      {!loading && consumos.length === 0 && (
         <div className="empty-state"><p>Nenhum consumo registrado nesta gira.</p></div>
       )}
-
       {consumos.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table className="table-custom">
@@ -611,19 +620,18 @@ function SecaoListaConsumos({ giraId, refreshTrigger }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEÇÃO 7 — FINALIZAR GIRA
+// SEÇÃO 6 — FINALIZAR GIRA
 // ══════════════════════════════════════════════════════════════════════════════
-function SecaoFinalizar({ giraId, onFinalizado }) {
-  const [loading, setLoading]   = useState(false);
+function SecaoFinalizar({ giraId, giraAberta, onFinalizado }) {
+  const [loading, setLoading]     = useState(false);
   const [resultado, setResultado] = useState(null);
-  const [erro, setErro]         = useState('');
+  const [erro, setErro]           = useState('');
 
   const handleFinalizar = async () => {
-    if (!giraId) { setErro('Configure o Gira ID acima.'); return; }
     if (!window.confirm(
-      `Finalizar gira ${giraId.slice(0, 8)}...?\n\n` +
-      `Os consumos PENDENTE serão convertidos em movimentações OUT no ledger.\n` +
-      `Esta ação não pode ser desfeita.`
+      'Finalizar a gira?\n\n' +
+      'Os consumos PENDENTE serão convertidos em movimentações OUT no ledger.\n' +
+      'Esta ação não pode ser desfeita.'
     )) return;
 
     setLoading(true);
@@ -648,11 +656,7 @@ function SecaoFinalizar({ giraId, onFinalizado }) {
         </span>
       </div>
       <div className="p-3">
-        {erro && (
-          <div className="alert-custom alert-danger-custom mb-3">
-            <i className="bi bi-exclamation-circle me-2"></i>{erro}
-          </div>
-        )}
+        {erro && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2"></i>{erro}</div>}
 
         {resultado && (
           <div className="alert-custom alert-success-custom mb-3">
@@ -672,17 +676,18 @@ function SecaoFinalizar({ giraId, onFinalizado }) {
 
         <button
           onClick={handleFinalizar}
-          disabled={loading || !giraId}
+          disabled={loading || !giraAberta}
+          title={!giraAberta ? 'A gira precisa estar aberta para ser finalizada' : undefined}
           style={{
-            background:    'rgba(239,68,68,0.12)',
-            border:        '1px solid rgba(239,68,68,0.35)',
-            color:         '#ef4444',
-            borderRadius:  '8px',
-            padding:       '0.6rem 1.5rem',
-            cursor:        loading || !giraId ? 'not-allowed' : 'pointer',
-            fontWeight:    700,
-            fontSize:      '0.9rem',
-            opacity:       !giraId ? 0.5 : 1,
+            background:   'rgba(239,68,68,0.12)',
+            border:       '1px solid rgba(239,68,68,0.35)',
+            color:        '#ef4444',
+            borderRadius: '8px',
+            padding:      '0.6rem 1.5rem',
+            cursor:       loading || !giraAberta ? 'not-allowed' : 'pointer',
+            fontWeight:   700,
+            fontSize:     '0.9rem',
+            opacity:      !giraAberta ? 0.45 : 1,
           }}
         >
           {loading
@@ -699,7 +704,7 @@ function SecaoFinalizar({ giraId, onFinalizado }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MODAL DE HISTÓRICO DE MOVIMENTAÇÕES
+// MODAL DE HISTÓRICO
 // ══════════════════════════════════════════════════════════════════════════════
 function ModalHistorico({ item, onClose }) {
   const [historico, setHistorico] = useState([]);
@@ -716,59 +721,32 @@ function ModalHistorico({ item, onClose }) {
   if (!item) return null;
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.65)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 2000, padding: '1rem',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        className="card-custom"
-        style={{ width: '100%', maxWidth: '700px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
-      >
-        {/* Header */}
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 2000, padding: '1rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} className="card-custom"
+        style={{ width: '100%', maxWidth: '700px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-header d-flex justify-content-between align-items-center">
           <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
             Histórico: {item.name}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
-              Saldo atual:{' '}
-              <strong style={{ color: 'var(--cor-acento)' }}>{item.current_stock ?? '?'}</strong>
+              Saldo atual: <strong style={{ color: 'var(--cor-acento)' }}>{item.current_stock ?? '?'}</strong>
             </span>
-            <button
-              onClick={onClose}
-              style={{ background: 'none', border: 'none', color: 'var(--cor-texto-suave)', cursor: 'pointer', fontSize: '1.2rem' }}
-            >
-              ×
-            </button>
+            <button onClick={onClose}
+              style={{ background: 'none', border: 'none', color: 'var(--cor-texto-suave)', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
           </div>
         </div>
-
-        {/* Corpo com scroll */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {loading && (
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-              <div className="spinner-gold"></div>
-            </div>
-          )}
-          {!loading && historico.length === 0 && (
-            <div className="empty-state"><p>Sem movimentações registradas.</p></div>
-          )}
+          {loading && <div style={{ padding: '2rem', textAlign: 'center' }}><div className="spinner-gold"></div></div>}
+          {!loading && historico.length === 0 && <div className="empty-state"><p>Sem movimentações.</p></div>}
           {historico.length > 0 && (
             <table className="table-custom">
               <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Tipo</th>
-                  <th>Qtd</th>
-                  <th>Gira</th>
-                  <th>Observação</th>
-                </tr>
+                <tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Gira</th><th>Observação</th></tr>
               </thead>
               <tbody>
                 {historico.map(m => {
@@ -779,9 +757,7 @@ function ModalHistorico({ item, onClose }) {
                         {new Date(m.created_at).toLocaleString('pt-BR')}
                       </td>
                       <td>
-                        <span className={`badge-status ${isEntrada ? 'badge-compareceu' : 'badge-faltou'}`}>
-                          {m.type}
-                        </span>
+                        <span className={`badge-status ${isEntrada ? 'badge-compareceu' : 'badge-faltou'}`}>{m.type}</span>
                       </td>
                       <td style={{ fontWeight: 700, color: isEntrada ? '#10b981' : '#ef4444' }}>
                         {isEntrada ? '+' : '−'}{m.quantity}
@@ -789,9 +765,7 @@ function ModalHistorico({ item, onClose }) {
                       <td style={{ fontSize: '0.78rem', fontFamily: 'monospace', color: 'var(--cor-texto-suave)' }}>
                         {m.gira_id ? m.gira_id.slice(0, 8) + '...' : '—'}
                       </td>
-                      <td style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
-                        {m.notes || '—'}
-                      </td>
+                      <td style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>{m.notes || '—'}</td>
                     </tr>
                   );
                 })}
@@ -808,14 +782,19 @@ function ModalHistorico({ item, onClose }) {
 // COMPONENTE RAIZ
 // ══════════════════════════════════════════════════════════════════════════════
 export default function InventarioPage() {
-  const [giraId, setGiraId]               = useState('');
-  const [itens, setItens]                 = useState([]);
-  const [loadingItens, setLoadingItens]   = useState(false);
-  const [erroItens, setErroItens]         = useState('');
+  // Gira ativa definida em /giras ao clicar "Entrar"
+  const { giraAtual } = useGiraAtual();
+
+  const [itens, setItens]                   = useState([]);
+  const [loadingItens, setLoadingItens]     = useState(false);
+  const [erroItens, setErroItens]           = useState('');
   const [itemMovimentar, setItemMovimentar] = useState(null);
   const [itemHistorico, setItemHistorico]   = useState(null);
-  // Incrementado a cada novo consumo registrado → força refresh da SecaoListaConsumos
+  // Trigger para forçar refresh da lista de consumos
   const [consumoRefresh, setConsumoRefresh] = useState(0);
+
+  // Gira aberta = aceita consumo e finalização
+  const giraAberta = giraAceita(giraAtual);
 
   const carregarItens = useCallback(async () => {
     setLoadingItens(true);
@@ -830,16 +809,12 @@ export default function InventarioPage() {
     }
   }, []);
 
-  // Recupera giraId salvo e carrega itens na montagem
-  useEffect(() => {
-    const saved = localStorage.getItem('test_gira_id') || '';
-    setGiraId(saved);
-    carregarItens();
-  }, [carregarItens]);
+  // Estoque carrega sempre, independente de gira ativa
+  useEffect(() => { carregarItens(); }, [carregarItens]);
 
   const handleConsumoRegistrado = () => {
     setConsumoRefresh(n => n + 1);
-    carregarItens(); // atualiza estoque na listagem
+    carregarItens();
   };
 
   const handleFinalizado = () => {
@@ -850,29 +825,24 @@ export default function InventarioPage() {
   return (
     <>
       <Head><title>Inventário | AxeFlow</title></Head>
-
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">
-
-          {/* ── Topbar ── */}
           <div className="topbar">
             <div>
-              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>
-                Inventário
-              </h5>
-              <small style={{ color: 'var(--cor-texto-suave)' }}>
-                Gestão de estoque e consumo por gira
-              </small>
+              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Inventário</h5>
+              <small style={{ color: 'var(--cor-texto-suave)' }}>Gestão de estoque e consumo por gira</small>
             </div>
           </div>
 
           <div className="page-content">
 
-            {/* 1 — Config */}
-            <SecaoConfig giraId={giraId} setGiraId={setGiraId} />
+            {/* Painel de gira ativa — ou CTA para selecionar */}
+            {giraAtual ? <PainelGiraAtiva giraAtual={giraAtual} /> : <AvisoSemGira />}
 
-            {/* Erro global de carregamento */}
+            {/* Aviso contextual quando gira existe mas não está aberta */}
+            {giraAtual && !giraAberta && <AvisoGiraFechada status={giraAtual.status} />}
+
             {erroItens && (
               <div className="alert-custom alert-danger-custom mb-4">
                 <i className="bi bi-exclamation-triangle me-2"></i>
@@ -880,7 +850,7 @@ export default function InventarioPage() {
               </div>
             )}
 
-            {/* 2 — Lista de itens */}
+            {/* Listagem e movimentações: sempre visíveis */}
             <SecaoListaItens
               itens={itens}
               loading={loadingItens}
@@ -888,35 +858,33 @@ export default function InventarioPage() {
               onVerHistorico={setItemHistorico}
               onMovimentar={setItemMovimentar}
             />
-
-            {/* 3 — Criar item */}
             <SecaoCriarItem onCriado={carregarItens} />
-
-            {/* 4 — Movimentação manual */}
             <SecaoMovimentacao
               itemSelecionado={itemMovimentar}
               itens={itens}
               onMovimentado={carregarItens}
             />
 
-            {/* 5 — Consumo por gira */}
-            <SecaoConsumoGira
-              giraId={giraId}
-              itens={itens}
-              onConsumoRegistrado={handleConsumoRegistrado}
-            />
-
-            {/* 6 — Listar consumos */}
-            <SecaoListaConsumos
-              giraId={giraId}
-              refreshTrigger={consumoRefresh}
-            />
-
-            {/* 7 — Finalizar */}
-            <SecaoFinalizar
-              giraId={giraId}
-              onFinalizado={handleFinalizado}
-            />
+            {/* Consumo e finalização: só aparecem com gira ativa */}
+            {giraAtual && (
+              <>
+                <SecaoConsumoGira
+                  giraId={giraAtual.id}
+                  giraAberta={giraAberta}
+                  itens={itens}
+                  onConsumoRegistrado={handleConsumoRegistrado}
+                />
+                <SecaoListaConsumos
+                  giraId={giraAtual.id}
+                  refreshTrigger={consumoRefresh}
+                />
+                <SecaoFinalizar
+                  giraId={giraAtual.id}
+                  giraAberta={giraAberta}
+                  onFinalizado={handleFinalizado}
+                />
+              </>
+            )}
 
           </div>
         </div>
@@ -924,12 +892,8 @@ export default function InventarioPage() {
 
       <BottomNav />
 
-      {/* Modal de histórico de movimentações */}
       {itemHistorico && (
-        <ModalHistorico
-          item={itemHistorico}
-          onClose={() => setItemHistorico(null)}
-        />
+        <ModalHistorico item={itemHistorico} onClose={() => setItemHistorico(null)} />
       )}
     </>
   );
