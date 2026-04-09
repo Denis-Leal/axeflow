@@ -1,0 +1,63 @@
+name: Backup PostgreSQL
+
+on:
+  schedule:
+    - cron: "0 3,15 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ secrets.DB_URL }}
+        run: |
+          set -e
+
+          mkdir -p backups
+          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
+
+          docker run --rm \
+            -v $PWD/backups:/backups \
+            postgres:18 \
+            bash -c "pg_dump \"$DATABASE_URL\" \
+              --clean --if-exists --no-owner --no-privileges \
+              | gzip > /backups/backup_$TIMESTAMP.sql.gz"
+
+          echo "Backup criado: backup_$TIMESTAMP.sql.gz"
+
+      # 🔍 Validação mínima (evita backup vazio)
+      - name: Validate backup
+        run: |
+          set -e
+          gunzip -c backups/*.gz | grep -q "CREATE TABLE" || (echo "Backup inválido" && exit 1)
+
+      # 🔥 Teste REAL de restore (isso muda o jogo)
+      - name: Test restore
+        run: |
+          set -e
+
+          docker run -d --name pg-test \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5433:5432 postgres:18
+
+          sleep 5
+
+          gunzip -c backups/*.gz | docker exec -i pg-test psql -U postgres
+
+          docker exec pg-test psql -U postgres -c "\dt" | grep -q "giras" || (echo "Restore falhou" && exit 1)
+
+          docker stop pg-test
+          docker rm pg-test
+
+      # ☁️ Artifact com versionamento
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/*.gz
+
+      - name: Notify success
+        run: echo "Backup validado e testado com sucesso"
