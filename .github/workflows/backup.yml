@@ -31,3 +31,6 @@ jobs:
         with:
           name: db-backup
           path: backups/*.gz
+          
+      - name: Notify success
+        run: echo "Backup realizado com sucesso"
