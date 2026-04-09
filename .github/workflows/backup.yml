@@ -26,9 +26,6 @@ jobs:
               --clean --if-exists --no-owner --no-privileges \
               | gzip > /backups/backup_$TIMESTAMP.sql.gz"
 
-      - name: Compress
-        run: gzip backups/*.sql
-
       - name: Upload artifact (backup)
         uses: actions/upload-artifact@v4
         with:
