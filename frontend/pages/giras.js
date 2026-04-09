@@ -1,19 +1,12 @@
 /**
  * pages/giras.js — AxeFlow
  *
- * CORREÇÃO: removida a validação de permissão via query param (?erro=sem-permissao).
+ * ALTERAÇÃO: adicionado botão "Entrar" em cada linha da tabela.
+ *   - Define a gira como "gira ativa" via GiraContext
+ *   - Redireciona para /inventario
+ *   - Bloqueado para giras com status 'concluida' (não faz sentido entrar)
  *
- * Antes: editar/[id].js redirecionava para /giras?erro=sem-permissao e esta
- *   página construía um erro falso manualmente para exibir a mensagem.
- *   Isso era frágil, expunha estado na URL e duplicava lógica de permissão.
- *
- * Agora: o backend retorna 403 quando necessário → o errorHandler traduz →
- *   o catch exibe a mensagem diretamente. Sem parâmetros de URL, sem
- *   construção manual de objetos de erro.
- *
- * A verificação de role no frontend (podeGerenciar, podeExcluir) serve
- * apenas para ocultar botões irrelevantes — não é uma barreira de segurança.
- * A segurança real está nas permissões do backend (require_role).
+ * Todo o resto permanece idêntico ao original.
  */
 
 import { useEffect, useState } from 'react';
@@ -25,6 +18,7 @@ import BottomNav from '../components/BottomNav';
 import ConfirmModal from '../components/ConfirmModal';
 import { listGiras, deleteGira, getMe } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
+import { useGiraAtual } from '../contexts/GiraContext';
 
 export default function Giras() {
   const router = useRouter();
@@ -35,6 +29,9 @@ export default function Giras() {
   const [modal, setModal]       = useState({
     aberto: false, titulo: '', mensagem: '', onConfirmar: null,
   });
+
+  // Contexto de gira ativa — usado pelo botão "Entrar"
+  const { setGiraAtual } = useGiraAtual();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -54,7 +51,6 @@ export default function Giras() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Controla visibilidade de botões — puramente UX, não segurança
   const podeGerenciar = ['admin', 'operador'].includes(userRole);
   const podeExcluir   = userRole === 'admin';
 
@@ -73,12 +69,30 @@ export default function Giras() {
           await deleteGira(id);
           setGiras(prev => prev.filter(g => g.id !== id));
         } catch (err) {
-          // 403 do backend é traduzido pelo handleApiError para mensagem legível
           setErro(handleApiError(err, 'Excluir Gira'));
           setTimeout(() => setErro(''), 5000);
         }
       },
     });
+  };
+
+  /**
+   * Define a gira selecionada como ativa e navega para o inventário.
+   * Giras concluídas são bloqueadas — não faz sentido registrar consumos.
+   */
+  const handleEntrar = (g) => {
+    if (g.status === 'concluida') return; // botão desabilitado, mas guarda dupla
+
+    // Persiste apenas os campos necessários para o inventário
+    setGiraAtual({
+      id:     g.id,
+      titulo: g.titulo,
+      data:   g.data,
+      status: g.status,
+      acesso: g.acesso,
+    });
+
+    router.push('/inventario');
   };
 
   if (loading) return (
@@ -131,58 +145,83 @@ export default function Giras() {
                     </tr>
                   </thead>
                   <tbody>
-                    {giras.map(g => (
-                      <tr key={g.id}>
-                        <td><strong>{g.titulo}</strong></td>
-                        <td style={{ color: 'var(--cor-texto-suave)' }}>{g.tipo || '—'}</td>
-                        <td>{new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                        <td>{g.horario}</td>
-                        <td>
-                          {g.acesso === 'fechada' ? (
-                            <span style={{ color: g.total_inscritos >= g.limite_membros ? '#ef4444' : 'var(--cor-sucesso)' }}>
-                              {g.total_inscritos}/{g.limite_membros}
-                            </span>
-                          ) : (
-                            <span style={{ color: g.total_inscritos >= g.limite_consulentes ? '#ef4444' : 'var(--cor-sucesso)' }}>
-                              {g.total_inscritos}/{g.limite_consulentes}
-                            </span>
-                          )}
-                        </td>
-                        <td><span className={`badge-status badge-${g.status}`}>{g.status}</span></td>
-                        <td>
-                          <div className="d-flex gap-1">
-                            <Link href={`/giras/${g.id}`} className="btn-outline-gold"
-                              title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-                              <i className="bi bi-list-ul"></i>
-                            </Link>
-                            {podeGerenciar && (
-                              <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold"
-                                title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-                                <i className="bi bi-pencil"></i>
-                              </Link>
+                    {giras.map(g => {
+                      const concluida = g.status === 'concluida';
+                      return (
+                        <tr key={g.id}>
+                          <td><strong>{g.titulo}</strong></td>
+                          <td style={{ color: 'var(--cor-texto-suave)' }}>{g.tipo || '—'}</td>
+                          <td>{new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                          <td>{g.horario}</td>
+                          <td>
+                            {g.acesso === 'fechada' ? (
+                              <span style={{ color: g.total_inscritos >= g.limite_membros ? '#ef4444' : 'var(--cor-sucesso)' }}>
+                                {g.total_inscritos}/{g.limite_membros}
+                              </span>
+                            ) : (
+                              <span style={{ color: g.total_inscritos >= g.limite_consulentes ? '#ef4444' : 'var(--cor-sucesso)' }}>
+                                {g.total_inscritos}/{g.limite_consulentes}
+                              </span>
                             )}
-                            {g.slug_publico && (
-                              <a href={`/public/${g.slug_publico}`} target="_blank"
-                                className="btn-outline-gold" title="Página pública"
-                                style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-                                <i className="bi bi-share"></i>
-                              </a>
-                            )}
-                            {podeExcluir && (
-                              <button onClick={() => handleDelete(g.id)} title="Excluir"
+                          </td>
+                          <td><span className={`badge-status badge-${g.status}`}>{g.status}</span></td>
+                          <td>
+                            <div className="d-flex gap-1">
+                              {/*
+                                Botão "Entrar" — define gira ativa e vai para /inventario.
+                                Desabilitado para giras concluídas (estoque já processado).
+                              */}
+                              <button
+                                onClick={() => handleEntrar(g)}
+                                disabled={concluida}
+                                title={concluida ? 'Gira concluída — estoque já processado' : 'Entrar nesta gira (inventário)'}
                                 style={{
-                                  background: 'transparent',
-                                  border: '1px solid rgba(239,68,68,0.4)',
-                                  color: '#ef4444', borderRadius: '8px',
-                                  padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
-                                }}>
-                                <i className="bi bi-trash"></i>
+                                  background: concluida ? 'rgba(148,163,184,0.08)' : 'rgba(212,175,55,0.12)',
+                                  border: `1px solid ${concluida ? 'rgba(148,163,184,0.2)' : 'rgba(212,175,55,0.35)'}`,
+                                  color: concluida ? '#94a3b8' : 'var(--cor-acento)',
+                                  borderRadius: '8px', padding: '0.2rem 0.6rem',
+                                  cursor: concluida ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.8rem', opacity: concluida ? 0.5 : 1,
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                }}
+                              >
+                                <i className="bi bi-box-arrow-in-right"></i>
+                                Entrar
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+
+                              <Link href={`/giras/${g.id}`} className="btn-outline-gold"
+                                title="Ver inscrições" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                                <i className="bi bi-list-ul"></i>
+                              </Link>
+                              {podeGerenciar && (
+                                <Link href={`/giras/editar/${g.id}`} className="btn-outline-gold"
+                                  title="Editar gira" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                                  <i className="bi bi-pencil"></i>
+                                </Link>
+                              )}
+                              {g.slug_publico && (
+                                <a href={`/public/${g.slug_publico}`} target="_blank"
+                                  className="btn-outline-gold" title="Página pública"
+                                  style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                                  <i className="bi bi-share"></i>
+                                </a>
+                              )}
+                              {podeExcluir && (
+                                <button onClick={() => handleDelete(g.id)} title="Excluir"
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px solid rgba(239,68,68,0.4)',
+                                    color: '#ef4444', borderRadius: '8px',
+                                    padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
+                                  }}>
+                                  <i className="bi bi-trash"></i>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {giras.length === 0 && (
                       <tr><td colSpan="7">
                         <div className="empty-state">

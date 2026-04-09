@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 // Páginas que ativam o botão "Mais" quando acessadas
-const PAGINAS_MAIS = ['/inventario', '/membros', '/configuracoes', '/contato', '/sobre', '/api-docs'];
+const PAGINAS_MAIS = ['/membros', '/configuracoes', '/contato', '/sobre', '/api-docs'];
 
 export default function BottomNav() {
   const router = useRouter();
@@ -24,7 +24,6 @@ export default function BottomNav() {
 
   // Itens da gaveta "Mais" — centralizados para facilitar manutenção
   const itensMais = [
-    { href: '/inventario',    icon: 'bi-box-seam',     label: 'Inventário' },
     { href: '/membros',       icon: 'bi-person-badge', label: 'Membros' },
     { href: '/configuracoes', icon: 'bi-gear',         label: 'Configurações' },
     { href: '/api-docs',      icon: 'bi-code-slash',   label: 'API & Integrações' },
