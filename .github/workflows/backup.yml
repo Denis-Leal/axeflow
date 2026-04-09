@@ -10,23 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Run backup with PostgreSQL 18
+      - name: Run backup (correct)
         env:
           DATABASE_URL: ${{ secrets.DB_URL }}
         run: |
-          mkdir backups
+          set -e
+      
+          mkdir -p backups
           TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
-
+      
           docker run --rm \
-            -e DATABASE_URL="$DATABASE_URL" \
             -v $PWD/backups:/backups \
             postgres:18 \
-            sh -c 'pg_dump "$DATABASE_URL" \
-            --clean \
-            --if-exists \
-            --no-owner \
-            --no-privileges \ 
-            > /backups/backup_'$TIMESTAMP'.sql'
+            bash -c "pg_dump \"$DATABASE_URL\" \
+              --clean --if-exists --no-owner --no-privileges \
+              | gzip > /backups/backup_$TIMESTAMP.sql.gz"
 
       - name: Compress
         run: gzip backups/*.sql
