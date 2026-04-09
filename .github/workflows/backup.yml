@@ -21,7 +21,12 @@ jobs:
             -e DATABASE_URL="$DATABASE_URL" \
             -v $PWD/backups:/backups \
             postgres:18 \
-            sh -c 'pg_dump "$DATABASE_URL" > /backups/backup_'$TIMESTAMP'.sql'
+            sh -c 'pg_dump "$DATABASE_URL" \
+            --clean \
+            --if-exists \
+            --no-owner \
+            --no-privileges \ 
+            > /backups/backup_'$TIMESTAMP'.sql'
 
       - name: Compress
         run: gzip backups/*.sql
