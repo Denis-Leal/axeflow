@@ -16,7 +16,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
-import NotificationButton from '../components/NotificationButton';
+// import NotificationButton from '../components/NotificationButton';
 import { listGiras, getMe, getPresencaMembros, getPresencaMembrosPublica, confirmarPresencaMembro, confirmarPresencaMembroPublica } from '../services/api';
 
 export default function Dashboard() {
@@ -216,7 +216,7 @@ export default function Dashboard() {
               <small style={{ color: 'var(--cor-texto-suave)' }}>Visão geral do terreiro</small>
             </div>
             <div className="d-flex align-items-center gap-3">
-              <NotificationButton compact />
+              {/* <NotificationButton compact /> */}
               <Link href="/giras/nova" className="btn-gold" style={{ fontSize: '0.85rem' }}>
                 + Nova Gira
               </Link>

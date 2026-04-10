@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
   const firebaseConfig = {
