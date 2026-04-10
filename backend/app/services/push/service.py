@@ -3,13 +3,12 @@
 import hashlib
 import json
 from app.services.push.factory import get_provider_for_device
-from app.repositories.device_repository import DeviceRepository
 
 
 class PushService:
 
-    def __init__(self):
-        self.repo = DeviceRepository()
+    def __init__(self, repo):
+        self.repo = repo
 
     def _hash_payload(self, payload):
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
