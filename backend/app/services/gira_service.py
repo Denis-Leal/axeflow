@@ -90,11 +90,15 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     horario_fmt  = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
 
+    payload = {
+        "title": "✦ Nova Gira Criada",
+        "body": f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
+        "url": f"/giras/{gira.id}",
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id=gira.terreiro_id,
-        title="✦ Nova Gira Criada",
-        body=f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
-        url=f"/giras/{gira.id}",
+        payload=payload,
     )
 
     return _enrich(gira, db, 0)
@@ -161,11 +165,16 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         }
         if (novo_status := campos_alterados["status"]) in msgs:
             titulo_push, corpo_push = msgs[novo_status]
+            
+            payload = {
+                "title": f"{titulo_push} — {gira.titulo}",
+                "body": f"{corpo_push}",
+                "url": f"/giras/{gira.id}",
+            }
             send_push_to_terreiro(
+                db=db,
                 terreiro_id=gira.terreiro_id,
-                title=titulo_push,
-                body=corpo_push,
-                url=f"/giras/{gira.id}",
+                payload=payload,
             )
 
     if promovidos:
