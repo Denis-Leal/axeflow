@@ -33,7 +33,7 @@ from app.repositories.device_repository import DeviceRepository
 
 
 provider = get_push_provider()
-DeviceRepo = DeviceRepository.get_active_by_terreiro()
+DeviceRepo = DeviceRepository()
 push_service = PushService(DeviceRepo)
 
 logger = logging.getLogger(__name__)
