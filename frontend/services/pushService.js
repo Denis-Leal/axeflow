@@ -28,14 +28,14 @@ function urlBase64ToUint8Array(base64String) {
 /**
  * Verifica se o browser suporta PWA/Push
  */
-// export function isPushSupported() {
-//   return (
-//     typeof window !== 'undefined' &&
-//     'serviceWorker' in navigator &&
-//     'PushManager' in window &&
-//     'Notification' in window
-//   );
-// }
+export function isPushSupported() {
+  return (
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window
+  );
+}
 
 /**
  * Retorna o estado atual da permissão de notificação
