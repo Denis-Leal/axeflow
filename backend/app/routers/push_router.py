@@ -2,6 +2,8 @@
 push_router.py — AxeFlow
 Endpoints para gerenciar push subscriptions e disparar notificações.
 """
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Depends
 from app.core.security import get_current_user
 from pydantic import BaseModel
@@ -12,6 +14,9 @@ from app.services.push_service import (
     send_push_to_terreiro,
     get_subscriptions_count,
 )
+from app.models.device import Device
+from app.core.database import get_db
+from app.workers.push_worker import run_push_async
 
 router = APIRouter(prefix="/push", tags=["push"])
 
@@ -82,29 +87,18 @@ def unsubscribe(data: PushUnsubscribeRequest, user=Depends(get_current_user)):
 
 @router.post("/test")
 def send_test_push(data: PushTestRequest = PushTestRequest(), user=Depends(get_current_user)):
-    """
-    Dispara notificação de teste apenas para o terreiro do usuário logado.
-    Útil para validar que o push está funcionando.
-    """
-    total = get_subscriptions_count(terreiro_id=user.terreiro_id)
-    if total == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="Nenhuma subscription registrada para este terreiro. Ative as notificações no app.",
-        )
-
-    result = send_push_to_terreiro(
-        terreiro_id=user.terreiro_id,
-        title=data.title,
-        body=data.body,
-        url=data.url,
-    )
-
-    return {
-        "ok": True,
-        "resultado": result,
-        "message": f"{result['enviados']} notificação(ões) enviada(s)",
+    payload = {
+        "title": data.title,
+        "body": data.body,
+        "data": {
+            "url": data.url,
+            "terreiro_id": str(user.terreiro_id)
+        }
     }
+
+    run_push_async(user.terreiro_id, payload)
+
+    return {"ok": True, "message": "Push enviado async"}
 
 
 @router.get("/status")
@@ -113,3 +107,31 @@ def push_status(user=Depends(get_current_user)):
     return {
         "subscriptions_ativas": get_subscriptions_count(terreiro_id=user.terreiro_id),
     }
+    
+@router.post("/devices/register")
+def register_device(data: dict, user=Depends(get_current_user), db=Depends(get_db)):
+
+    token = data.get("token")
+    if not token:
+        raise HTTPException(400, "Token ausente")
+
+    device = db.query(Device).filter(Device.token == token).first()
+
+    if device:
+        device.user_id = user.id
+        device.terreiro_id = user.terreiro_id
+        device.last_seen = datetime.utcnow()
+        device.active = True
+    else:
+        device = Device(
+            user_id=user.id,
+            terreiro_id=user.terreiro_id,
+            token=token,
+            platform=data.platform,
+            provider="fcm"
+        )
+        db.add(device)
+
+    db.commit()
+
+    return {"ok": True}
