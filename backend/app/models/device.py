@@ -1,7 +1,7 @@
 # app/models/device.py
 
 from datetime import datetime
-from unittest.mock import Base
+from app.core.database import Base
 from uuid import UUID
 import uuid
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text

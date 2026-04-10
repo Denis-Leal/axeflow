@@ -19,6 +19,9 @@ from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_membro import InscricaoMembro
 
 from app.models.push_subscription import PushSubscription
+from app.models.device import Device
+from app.models.notification_log import NotificationLog
+
 
 # AuditLog deve estar aqui para o Alembic detectar a tabela no autogenerate
 from app.models.audit_log import AuditLog
