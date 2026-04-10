@@ -29,9 +29,12 @@ from firebase_admin import messaging
 from app.services.push.factory import get_push_provider
 from app.services.push.service import PushService
 from app.models.device import Device
+from app.repositories.device_repository import DeviceRepository
+
 
 provider = get_push_provider()
-push_service = PushService(provider)
+DeviceRepo = DeviceRepository.get_active_by_terreiro()
+push_service = PushService(DeviceRepo)
 
 logger = logging.getLogger(__name__)
 
