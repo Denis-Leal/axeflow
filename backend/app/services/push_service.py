@@ -25,6 +25,13 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.push_subscription import PushSubscription
+from firebase_admin import messaging
+from app.services.push.factory import get_push_provider
+from app.services.push.service import PushService
+from app.models.device import Device
+
+provider = get_push_provider()
+push_service = PushService(provider)
 
 logger = logging.getLogger(__name__)
 
@@ -145,106 +152,62 @@ def get_subscriptions_count(terreiro_id: Optional[UUID] = None) -> int:
 
 
 # ── Envio ──────────────────────────────────────────────────────────────────────
+# region Envio de push notifications para as subscriptions do terreiro (obsoleto)
+# def _send_one(
+#     sub: PushSubscription,
+#     title: str,
+#     body: str,
+#     url: str,
+#     icon: str,
+#     terreiro_id: UUID,
+# ) -> bool:
+#     """
+#     Envia push para uma subscription específica.
 
-def _send_one(
-    sub: PushSubscription,
-    title: str,
-    body: str,
-    url: str,
-    icon: str,
-    terreiro_id: UUID,
-) -> bool:
-    """
-    Envia push para uma subscription específica.
-
-    O payload inclui `terreiro_id` dentro de `data` para que o frontend
-    possa validar se a notificação pertence ao terreiro do usuário logado.
-    Isso é a segunda camada de segurança multi-tenant no lado cliente.
-    """
-    payload = json.dumps({
-        "title": title,
-        "body":  body,
-        "icon":  icon,
-        "badge": "/icons/notification-icon.png",
-        "data": {
-            # URL da página de destino (ex: /giras/{id})
-            "url": url,
-            # terreiro_id permite ao frontend validar o contexto antes de navegar
-            "terreiro_id": str(terreiro_id),
-        },
-    })
-    subscription_info = {
-        "endpoint": sub.endpoint,
-        "keys": {
-            "p256dh": sub.p256dh,
-            "auth":   sub.auth,
-        },
-    }
-    try:
-        webpush(
-            subscription_info=subscription_info,
-            data=payload,
-            vapid_private_key=settings.VAPID_PRIVATE_KEY,
-            vapid_claims={"sub": settings.VAPID_EMAIL},
-        )
-        return True
-    except WebPushException as ex:
-        status = ex.response.status_code if ex.response else None
-        logger.warning("[Push] Falha ao enviar para %s: %s | Status: %s",
-                       sub.endpoint[:40], ex, status)
-        # 404/410 = subscription expirada ou cancelada — remove sem validar terreiro
-        if status in (404, 410):
-            remove_subscription(sub.endpoint)
-        return False
-    except Exception as ex:
-        logger.error("[Push] Erro inesperado ao enviar: %s", ex)
-        return False
+#     O payload inclui `terreiro_id` dentro de `data` para que o frontend
+#     possa validar se a notificação pertence ao terreiro do usuário logado.
+#     Isso é a segunda camada de segurança multi-tenant no lado cliente.
+#     """
+#     payload = json.dumps({
+#         "title": title,
+#         "body":  body,
+#         "icon":  icon,
+#         "badge": "/icons/notification-icon.png",
+#         "data": {
+#             # URL da página de destino (ex: /giras/{id})
+#             "url": url,
+#             # terreiro_id permite ao frontend validar o contexto antes de navegar
+#             "terreiro_id": str(terreiro_id),
+#         },
+#     })
+#     subscription_info = {
+#         "endpoint": sub.endpoint,
+#         "keys": {
+#             "p256dh": sub.p256dh,
+#             "auth":   sub.auth,
+#         },
+#     }
+#     try:
+#         webpush(
+#             subscription_info=subscription_info,
+#             data=payload,
+#             vapid_private_key=settings.VAPID_PRIVATE_KEY,
+#             vapid_claims={"sub": settings.VAPID_EMAIL},
+#         )
+#         return True
+#     except WebPushException as ex:
+#         status = ex.response.status_code if ex.response else None
+#         logger.warning("[Push] Falha ao enviar para %s: %s | Status: %s",
+#                        sub.endpoint[:40], ex, status)
+#         # 404/410 = subscription expirada ou cancelada — remove sem validar terreiro
+#         if status in (404, 410):
+#             remove_subscription(sub.endpoint)
+#         return False
+#     except Exception as ex:
+#         logger.error("[Push] Erro inesperado ao enviar: %s", ex)
+#         return False
+# endregion
 
 
-def send_push_to_terreiro(
-    terreiro_id: UUID,
-    title: str,
-    body: str,
-    url: str = "/giras",
-    icon: str = "/icons/icon-192.png",
-) -> Dict[str, int]:
-    """
-    Envia push notification apenas para os dispositivos do terreiro informado.
-
-    Isolamento multi-tenant (backend):
-        Filtra subscriptions por terreiro_id — nenhum outro terreiro recebe.
-
-    Isolamento multi-tenant (frontend):
-        O payload inclui terreiro_id para que sw.js e _app.js validem
-        o contexto antes de navegar para a URL específica.
-    """
-    if not settings.VAPID_PRIVATE_KEY:
-        logger.info("[Push] VAPID_PRIVATE_KEY não configurada — push desabilitado.")
-        return {"enviados": 0, "falhas": 0, "total": 0}
-
-    db = _get_db()
-    try:
-        subs = (
-            db.query(PushSubscription)
-            .filter(PushSubscription.terreiro_id == terreiro_id)
-            .all()
-        )
-
-        if not subs:
-            logger.info("[Push] Nenhuma subscription para terreiro %s", terreiro_id)
-            return {"enviados": 0, "falhas": 0, "total": 0}
-
-        success, failed = 0, 0
-        for sub in subs:
-            if _send_one(sub, title=title, body=body, url=url, icon=icon, terreiro_id=terreiro_id):
-                success += 1
-            else:
-                failed += 1
-
-        logger.info(
-            "[Push] Terreiro %s — %d enviados, %d falhas de %d subscriptions",
-            terreiro_id, success, failed, len(subs),
-        )
-        return {"enviados": success, "falhas": failed, "total": len(subs)}
-    finally:
-        db.close()
+def send_push_to_terreiro(db, terreiro_id, payload):
+    return push_service.send_to_terreiro(db, terreiro_id, payload)

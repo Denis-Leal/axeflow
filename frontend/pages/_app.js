@@ -18,75 +18,42 @@ import '../styles/globals.css';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { getFirebaseMessaging } from "../services/firebase";
+import { onMessage } from "firebase/messaging";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
   const swListenerRegistered = useRef(false);
 
-  useEffect(() => {
-    // Bootstrap JS — carregado dinamicamente para evitar SSR crash
-    require('bootstrap/dist/js/bootstrap.bundle.min.js');
+useEffect(() => {
+  async function setupFCM() {
+    const messaging = await getFirebaseMessaging();
+    if (!messaging) return;
 
-    // ── Registrar Service Worker para PWA ──────────────
-    if (!('serviceWorker' in navigator)) return;
+    onMessage(messaging, (payload) => {
+      console.log("[Push] Foreground:", payload);
 
-    navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
-      .then((reg) => {
-        console.log('[PWA] SW registrado:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('[PWA] Falha ao registrar SW:', err);
-      });
+      const data = payload.data || {};
+      const title = payload.notification?.title || "AxeFlow";
+      const body  = payload.notification?.body  || "";
 
-    // ── Listener de clique em notificação push ─────────
-    // Evita registrar múltiplas vezes em hot-reload (dev)
-    if (swListenerRegistered.current) return;
-    swListenerRegistered.current = true;
+      const userTerreiroId = localStorage.getItem("terreiro_id");
 
-    const handleSwMessage = (event) => {
-      // Só processa mensagens do tipo PUSH_NOTIFICATION_CLICK
-      if (!event.data || event.data.type !== 'PUSH_NOTIFICATION_CLICK') return;
-
-      const { url: targetUrl, terreiro_id: notifTerreiroId } = event.data.payload || {};
-
-      console.log('[App] Push click recebido — url:', targetUrl, '| terreiro_id:', notifTerreiroId);
-
-      // Recupera o terreiro do usuário logado (salvo no login)
-      const userTerreiroId = localStorage.getItem('terreiro_id');
-
-      if (!notifTerreiroId || !userTerreiroId) {
-        // Sem informação de terreiro: navega para /giras (seguro)
-        console.warn('[App] terreiro_id ausente — redirecionando para /giras');
-        router.push('/giras');
+      // 🔒 mesma regra multi-tenant do SW
+      if (data.terreiro_id && data.terreiro_id !== userTerreiroId) {
+        console.warn("[Push] Ignorado (terreiro diferente)");
         return;
       }
 
-      if (notifTerreiroId === userTerreiroId) {
-        // Mesmos terreiros: pode navegar para a URL específica da gira
-        console.log('[App] Terreiro validado — navegando para:', targetUrl);
-        router.push(targetUrl || '/giras');
-      } else {
-        // Terreiros diferentes: notificação chegou em dispositivo de outro terreiro
-        // Redireciona para a lista de giras do terreiro logado (sem expor dados alheios)
-        console.warn(
-          '[App] Terreiro da notificação (%s) difere do usuário logado (%s) — redirecionando para /giras',
-          notifTerreiroId,
-          userTerreiroId
-        );
-        router.push('/giras');
+      if (confirm(`${title}\n${body}\n\nAbrir?`)) {
+        router.push(data.url || "/giras");
       }
-    };
+    });
+  }
 
-    navigator.serviceWorker.addEventListener('message', handleSwMessage);
-
-    // Cleanup ao desmontar (troca de página no Next.js)
-    return () => {
-      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
-      swListenerRegistered.current = false;
-    };
-  }, []); // Executa apenas uma vez na montagem
+  setupFCM();
+}, []);
 
   // ── Handler para abertura via query string ─────────
   // Cobre o caso de abertura em nova aba (sem janela aberta)

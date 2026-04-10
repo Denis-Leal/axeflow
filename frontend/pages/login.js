@@ -19,6 +19,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { login, getMe } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
+import { registerDevice } from '../services/pushFCM';
 
 export default function Login() {
   const router = useRouter();
@@ -47,6 +48,13 @@ export default function Login() {
         // Falha silenciosa: a falta do terreiro_id apenas desativa
         // a navegação específica nas notificações push (vai para /giras)
         console.warn('[Login] Não foi possível obter terreiro_id — push redirect será genérico.');
+      }
+
+      // 3. 🔥 REGISTRAR DEVICE (FCM)
+      try {
+        await registerDevice();
+      } catch (err) {
+        console.warn('[Push] Falha ao registrar device:', err);
       }
 
       router.push('/dashboard');
