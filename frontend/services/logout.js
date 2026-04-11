@@ -16,45 +16,48 @@
 //   para garantir que as notificações push sejam
 //   desvinculadas antes de trocar de conta.
 // =====================================================
-
-import { isPushSupported } from './pushService';
-
 const API_URL = '/api';
 
 /**
  * Remove a subscription do backend (best-effort).
  * Não lança exceção — falha silenciosa para não bloquear o logout.
  */
-async function removeSubscriptionFromBackend() {
+async function removePushDataFromBackend() {
   try {
-    if (!isPushSupported()) return;
-
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-
-    if (!subscription) return;
-
     const token = localStorage.getItem('token');
+    const fcmToken = localStorage.getItem('fcm_token'); // 🔥 precisa existir
 
-    // Avisa o backend para remover a subscription do banco
-    await fetch(`${API_URL}/push/unsubscribe`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ endpoint: subscription.endpoint }),
-    });
+    // ───────────────
+    // 1. Remove FCM device
+    // ───────────────
+    if (fcmToken) {
+      await fetch(`${API_URL}/push/devices/unregister`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ token: fcmToken }),
+      });
+    }
 
-    // Remove a subscription do browser
-    await subscription.unsubscribe();
-    console.log('[Logout] Push subscription removida');
+    // ───────────────
+    // 2. Remove WebPush subscription (browser)
+    // ───────────────
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        await subscription.unsubscribe();
+      }
+    }
+
+    console.log('[Logout] Push removido');
   } catch (err) {
-    // Falha silenciosa — não impede o logout
-    console.warn('[Logout] Falha ao remover subscription:', err);
+    console.warn('[Logout] Falha ao remover push:', err);
   }
 }
-
 /**
  * Executa o logout completo:
  *   - Desativa push (remove subscription do browser e do backend)
@@ -65,7 +68,7 @@ async function removeSubscriptionFromBackend() {
  */
 export async function logout(router) {
   // 1. Remove subscription de push (assíncrono, best-effort)
-  await removeSubscriptionFromBackend();
+  await removePushDataFromBackend();
 
   // 2. Limpa todos os dados de sessão do localStorage
   localStorage.removeItem('token');

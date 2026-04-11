@@ -64,27 +64,6 @@ def subscribe(data: PushSubscribeRequest, user=Depends(get_current_user)):
         "message": "Subscription registrada" if added else "Subscription atualizada",
     }
 
-
-@router.delete("/unsubscribe")
-def unsubscribe(data: PushUnsubscribeRequest, user=Depends(get_current_user)):
-    """
-    Remove a push subscription do banco ao fazer logout.
-
-    Chamado pelo frontend (logout.js) antes de limpar o localStorage.
-    Garante que, após trocar de conta no mesmo dispositivo, o novo login
-    não herde a subscription do usuário anterior.
-
-    O endpoint valida que a subscription pertence ao terreiro do usuário
-    logado antes de remover — evita remoção indevida de subscriptions alheias.
-    """
-    if not data.endpoint:
-        raise HTTPException(status_code=400, detail="endpoint ausente")
-
-    remove_subscription(endpoint=data.endpoint, terreiro_id=user.terreiro_id)
-
-    return {"ok": True, "message": "Subscription removida"}
-
-
 @router.post("/test")
 def send_test_push(data: PushTestRequest = PushTestRequest(), user=Depends(get_current_user)):
     payload = {
@@ -134,5 +113,26 @@ def register_device(data: dict, user=Depends(get_current_user), db=Depends(get_d
         db.add(device)
 
     db.commit()
+
+    return {"ok": True}
+
+@router.delete("/devices/unregister")
+def unregister_device(data: dict, user=Depends(get_current_user), db=Depends(get_db)):
+
+    token = data.get("token")
+
+    if not token:
+        raise HTTPException(400, "Token ausente")
+
+    device = (
+        db.query(Device)
+        .filter(Device.token == token)
+        .filter(Device.terreiro_id == user.terreiro_id)
+        .first()
+    )
+
+    if device:
+        device.active = False  # melhor que deletar
+        db.commit()
 
     return {"ok": True}
