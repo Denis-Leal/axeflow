@@ -36,7 +36,7 @@ useEffect(() => {
       const data = payload.data || {};
       const title = payload.notification?.title || "AxeFlow";
       const body  = payload.notification?.body  || "";
-
+      console.log("[Push] Recebida em foreground:", payload);
       const userTerreiroId = localStorage.getItem("terreiro_id");
 
       // 🔒 mesma regra multi-tenant do SW
