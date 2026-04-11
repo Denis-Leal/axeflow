@@ -1,3 +1,4 @@
+# app/core/firebase.py
 import os
 import json
 import firebase_admin

@@ -57,6 +57,7 @@ async def lifespan(app: FastAPI):
     Tudo antes do `yield` roda no startup; depois do `yield`, no shutdown.
     """
     # Startup
+    init_firebase()
     start_scheduler()
     logger.info("[App] AxeFlow iniciado.")
 
@@ -76,10 +77,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-@app.on_event("startup")
-def on_startup():
-    init_firebase()
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
