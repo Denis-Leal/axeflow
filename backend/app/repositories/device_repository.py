@@ -1,7 +1,7 @@
 # app/repositories/device_repository.py
 
 from app.models.device import Device
-from sqlalchemy.dialects.postgresql import UUID
+from uuid import UUID
 
 
 class DeviceRepository:
