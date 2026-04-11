@@ -179,11 +179,16 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     if promovidos:
         nomes = ", ".join(p["nome"] for p in promovidos)
+        
+        payload = {
+            "title": "🎉 Vagas Abertas — Fila Promovida",
+            "body": f"{len(promovidos)} pessoa(s) promovida(s) da espera: {nomes}",
+            "url": f"/giras/{gira.id}",
+        }
         send_push_to_terreiro(
+            db=db,
             terreiro_id=gira.terreiro_id,
-            title="🎉 Vagas Abertas — Fila Promovida",
-            body=f"{len(promovidos)} pessoa(s) promovida(s) da espera: {nomes}",
-            url=f"/giras/{gira.id}",
+            payload=payload,
         )
 
     base = _enrich(gira, db, _count_inscritos(db, gira))
@@ -206,12 +211,16 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
     titulo = gira.titulo
     gira.deleted_at = datetime.utcnow()
     db.commit()
-
+    
+    payload = {
+        "title": "🗑️ Gira Removida",
+        "body": f"A gira {titulo} foi removida.",
+        "url": f"/giras/{gira.id}",
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id=gira.terreiro_id,
-        title="🗑️ Gira Removida",
-        body=f"A gira {titulo} foi removida.",
-        url="/giras",
+        payload=payload,
     )
 
     return {"ok": True}
