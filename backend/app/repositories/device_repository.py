@@ -9,6 +9,8 @@ class DeviceRepository:
         print("Fetching active devices for terreiro:", terreiro_id)  # Debug log
         print("DeviceID:", Device.id)  # Debug log to check if Device model is correct
         print("Device terreiro_id:", Device.terreiro_id)  # Debug log to check if terreiro_id field is correct
+        result = db.query(Device).filter(Device.terreiro_id == terreiro_id).filter(Device.active == True).all()
+        print("Found devices:", result)  # Debug log to check query result
         return (
             db.query(Device)
             .filter(Device.terreiro_id == terreiro_id)
