@@ -41,6 +41,7 @@ from app.models.inventory_alert import InventoryAlert, GiraNotification
 from app.services.cleanup_service import start_scheduler, stop_scheduler
 
 from app.core.config import settings
+from app.core.firebase import init_firebase
 
 import logging
 
@@ -75,6 +76,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+@app.on_event("startup")
+def on_startup():
+    init_firebase()
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
