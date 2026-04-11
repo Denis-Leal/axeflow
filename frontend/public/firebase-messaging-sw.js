@@ -13,6 +13,25 @@ firebase.initializeApp({
     measurementId: "G-GNC45K00S9"
 });
 
+const messaging = firebase.messaging();
+const channel = new BroadcastChannel('push_channel');
+messaging.onBackgroundMessage(function(payload) {
+  const data = payload.data || {};
+  console.log("[Push] Background:", payload);
+
+  // 🔴 App fechado → mostra notificação
+  self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || '/icons/icon-192.png',
+      badge: data.badge || '/icons/notification-icon.png',
+      image: data.image || undefined,
+      vibrate: [200, 100, 200],
+      data: {
+        url: data.url || "/giras",
+        terreiro_id: data.terreiro_id || null,
+      }
+  });
+
 // 🔥 CLICK HANDLER (fora!)
 self.addEventListener('notificationclick', function(event) {
   const data = event.notification.data;
@@ -25,3 +44,4 @@ self.addEventListener('notificationclick', function(event) {
     )
   );
 })
+});

@@ -45,8 +45,15 @@ useEffect(() => {
         return;
       }
 
-      if (confirm(`${data.title}\n${data.body}\n\nAbrir?`)) {
-          router.push(data.url || "/giras");
+      // 🔐 garante permissão
+      if (Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(data.title, {
+            body: data.body,
+            icon: '/icons/icon-192.png',
+            data
+          });
+        });
       }
 
     });
