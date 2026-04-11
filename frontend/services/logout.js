@@ -68,11 +68,12 @@ async function removePushDataFromBackend() {
  */
 export async function logout(router) {
   // 1. Remove subscription de push (assíncrono, best-effort)
-  await removePushDataFromBackend();
+  removePushDataFromBackend();
 
   // 2. Limpa todos os dados de sessão do localStorage
-  localStorage.removeItem('token');
-  localStorage.removeItem('terreiro_id');
+  localStorage.removeItem('token'); // 🔥 remove token JWT para encerrar sessão
+  localStorage.removeItem('terreiro_id'); // 🔥 importante para evitar confusão futura, mesmo que seja opcional
+  localStorage.removeItem('fcm_token'); // 🔥 limpa token FCM para evitar confusão futura
 
   // 3. Redireciona para login
   router.push('/login');
