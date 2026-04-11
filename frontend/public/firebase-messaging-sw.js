@@ -20,7 +20,10 @@ messaging.onBackgroundMessage(function(payload) {
 
   self.registration.showNotification(payload.notification.title, {
     body: payload.notification.body,
-    icon: "/icons/icon-192.png",
+    icon: data.data?.icon || '/icons/icon-192.png',
+    badge: data.data?.badge || '/icons/notification-icon.png',
+    image: data.data?.image || undefined,
+    vibrate: [200, 100, 200],
     data: {
       url: data.url || "/giras",
       terreiro_id: data.terreiro_id || null,
