@@ -325,20 +325,24 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     )
 
 def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> dict:
-    """
-    Reativa uma inscrição cancelada.
-
-    Verificação de vaga também dentro de FOR UPDATE para evitar
-    que reativação simultânea de dois cancelados ultrapasse o limite.
-    """
-    inscricao = db.query(InscricaoConsulente).filter(InscricaoConsulente.id == inscricao_id).first()
+    # 1. Busca inscrição (sem lock ainda)
+    inscricao = (
+        db.query(InscricaoConsulente)
+        .filter(InscricaoConsulente.id == inscricao_id)
+        .first()
+    )
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
 
+    # 2. LOCK na GIRA (esse é o ponto crítico)
     gira = (
         db.query(Gira)
-        .filter(Gira.id == inscricao.gira_id)
-        .with_for_update()
+        .filter(
+            Gira.id == inscricao.gira_id,
+            Gira.terreiro_id == terreiro_id,
+            Gira.deleted_at.is_(None),
+        )
+        .with_for_update()  # 🔥 mutex aqui
         .first()
     )
     if not gira:
@@ -347,7 +351,7 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     if inscricao.status != StatusInscricaoEnum.cancelado:
         raise HTTPException(status_code=400, detail="Inscrição não está cancelada")
 
-    # FOR UPDATE para serializar reativações concorrentes
+    # 3. Conta novamente (agora seguro, porque a gira está lockada)
     confirmados = (
         db.query(InscricaoConsulente)
         .filter(
@@ -355,27 +359,27 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
             InscricaoConsulente.consulente_id.isnot(None),
             InscricaoConsulente.status == StatusNovo.confirmado,
         )
-        .with_for_update()
-        .all()
+        .count()
     )
 
-    quantidade = len(confirmados)
+    # 4. Decide com consistência garantida
+    if confirmados < (gira.limite_consulentes or 0):
+        novo_status = StatusInscricaoEnum.confirmado
+    else:
+        novo_status = StatusInscricaoEnum.lista_espera
 
-    novo_status = (
-        StatusInscricaoEnum.confirmado
-        if quantidade < (gira.limite_consulentes or 0)
-        else StatusInscricaoEnum.lista_espera
-    )
-
+    # 5. Atualiza
     inscricao.status = novo_status
+
     db.commit()
     db.refresh(inscricao)
 
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
+
     return {
-        "ok":       True,
-        "status":   novo_status,
-        "nome":     nome,
+        "ok": True,
+        "status": novo_status,
+        "nome": nome,
         "mensagem": (
             f"{nome} reativado(a) como confirmado(a)."
             if novo_status == StatusInscricaoEnum.confirmado
