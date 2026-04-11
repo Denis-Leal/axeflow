@@ -20,13 +20,26 @@ messaging.onBackgroundMessage(function(payload) {
 
   self.registration.showNotification(payload.notification.title, {
     body: payload.notification.body,
-    icon: data.data?.icon || '/icons/icon-192.png',
-    badge: data.data?.badge || '/icons/notification-icon.png',
-    image: data.data?.image || undefined,
+    icon: data.icon || '/icons/icon-192.png',
+    badge: data.badge || '/icons/notification-icon.png',
+    image: data.image || undefined,
     vibrate: [200, 100, 200],
     data: {
       url: data.url || "/giras",
       terreiro_id: data.terreiro_id || null,
     }
   });
+});
+
+// 🔥 CLICK HANDLER (fora!)
+self.addEventListener('notificationclick', function(event) {
+  const data = event.notification.data;
+
+  event.notification.close();
+
+  event.waitUntil(
+    clients.openWindow(
+      `${data.url}?from_push=1&terreiro_id=${data.terreiro_id}&target=${encodeURIComponent(data.url)}`
+    )
+  );
 });

@@ -10,9 +10,7 @@ import { getMessaging, getToken, isSupported } from "firebase/messaging";
     appId: "1:412400342317:web:1daa7a2f0e801e6bb92fa4", //process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     measurementId: "G-GNC45K00S9"
   };
-
-console.log("FIREBASE CONFIG:", firebaseConfig);
-
+  
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 let messaging = null;

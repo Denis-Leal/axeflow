@@ -33,8 +33,6 @@ useEffect(() => {
     if (!messaging) return;
 
     onMessage(messaging, (payload) => {
-      console.log("[Push] Foreground:", payload);
-
       const data = payload.data || {};
       const title = payload.notification?.title || "AxeFlow";
       const body  = payload.notification?.body  || "";
@@ -46,16 +44,30 @@ useEffect(() => {
         console.warn("[Push] Ignorado (terreiro diferente)");
         return;
       }
-
-      if (confirm(`${title}\n${body}\n\nAbrir?`)) {
-        router.push(data.url || "/giras");
-      }
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, {
+          body,
+          icon: data.icon || '/icons/icon-192.png',
+          data
+        });
+      });
     });
   }
 
   setupFCM();
 }, []);
-
+useEffect(() => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker
+      .register('/firebase-messaging-sw.js')
+      .then((registration) => {
+        console.log('[SW] registrado:', registration);
+      })
+      .catch((err) => {
+        console.error('[SW] erro ao registrar:', err);
+      });
+  }
+}, []);
   // ── Handler para abertura via query string ─────────
   // Cobre o caso de abertura em nova aba (sem janela aberta)
   // SW abre /giras?from_push=1&terreiro_id=X&target=URL
@@ -75,7 +87,7 @@ useEffect(() => {
 
     if (userTerreiroId && notifTerreiroId === userTerreiroId) {
       // Terreiro validado — navega para a URL alvo da notificação
-      console.log('[App] Push via query — terreiro validado, navegando para:', target);
+      // console.log('[App] Push via query — terreiro validado, navegando para:', target);
       router.replace(decodeURIComponent(target));
     } else {
       // Terreiro inválido — fica em /giras sem parâmetros extras
