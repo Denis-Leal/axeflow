@@ -14,10 +14,10 @@ class FCMProvider(PushProvider):
             message = messaging.Message(
                 token=token,
                 data={
-                    "title": payload.get("title"),
-                    "body": payload.get("body"),
-                    "url": payload.get("url"),
-                    "terreiro_id": payload.get("terreiro_id"),
+                    "title": str(payload.get("title") or "AxeFlow"),
+                    "body": str(payload.get("body") or ""),
+                    "url": str(payload.get("url") or "/giras"),
+                    "terreiro_id": str(payload.get("terreiro_id") or ""),
                 }
             )
 

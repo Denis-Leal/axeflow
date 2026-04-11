@@ -35,7 +35,7 @@ useEffect(() => {
     onMessage(messaging, (payload) => {
       const data = payload.data || {};
       
-      console.log("[Push] Recebida em foreground:", payload);
+      console.log("[Push] Recebida em foreground:", payload.data);
       const userTerreiroId = localStorage.getItem("terreiro_id");
 
       // 🔒 mesma regra multi-tenant do SW
@@ -44,8 +44,8 @@ useEffect(() => {
         return;
       }
       navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(data.title || "AxeFlow", {
-          body: data.body || "",
+        reg.showNotification(data.title, {
+          body: data.body,
           icon: data.icon || '/icons/icon-192.png',
           data
         });
