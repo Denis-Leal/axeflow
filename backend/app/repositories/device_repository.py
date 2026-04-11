@@ -1,20 +1,24 @@
 # app/repositories/device_repository.py
 
 from app.models.device import Device
+from sqlalchemy.dialects.postgresql import UUID
 
 
 class DeviceRepository:
 
     def get_active_by_terreiro(self, db, terreiro_id):
-        print("db:", db)  # Debug log to check if db session is correct
-        print("Fetching active devices for terreiro:", terreiro_id)  # Debug log
-        print("DeviceID:", Device.id)  # Debug log to check if Device model is correct
-        print("Device terreiro_id:", Device.terreiro_id)  # Debug log to check if terreiro_id field is correct
-        result = db.query(Device).filter(Device.terreiro_id == terreiro_id).filter(Device.active == True).all()
-        print("Found devices:", result)  # Debug log to check query result
-        return (
+        print("TYPE antes:", type(terreiro_id))
+        terreiro_id = UUID(str(terreiro_id))
+        devices = (
             db.query(Device)
             .filter(Device.terreiro_id == terreiro_id)
             .filter(Device.active == True)
             .all()
         )
+        devices = db.query(Device).all()
+        for d in devices:
+            print("DB:", d.terreiro_id, type(d.terreiro_id))
+        
+        print("Found devices:", devices)
+        
+        return devices
