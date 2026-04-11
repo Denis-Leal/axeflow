@@ -160,11 +160,51 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     db.commit()
     db.refresh(gira)
+    
+    if "acesso" in campos_alterados:
+        acesso_label = "pública" if gira.acesso != "fechada" else "fechada (membros)"
+        payload = {
+            "title": "🔄 Gira Atualizada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"O acesso da gira {gira.titulo} foi alterado para: {acesso_label}",
+            "url": f"/giras/{gira.id}",
+        }
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=gira.terreiro_id,
+            payload=payload,
+        )
+    
+    if "titulo" in campos_alterados:
+        payload = {
+            "title": "✏️ Gira Editada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"O título da gira foi alterado  de: {dados.get('titulo')} para: {gira.titulo}",
+            "url": f"/giras/{gira.id}",
+        }
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=gira.terreiro_id,
+            payload=payload,
+        )
+        
+    if "tipo" in campos_alterados:
+        payload = {
+            "title": "🔄 Gira Atualizada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"O tipo da gira {gira.titulo} foi alterado de: {dados.get('tipo')} para: {gira.tipo}",
+            "url": f"/giras/{gira.id}",
+        }
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=gira.terreiro_id,
+            payload=payload,
+        )
 
     if "status" in campos_alterados:
         msgs = {
-            "aberta":    ("📋 Lista Aberta",    f"A lista da gira {gira.titulo} está aberta!"),
-            "fechada":   ("🔒 Lista Encerrada", f"A lista da gira {gira.titulo} foi encerrada."),
+            "aberta":    ("📋 Gira Aberta",    f"O status da gira {gira.titulo} foi marcada como aberta!"),
+            "fechada":   ("🔒 Gira Encerrada", f"O status da gira {gira.titulo} foi marcada como encerrada."),
             "concluida": ("✅ Gira Concluída",  f"A gira {gira.titulo} foi marcada como concluída."),
         }
         if (novo_status := campos_alterados["status"]) in msgs:
@@ -181,6 +221,39 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
                 terreiro_id=gira.terreiro_id,
                 payload=payload,
             )
+        
+    if "data" in campos_alterados or "horario" in campos_alterados:
+        data_fmt     = gira.data.strftime("%d/%m/%Y")
+        horario_fmt  = gira.horario.strftime("%H:%M")
+        
+        payload = {
+            "title": "📅 Gira Atualizada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"A data/horário da gira {gira.titulo} foi alterada para: {data_fmt} às {horario_fmt}",
+            "url": f"/giras/{gira.id}",
+        }
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=gira.terreiro_id,
+            payload=payload,
+        )
+        
+    if "Abertura_lista" in campos_alterados or "fechamento_lista" in campos_alterados:
+        abertura_fmt   = gira.abertura_lista.strftime("%d/%m/%Y %H:%M") if gira.abertura_lista else "N/A"
+        fechamento_fmt = gira.fechamento_lista.strftime("%d/%m/%Y %H:%M") if gira.fechamento_lista else "N/A"
+        
+        payload = {
+            "title": "⏰ Gira Atualizada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"As datas da lista de espera da gira {gira.titulo} foram atualizadas: abertura: {abertura_fmt}, fechamento: {fechamento_fmt}",
+            "url": f"/giras/{gira.id}",
+        }
+        
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=gira.terreiro_id,
+            payload=payload,
+        )
 
     if promovidos:
         nomes = ", ".join(p["nome"] for p in promovidos)
