@@ -112,6 +112,7 @@ def push_status(user=Depends(get_current_user)):
 def register_device(data: dict, user=Depends(get_current_user), db=Depends(get_db)):
 
     token = data.get("token")
+    print("Registering device with token:", token)
     if not token:
         raise HTTPException(400, "Token ausente")
 
@@ -127,7 +128,7 @@ def register_device(data: dict, user=Depends(get_current_user), db=Depends(get_d
             user_id=user.id,
             terreiro_id=user.terreiro_id,
             token=token,
-            platform=data.platform,
+            platform=data.get("platform"),
             provider="fcm"
         )
         db.add(device)
