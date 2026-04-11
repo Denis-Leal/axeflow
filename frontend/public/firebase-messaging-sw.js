@@ -17,7 +17,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function(payload) {
   const data = payload.data || {};
-
+  console.log("[Push] Background:", payload);
   self.registration.showNotification(payload.notification.title, {
     body: payload.notification.body,
     icon: data.icon || '/icons/icon-192.png',
