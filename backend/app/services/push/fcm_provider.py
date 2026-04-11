@@ -13,11 +13,12 @@ class FCMProvider(PushProvider):
                 init_firebase()
             message = messaging.Message(
                 token=token,
-                notification=messaging.Notification(
-                    title=payload.get("title"),
-                    body=payload.get("body"),
-                ),
-                data=payload.get("data", {}),
+                data={
+                    "title": payload.get("title"),
+                    "body": payload.get("body"),
+                    "url": payload.get("url"),
+                    "terreiro_id": payload.get("terreiro_id"),
+                }
             )
 
             messaging.send(message)

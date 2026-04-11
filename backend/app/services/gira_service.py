@@ -168,6 +168,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
             
             payload = {
                 "title": f"{titulo_push} — {gira.titulo}",
+                "terreiro_id": str(gira.terreiro_id),
                 "body": f"{corpo_push}",
                 "url": f"/giras/{gira.id}",
             }

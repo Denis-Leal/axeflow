@@ -34,8 +34,7 @@ useEffect(() => {
 
     onMessage(messaging, (payload) => {
       const data = payload.data || {};
-      const title = payload.notification?.title || "AxeFlow";
-      const body  = payload.notification?.body  || "";
+      
       console.log("[Push] Recebida em foreground:", payload);
       const userTerreiroId = localStorage.getItem("terreiro_id");
 
@@ -45,8 +44,8 @@ useEffect(() => {
         return;
       }
       navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title, {
-          body,
+        reg.showNotification(data.title || "AxeFlow", {
+          body: data.body || "",
           icon: data.icon || '/icons/icon-192.png',
           data
         });
