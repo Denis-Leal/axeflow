@@ -33,7 +33,7 @@ export async function getFCMToken() {
   if (!messaging) return null;
 
   const token = await getToken(messaging, {
-    vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+    vapidKey: "BK8yUbAAObmhuq2F88jrhcVdBKlpWw_DkQk3gPa93idqZVhDK1mLMs2JrqDCBpXeIQYG-P9VhQL0g0nl7dVVVKI"//process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
   });
 
   return token;
