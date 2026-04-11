@@ -20,6 +20,7 @@ class FCMProvider(PushProvider):
                     "terreiro_id": str(payload.get("terreiro_id") or ""),
                 }
             )
+            print("DEBUG FCM payload:", message.data)
 
             messaging.send(message)
             return True
