@@ -28,6 +28,7 @@ export default function App({ Component, pageProps }) {
   const swListenerRegistered = useRef(false);
 
 useEffect(() => {
+  const channel = new BroadcastChannel('push_channel');
   async function setupFCM() {
     const messaging = await getFirebaseMessaging();
     if (!messaging) return;
@@ -43,13 +44,6 @@ useEffect(() => {
         console.warn("[Push] Ignorado (terreiro diferente)");
         return;
       }
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(data.title, {
-          body: data.body,
-          icon: data.icon || '/icons/icon-192.png',
-          data
-        });
-      });
     });
   }
 
@@ -66,6 +60,37 @@ useEffect(() => {
         console.error('[SW] erro ao registrar:', err);
       });
   }
+}, []);
+
+useEffect(() => {
+  const channel = new BroadcastChannel('push_channel');
+
+  channel.onmessage = (event) => {
+    const { type, data } = event.data || {};
+
+    if (type !== 'PUSH_FOREGROUND') return;
+
+    console.log('[Push] via BroadcastChannel:', data);
+
+    const userTerreiroId = localStorage.getItem("terreiro_id");
+
+    if (data.terreiro_id && data.terreiro_id !== userTerreiroId) {
+      return;
+    }
+
+    // 👉 Aqui você controla UX
+    // Pode usar toast, modal, etc
+
+    navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(data.title, {
+          body: data.body,
+          icon: data.icon || '/icons/icon-192.png',
+          data
+        });
+      });
+  };
+
+  return () => channel.close();
 }, []);
   // ── Handler para abertura via query string ─────────
   // Cobre o caso de abertura em nova aba (sem janela aberta)

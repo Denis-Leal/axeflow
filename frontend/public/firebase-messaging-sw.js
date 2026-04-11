@@ -14,7 +14,7 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
-
+const channel = new BroadcastChannel('push_channel');
 messaging.onBackgroundMessage(function(payload) {
   const data = payload.data || {};
   console.log("[Push] Background:", payload);
@@ -29,6 +29,27 @@ messaging.onBackgroundMessage(function(payload) {
       terreiro_id: data.terreiro_id || null,
     }
   });
+
+  // Pergunta se existe cliente ativo
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(clients => {
+
+      if (clients.length > 0) {
+        // 🟢 App aberto → envia para o frontend
+        channel.postMessage({
+          type: 'PUSH_FOREGROUND',
+          data
+        });
+
+        return; // ❌ NÃO mostra notificação
+      }
+
+      // 🔴 App fechado → mostra notificação
+      self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/icons/icon-192.png',
+        data
+      });
 });
 
 // 🔥 CLICK HANDLER (fora!)
@@ -42,4 +63,5 @@ self.addEventListener('notificationclick', function(event) {
       `${data.url}?from_push=1&terreiro_id=${data.terreiro_id}&target=${encodeURIComponent(data.url)}`
     )
   );
+})
 });
