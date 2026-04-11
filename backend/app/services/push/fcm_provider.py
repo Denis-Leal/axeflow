@@ -22,8 +22,6 @@ class FCMProvider(PushProvider):
                 notification=messaging.Notification(
                     title=str(payload.get("title") or "AxeFlow"),
                     body=str(payload.get("body") or ""),
-                    url=str(payload.get("url") or "/giras"),
-                    terreiro_id=str(payload.get("terreiro_id") or ""),
                 )
             )
             print("DEBUG FCM payload:", message.data)

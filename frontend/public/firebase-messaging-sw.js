@@ -13,27 +13,6 @@ firebase.initializeApp({
     measurementId: "G-GNC45K00S9"
 });
 
-const messaging = firebase.messaging();
-const channel = new BroadcastChannel('push_channel');
-messaging.onBackgroundMessage(function(payload) {
-  const data = payload.data || {};
-  console.log("[Push] Background:", payload);
-
-    // Pergunta se existe cliente ativo
-  self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    .then(clients => {
-
-      if (clients.length > 0) {
-        // 🟢 App aberto → envia para o frontend
-        channel.postMessage({
-          type: 'PUSH_FOREGROUND',
-          data
-        });
-
-        return; // ❌ NÃO mostra notificação
-      }
-});
-
 // 🔥 CLICK HANDLER (fora!)
 self.addEventListener('notificationclick', function(event) {
   const data = event.notification.data;
@@ -46,4 +25,3 @@ self.addEventListener('notificationclick', function(event) {
     )
   );
 })
-});

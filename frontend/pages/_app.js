@@ -20,7 +20,7 @@ import { useRouter } from 'next/router';
 import { GiraProvider } from '../contexts/GiraContext';
 import Head from 'next/head';
 import { getFirebaseMessaging } from "../services/firebase";
-// import { onMessage } from "firebase/messaging";
+import { onMessage } from "firebase/messaging";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -33,18 +33,23 @@ useEffect(() => {
     const messaging = await getFirebaseMessaging();
     if (!messaging) return;
 
-    // onMessage(messaging, (payload) => {
-    //   console.log("[Push] Recebida em foreground:", payload.data);
-    //   const data = payload.data || {};
+    onMessage(messaging, (payload) => {
+      console.log("[Push] Recebida em foreground:", payload.data);
+      const data = payload.data || {};
       
-    //   const userTerreiroId = localStorage.getItem("terreiro_id");
+      const userTerreiroId = localStorage.getItem("terreiro_id");
 
-    //   // 🔒 mesma regra multi-tenant do SW
-    //   if (data.terreiro_id && data.terreiro_id !== userTerreiroId) {
-    //     console.warn("[Push] Ignorado (terreiro diferente)");
-    //     return;
-    //   }
-    // });
+      // 🔒 mesma regra multi-tenant do SW
+      if (data.terreiro_id && data.terreiro_id !== userTerreiroId) {
+        console.warn("[Push] Ignorado (terreiro diferente)");
+        return;
+      }
+
+      if (confirm(`${data.title}\n${data.body}\n\nAbrir?`)) {
+          router.push(data.url || "/giras");
+      }
+
+    });
   }
 
   setupFCM();
@@ -78,18 +83,12 @@ useEffect(() => {
       return;
     }
 
-    // 👉 UX CONTROLADO PELO APP
-    // Aqui você decide como mostrar
+    // 👉 Aqui você controla UX
+    // Pode usar toast, modal, etc
 
-    // 🔹 opção simples (debug)
-    alert(`${data.title}\n${data.body}`);
-
-    // 🔹 opção profissional (recomendado)
-    // toast.success(data.title)
-    // toast(data.body)
-
-    // 🔹 opção agressiva
-    // router.push(data.url)
+    if (confirm(`${data.title}\n${data.body}\n\nAbrir?`)) {
+      router.push(data.url || "/giras");
+    }
   };
 
   return () => channel.close();
