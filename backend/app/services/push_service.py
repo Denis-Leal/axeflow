@@ -213,4 +213,4 @@ def get_subscriptions_count(terreiro_id: Optional[UUID] = None) -> int:
 
 
 def send_push_to_terreiro(db, terreiro_id, payload):
-    return push_service.send_to_terreiro(db, terreiro_id, payload)
+    return get_push_service().send_to_terreiro(db, terreiro_id, payload)
