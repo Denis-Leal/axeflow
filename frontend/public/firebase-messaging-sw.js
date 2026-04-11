@@ -16,36 +16,23 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 const channel = new BroadcastChannel('push_channel');
 messaging.onBackgroundMessage(function(payload) {
-//   const data = payload.data || {};
-//   console.log("[Push] Background:", payload);
+  const data = payload.data || {};
+  console.log("[Push] Background:", payload);
 
-//     // Pergunta se existe cliente ativo
-//   self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-//     .then(clients => {
+    // Pergunta se existe cliente ativo
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(clients => {
 
-//       if (clients.length > 0) {
-//         // 🟢 App aberto → envia para o frontend
-//         channel.postMessage({
-//           type: 'PUSH_FOREGROUND',
-//           data
-//         });
+      if (clients.length > 0) {
+        // 🟢 App aberto → envia para o frontend
+        channel.postMessage({
+          type: 'PUSH_FOREGROUND',
+          data
+        });
 
-//         return; // ❌ NÃO mostra notificação
-//       }
-
-//       // 🔴 App fechado → mostra notificação
-//         self.registration.showNotification(data.title, {
-//             body: data.body,
-//             icon: data.icon || '/icons/icon-192.png',
-//             badge: data.badge || '/icons/notification-icon.png',
-//             image: data.image || undefined,
-//             vibrate: [200, 100, 200],
-//             data: {
-//               url: data.url || "/giras",
-//               terreiro_id: data.terreiro_id || null,
-//             }
-//         });
-// });
+        return; // ❌ NÃO mostra notificação
+      }
+});
 
 // 🔥 CLICK HANDLER (fora!)
 self.addEventListener('notificationclick', function(event) {
