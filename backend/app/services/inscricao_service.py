@@ -300,15 +300,18 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # ── Commit único — atomicidade total ─────────────────────────────────────
     db.commit()
     db.refresh(inscricao_nova)
+    
+    payload = {
+            "title": "👤 Nova Inscrição",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"{data.nome} se inscreveu na {gira.titulo} (vaga {confirmados + 1}/{gira.limite_consulentes})",
+            "url": f"/giras/{gira.id}",
+        }
 
     send_push_to_terreiro(
+        db=db,
         terreiro_id=gira.terreiro_id,
-        title="👤 Nova Inscrição",
-        body=(
-            f"{data.nome} se inscreveu na {gira.titulo} "
-            f"(vaga {confirmados + 1}/{gira.limite_consulentes})"
-        ),
-        url=f"/giras/{gira.id}",
+        payload=payload,
     )
 
     return InscricaoResponse(
@@ -480,11 +483,15 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     corpo_push = f"{nome} cancelou a inscrição na {gira.titulo}"
     if resultado["promovido"]:
         corpo_push += f" → {resultado['promovido']['nome']} promovido(a) da fila!"
-
+    payload = {
+        "title": "❌ Inscrição Cancelada",
+        "terreiro_id": str(gira.terreiro_id),
+        "body": corpo_push,
+        "url": f"/giras/{gira.id}",
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id=gira.terreiro_id,
-        title="❌ Inscrição Cancelada",
-        body=corpo_push,
-        url=f"/giras/{gira.id}",
+        payload=payload,
     )
     return resultado

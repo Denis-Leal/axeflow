@@ -203,8 +203,8 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     if "status" in campos_alterados:
         msgs = {
-            "aberta":    ("📋 Gira Aberta",    f"O status da gira {gira.titulo} foi marcada como aberta!"),
-            "fechada":   ("🔒 Gira Encerrada", f"O status da gira {gira.titulo} foi marcada como encerrada."),
+            "aberta":    ("📋 Gira Aberta",    f"A gira {gira.titulo} foi marcada como aberta!"),
+            "fechada":   ("🔒 Gira Encerrada", f"A gira {gira.titulo} foi marcada como encerrada."),
             "concluida": ("✅ Gira Concluída",  f"A gira {gira.titulo} foi marcada como concluída."),
         }
         if (novo_status := campos_alterados["status"]) in msgs:
