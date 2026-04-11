@@ -335,11 +335,12 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
 
-    gira = db.query(Gira).filter(
-        Gira.id == inscricao.gira_id,
-        Gira.terreiro_id == terreiro_id,
-        Gira.deleted_at.is_(None),
-    ).first()
+    gira = (
+        db.query(Gira)
+        .filter(Gira.id == inscricao.gira_id)
+        .with_for_update()
+        .first()
+    )
     if not gira:
         raise HTTPException(status_code=403, detail="Acesso negado")
 
@@ -355,12 +356,14 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
             InscricaoConsulente.status == StatusNovo.confirmado,
         )
         .with_for_update()
-        .count()
+        .all()
     )
+
+    quantidade = len(confirmados)
 
     novo_status = (
         StatusInscricaoEnum.confirmado
-        if confirmados < (gira.limite_consulentes or 0)
+        if quantidade < (gira.limite_consulentes or 0)
         else StatusInscricaoEnum.lista_espera
     )
 
