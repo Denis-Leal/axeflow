@@ -25,7 +25,8 @@ class PushService:
 
             return ok
 
-        except Exception:
+        except Exception as e:
+            print("PUSH ERROR:", e)
             device.active = False
             return False
 
@@ -52,5 +53,7 @@ class PushService:
     def send_to_terreiro(self, db, terreiro_id, payload):
 
         devices = self.repo.get_active_by_terreiro(db, terreiro_id)
+        
+        print("DEBUG devices:", len(devices))
 
         return self.send_to_many(db, devices, payload)
