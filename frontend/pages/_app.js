@@ -43,10 +43,13 @@ useEffect(() => {
         console.warn("[Push] Ignorado (terreiro diferente)");
         return;
       }
-      // 👉 Só navegação, NÃO cria notificação
-      if (confirm(`${data.title}\n${data.body}\n\nAbrir?`)) {
-        router.push(data.url || "/giras");
-      }
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(data.title, {
+          body: data.body,
+          icon: data.icon || '/icons/icon-192.png',
+          data
+        });
+      });
     });
   }
 
