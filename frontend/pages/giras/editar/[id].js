@@ -154,6 +154,22 @@ function normalize(data) {
     responsavel_lista_id: data.responsavel_lista_id || null,
   };
 }
+
+function mappedGira(g) {
+  return {
+    titulo:               g.titulo || '',
+    tipo:                 g.tipo || '',
+    acesso:               g.acesso || 'publica',
+    data:                 g.data || '',
+    horario:              g.horario ? g.horario.slice(0, 5) : '',
+    limite_consulentes:   g.limite_consulentes || 20,
+    limite_membros:       g.limite_membros || null,
+    abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
+    fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
+    responsavel_lista_id: g.responsavel_lista_id || '',
+    status:               g.status || 'aberta',
+  };
+}
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function EditarGira() {
   const router = useRouter();
@@ -171,7 +187,7 @@ export default function EditarGira() {
     aberto: false, titulo: '', mensagem: '', onConfirmar: null,
   });
 
-  useEffect(() => {
+  useEffect(async () => {
     if (!id) return;
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
@@ -179,16 +195,36 @@ export default function EditarGira() {
     // Carrega gira e membros em paralelo — sem verificar role aqui.
     // Se o usuário não tiver permissão para editar, o backend retornará 403
     // quando o formulário for submetido, e o handleApiError exibirá a mensagem.
-    Promise.all([getGira(id), listMembros()])
-      .then(([giraRes, membrosRes]) => {
-        const g = giraRes.data;
-        setGiraTitulo(g.titulo || '');
-        setForm(mappedGira(g));
-        setInitialForm(mappedGira(g));
-        setMembros(membrosRes.data);
-      })
-      .catch(() => router.push('/giras'))
-      .finally(() => setLoading(false));
+    // Promise.all()
+    //   .then(([giraRes, membrosRes]) => {
+    //     const g = giraRes.data;
+    //     setGiraTitulo(g.titulo || '');
+    //     setForm(mappedGira(g));
+    //     setInitialForm(mappedGira(g));
+    //     setMembros(membrosRes.data);
+    //   })
+    //   // .catch(() => router.push('/giras'))
+    //   .catch((err) => {
+    //     console.error('Erro ao carregar gira:', err);
+
+    //     setError('Erro ao carregar dados da gira');
+    //   })
+    //   .finally(() => setLoading(false));
+    try {
+      const giraRes = await getGira(id);
+      const membrosRes = await listMembros();
+
+      const g = giraRes.data;
+
+      setGiraTitulo(g.titulo || '');
+      setForm(mappedGira(g));
+      setInitialForm(mappedGira(g));
+      setMembros(membrosRes.data);
+
+    } catch (err) {
+      console.error(err);
+      setError('Erro ao carregar dados');
+    }
   }, [id]);
 
   const fecharModal = () => setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
