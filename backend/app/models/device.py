@@ -12,8 +12,8 @@ class Device(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    user_id = Column(UUID, ForeignKey("usuarios.id"), nullable=False)
-    terreiro_id = Column(UUID, ForeignKey("terreiros.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    terreiro_id = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
 
     token = Column(Text, nullable=False, unique=True)
 
