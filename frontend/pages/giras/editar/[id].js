@@ -116,15 +116,6 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
 
 function buildDiff(initial, current) {
   const diff = {};
-    if (Object.keys(payload).length === 0) {
-      setModal({
-        aberto: true,
-        titulo: 'Nada para salvar',
-        mensagem: 'Você não alterou nenhum campo.',
-        onConfirmar: fecharModal,
-      });
-      return;
-    }
     Object.keys(current).forEach((key) => {
       const valorAtual = current[key];
       const valorInicial = initial[key];
@@ -139,6 +130,29 @@ function buildDiff(initial, current) {
   });
 
   return diff;
+}
+
+function normalize(data) {
+  return {
+    ...data,
+    horario: data.horario
+      ? data.horario.length === 5
+        ? data.horario + ':00'
+        : data.horario
+      : null,
+
+    limite_consulentes: data.limite_consulentes !== null && data.limite_consulentes !== undefined
+      ? parseInt(data.limite_consulentes)
+      : null,
+
+    limite_membros: data.limite_membros !== null && data.limite_membros !== undefined
+      ? parseInt(data.limite_membros)
+      : null,
+
+    abertura_lista: data.abertura_lista || null,
+    fechamento_lista: data.fechamento_lista || null,
+    responsavel_lista_id: data.responsavel_lista_id || null,
+  };
 }
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function EditarGira() {
@@ -207,21 +221,21 @@ export default function EditarGira() {
             responsavel_lista_id: form.acesso !== 'fechada' ? form.responsavel_lista_id || null : null,
           };
 
-          const payload = buildDiff(initialForm, raw);
+          const initialNormalized = normalize(initialForm);
+          const currentNormalized = normalize(raw);
 
-          if (form.acesso === 'fechada') {
-            payload.limite_membros       = parseInt(form.limite_membros);
-            payload.abertura_lista       = null;
-            payload.fechamento_lista     = null;
-            payload.responsavel_lista_id = null;
-            payload.limite_consulentes   = null;
-          } else {
-            payload.limite_consulentes   = parseInt(form.limite_consulentes);
-            payload.limite_membros       = null;
-            payload.abertura_lista       = form.abertura_lista || null;
-            payload.fechamento_lista     = form.fechamento_lista || null;
-            payload.responsavel_lista_id = form.responsavel_lista_id || null;
-          }
+          const payload = buildDiff(initialNormalized, currentNormalized);
+
+          if (Object.keys(payload).length === 0) {
+              setModal({
+                aberto: true,
+                titulo: 'Nada para salvar',
+                mensagem: 'Você não alterou nenhum campo.',
+                onConfirmar: fecharModal,
+              });
+              setSaving(false);
+              return;
+            }
 
           const res = await updateGira(id, payload);
           const resultado = res.data;
