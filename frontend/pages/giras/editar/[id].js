@@ -215,10 +215,10 @@ export default function EditarGira() {
       const membrosRes = await listMembros();
 
       const g = giraRes.data;
-
+      const mapped = mappedGira(g);
       setGiraTitulo(g.titulo || '');
-      setForm(mappedGira(g));
-      setInitialForm(mappedGira(g));
+      setForm(mapped);
+      setInitialForm(mapped);
       setMembros(membrosRes.data);
 
     } catch (err) {
