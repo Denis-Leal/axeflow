@@ -187,45 +187,37 @@ export default function EditarGira() {
     aberto: false, titulo: '', mensagem: '', onConfirmar: null,
   });
 
-  useEffect(async () => {
-    if (!id) return;
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
+useEffect(() => {
+  if (!id) return;
 
-    // Carrega gira e membros em paralelo — sem verificar role aqui.
-    // Se o usuário não tiver permissão para editar, o backend retornará 403
-    // quando o formulário for submetido, e o handleApiError exibirá a mensagem.
-    // Promise.all()
-    //   .then(([giraRes, membrosRes]) => {
-    //     const g = giraRes.data;
-    //     setGiraTitulo(g.titulo || '');
-    //     setForm(mappedGira(g));
-    //     setInitialForm(mappedGira(g));
-    //     setMembros(membrosRes.data);
-    //   })
-    //   // .catch(() => router.push('/giras'))
-    //   .catch((err) => {
-    //     console.error('Erro ao carregar gira:', err);
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/login');
+    return;
+  }
 
-    //     setError('Erro ao carregar dados da gira');
-    //   })
-    //   .finally(() => setLoading(false));
+  const fetchData = async () => {
     try {
       const giraRes = await getGira(id);
       const membrosRes = await listMembros();
 
       const g = giraRes.data;
       const mapped = mappedGira(g);
+
       setGiraTitulo(g.titulo || '');
       setForm(mapped);
       setInitialForm(mapped);
       setMembros(membrosRes.data);
-
     } catch (err) {
       console.error(err);
       setError('Erro ao carregar dados');
+    } finally {
+      setLoading(false); // ← ISSO ESTÁ FALTANDO
     }
-  }, [id]);
+  };
+
+  fetchData();
+}, [id]);
 
   const fecharModal = () => setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
 
