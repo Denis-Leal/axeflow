@@ -10,6 +10,8 @@ import { getMessaging, getToken, isSupported } from "firebase/messaging";
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   };
 
+console.log("FIREBASE CONFIG:", firebaseConfig);
+
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 let messaging = null;
