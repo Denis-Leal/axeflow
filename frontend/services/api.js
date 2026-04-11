@@ -69,7 +69,7 @@ export const getMe    = ()             => api.get('/auth/me');
 export const listGiras   = ()           => api.get('/giras');
 export const createGira  = (data)       => api.post('/giras', data);
 export const getGira     = (id)         => api.get(`/giras/${id}`);
-export const updateGira  = (id, data)   => api.put(`/giras/${id}`, data);
+export const updateGira  = (id, data)   => api.patch(`/giras/${id}`, data);
 export const deleteGira  = (id)         => api.delete(`/giras/${id}`);
 
 // ── Inscrições ────────────────────────────────────────
