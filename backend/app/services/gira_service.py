@@ -92,6 +92,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
 
     payload = {
         "title": "✦ Nova Gira Criada",
+        "terreiro_id": str(gira.terreiro_id),
         "body": f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
         "url": f"/giras/{gira.id}",
     }
@@ -129,8 +130,11 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    campos_alterados = data.model_dump(exclude_unset=True)
-
+    dados = data.model_dump(exclude_unset=True)
+    campos_alterados = {k: v for k, v in dados.items() if getattr(gira, k) != v}
+    if not campos_alterados:
+        return GiraUpdateResponse(**_enrich(gira, db).model_dump(), promovidos_fila=[])     
+    
     limite_anterior = gira.limite_consulentes or 0
     novo_limite     = campos_alterados.get("limite_consulentes", limite_anterior)
     vagas_abertas   = max(0, (novo_limite or 0) - limite_anterior)

@@ -60,7 +60,7 @@ def create_gira(
     return result
 
 
-@router.put("/{gira_id}", response_model=GiraUpdateResponse)
+@router.patch("/{gira_id}", response_model=GiraUpdateResponse)
 def update_gira(
     gira_id: UUID,
     data: GiraUpdate,

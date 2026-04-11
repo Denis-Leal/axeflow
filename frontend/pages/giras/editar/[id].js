@@ -114,12 +114,39 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
   );
 }
 
+function buildDiff(initial, current) {
+  const diff = {};
+    if (Object.keys(payload).length === 0) {
+      setModal({
+        aberto: true,
+        titulo: 'Nada para salvar',
+        mensagem: 'Você não alterou nenhum campo.',
+        onConfirmar: fecharModal,
+      });
+      return;
+    }
+    Object.keys(current).forEach((key) => {
+      const valorAtual = current[key];
+      const valorInicial = initial[key];
+
+      // normaliza null/empty/string
+      const normalizadoAtual = valorAtual ?? null;
+      const normalizadoInicial = valorInicial ?? null;
+
+      if (normalizadoAtual !== normalizadoInicial) {
+        diff[key] = valorAtual;
+      }
+  });
+
+  return diff;
+}
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function EditarGira() {
   const router = useRouter();
   const { id } = router.query;
 
   const [form, setForm]             = useState(null);
+  const [initialForm, setInitialForm] = useState(null);
   const [membros, setMembros]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
@@ -142,19 +169,8 @@ export default function EditarGira() {
       .then(([giraRes, membrosRes]) => {
         const g = giraRes.data;
         setGiraTitulo(g.titulo || '');
-        setForm({
-          titulo:               g.titulo || '',
-          tipo:                 g.tipo || '',
-          acesso:               g.acesso || 'publica',
-          data:                 g.data || '',
-          horario:              g.horario ? g.horario.slice(0, 5) : '',
-          limite_consulentes:   g.limite_consulentes || 20,
-          limite_membros:       g.limite_membros || null,
-          abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
-          fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
-          responsavel_lista_id: g.responsavel_lista_id || '',
-          status:               g.status || 'aberta',
-        });
+        setForm(mappedGira(g));
+        setInitialForm(mappedGira(g));
         setMembros(membrosRes.data);
       })
       .catch(() => router.push('/giras'))
@@ -177,14 +193,21 @@ export default function EditarGira() {
       onConfirmar: async () => {
         fecharModal();
         try {
-          const payload = {
+          const raw = {
             titulo:  form.titulo,
             tipo:    form.tipo,
             acesso:  form.acesso,
             data:    form.data,
             horario: form.horario.length === 5 ? form.horario + ':00' : form.horario,
             status:  form.status,
+            limite_consulentes: form.acesso !== 'fechada' ? parseInt(form.limite_consulentes) : null,
+            limite_membros: form.acesso === 'fechada' ? parseInt(form.limite_membros) : null,
+            abertura_lista: form.acesso !== 'fechada' ? form.abertura_lista || null : null,
+            fechamento_lista: form.acesso !== 'fechada' ? form.fechamento_lista || null : null,
+            responsavel_lista_id: form.acesso !== 'fechada' ? form.responsavel_lista_id || null : null,
           };
+
+          const payload = buildDiff(initialForm, raw);
 
           if (form.acesso === 'fechada') {
             payload.limite_membros       = parseInt(form.limite_membros);
