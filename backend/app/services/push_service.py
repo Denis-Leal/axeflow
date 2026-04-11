@@ -33,8 +33,8 @@ from app.repositories.device_repository import DeviceRepository
 
 
 provider = get_push_provider()
-DeviceRepo = DeviceRepository()
-push_service = PushService(DeviceRepo)
+def get_push_service():
+    return PushService(DeviceRepository())
 
 logger = logging.getLogger(__name__)
 
