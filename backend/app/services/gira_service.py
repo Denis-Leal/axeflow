@@ -262,6 +262,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
             "title": "🎉 Vagas Abertas — Fila Promovida",
             "body": f"{len(promovidos)} pessoa(s) promovida(s) da espera: {nomes}",
             "url": f"/giras/{gira.id}",
+            "terreiro_id": str(gira.terreiro_id),
         }
         send_push_to_terreiro(
             db=db,
@@ -294,6 +295,7 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
         "title": "🗑️ Gira Removida",
         "body": f"A gira {titulo} foi removida.",
         "url": f"/giras/{gira.id}",
+        "terreiro_id": str(gira.terreiro_id),
     }
     send_push_to_terreiro(
         db=db,

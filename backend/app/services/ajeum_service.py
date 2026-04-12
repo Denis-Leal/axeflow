@@ -236,11 +236,16 @@ def adicionar_item(
     # Busca o gira_id pelo ajeum para montar a URL de destino correta.
     # Falha silenciosa — o item já foi salvo antes de chegar aqui.
     gira = db.query(Gira).filter(Gira.id == ajeum.gira_id).first()
+    pyaload = {
+        "title": "🛒 Novo item no Ajeum",
+        "body":  f'"{data.descricao.strip()}" foi adicionado à lista — {data.limite} vaga(s) disponível(is).',
+        "url":   f"/giras/{gira.id}" if gira else "/giras",
+        "terreiro_id": str(user.terreiro_id),
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id = user.terreiro_id,
-        title       = "🛒 Novo item no Ajeum",
-        body        = f'"{data.descricao.strip()}" foi adicionado à lista — {data.limite} vaga(s) disponível(is).',
-        url         = f"/giras/{gira.id}" if gira else "/giras",
+        payload=pyaload,
     )
 
     return item
@@ -318,11 +323,17 @@ def criar_ajeum(
     # Falha silenciosa: se o push falhar, a criação já foi confirmada.
     nomes_itens = ", ".join(i.descricao.strip() for i in data.itens[:3])
     sufixo = f" e mais {len(data.itens) - 3}" if len(data.itens) > 3 else ""
+    
+    payload = {
+        "title": f"🛒 Ajeum da Gira: {gira.titulo}",
+        "body": f"Lista criada com {len(data.itens)} item(ns): {nomes_itens}{sufixo}. Confira o que você pode levar!",
+        "url": f"/giras/{gira.id}",
+        "terreiro_id": str(user.terreiro_id),
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id = user.terreiro_id,
-        title       = f"🛒 Ajeum da Gira: {gira.titulo}",
-        body        = f"Lista criada com {len(data.itens)} item(ns): {nomes_itens}{sufixo}. Confira o que você pode levar!",
-        url         = f"/giras/{gira.id}",
+        payload=payload,
     )
 
     return ajeum
@@ -579,11 +590,16 @@ def selecionar_item(
         db.refresh(selecao_existente)
 
         # Push: membro retomou o compromisso com o item
+        payload = {
+            "title": "🛒 Ajeum atualizado",
+            "body":  f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
+            "url":   f"/giras/{gira.id}",
+            "terreiro_id": str(user.terreiro_id),
+        }
         send_push_to_terreiro(
+            db=db,
             terreiro_id = user.terreiro_id,
-            title       = "🛒 Ajeum atualizado",
-            body        = f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
-            url         = f"/giras/{gira.id}",
+            payload=payload,
         )
 
         return selecao_existente
@@ -632,11 +648,16 @@ def selecionar_item(
 
     # Push: membro se comprometeu com o item — notifica o terreiro
     # Disparado após commit bem-sucedido (não no IntegrityError path acima)
+    payload = {
+        "title": "🛒 Ajeum atualizado",
+        "body":  f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
+        "url":   f"/giras/{gira.id}",
+        "terreiro_id": str(user.terreiro_id),
+    }
     send_push_to_terreiro(
+        db=db,
         terreiro_id = user.terreiro_id,
-        title       = "🛒 Ajeum atualizado",
-        body        = f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
-        url         = f"/giras/{gira.id}",
+        payload=payload,
     )
 
     return nova_selecao
