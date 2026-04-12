@@ -645,7 +645,7 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
         </div>
         {vagas_restantes > 0 && (
           <div style={{ fontSize: '0.68rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
-            {vagas_restantes} vaga{vagas_restantes !== 1 ? 's' : ''} disponível{vagas_restantes !== 1 ? 'is' : ''}
+            {vagas_restantes} {vagas_restantes == 1 ? 'item' : 'itens'} disponível{vagas_restantes !== 1 ? 's' : ''}
           </div>
         )}
       </div>

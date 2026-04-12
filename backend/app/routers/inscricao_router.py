@@ -78,7 +78,7 @@ def cancelar_inscricao(
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    result = inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id)
+    result = inscricao_service.cancelar_inscricao(db, inscricao_id, user.terreiro_id, user.id)
 
     audit_service.log(
         db, request,
@@ -99,7 +99,7 @@ def reativar_inscricao(
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    result = inscricao_service.reativar_inscricao(db, inscricao_id, user.terreiro_id)
+    result = inscricao_service.reativar_inscricao(db, inscricao_id, user.terreiro_id, user.id)
 
     audit_service.log(
         db, request,

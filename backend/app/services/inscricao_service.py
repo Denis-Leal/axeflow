@@ -35,6 +35,7 @@ from app.models.inscricao_status import StatusInscricaoEnum as StatusNovo
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
 from app.services.push_service import send_push_to_terreiro
+from app.models.usuario import Usuario
 
 
 def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[InscricaoResponse]:
@@ -324,7 +325,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         observacoes=inscricao_nova.observacoes,
     )
 
-def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> dict:
+def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID = None) -> dict:
     # 1. Busca inscrição (sem lock ainda)
     inscricao = (
         db.query(InscricaoConsulente)
@@ -375,6 +376,26 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     db.refresh(inscricao)
 
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
+    
+    usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    if usuario_id:
+        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if usuario:
+        nome_usuario = usuario.nome
+    else:
+        nome_usuario = "Um usuário"
+    
+    payload = {
+            "title": "🔄 Inscrição Reativada",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"{nome_usuario} reativou a inscrição de {nome} na {gira.titulo} como {novo_status.value}.",
+            "url": f"/giras/{gira.id}",
+        }
+    send_push_to_terreiro(
+        db=db,
+        terreiro_id=gira.terreiro_id,
+        payload=payload,
+    )
 
     return {
         "ok": True,
@@ -431,7 +452,7 @@ def update_presenca(
     return {"ok": True, "status": inscricao.status}
 
 
-def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> dict:
+def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID) -> dict:
     """
     Cancela inscrição e promove automaticamente 1 pessoa da fila de espera
     (apenas quando a inscrição cancelada era confirmada).
@@ -444,6 +465,8 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     Promove da fila usando InscricaoConsulente.
     Mantém sincronismo com legado.
     """
+    
+    
     # Busca na nova tabela
     inscricao = db.query(InscricaoConsulente).filter(
         InscricaoConsulente.id == inscricao_id
@@ -462,6 +485,15 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
     era_confirmado = inscricao.status == StatusNovo.confirmado
 
+    # Buscar o usuário logado para fins de auditoria e notificação
+    # (pode ser útil para logs ou para incluir o nome do usuário na mensagem de
+    usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    if usuario_id:
+        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if usuario:
+        nome_usuario = usuario.nome
+    else:
+        nome_usuario = "Um usuário"
     # Cancela na nova tabela
     inscricao.status = StatusNovo.cancelado
 
@@ -487,7 +519,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID) -> di
             "posicao":  promovido_inscricao.posicao,
         }
 
-    corpo_push = f"{nome} cancelou a inscrição na {gira.titulo}"
+    corpo_push = f"{nome_usuario} cancelou a inscrição do {nome} na {gira.titulo}"
     if resultado["promovido"]:
         corpo_push += f" → {resultado['promovido']['nome']} promovido(a) da fila!"
     payload = {

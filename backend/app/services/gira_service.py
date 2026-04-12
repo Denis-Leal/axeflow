@@ -89,11 +89,15 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     data_fmt     = gira.data.strftime("%d/%m/%Y")
     horario_fmt  = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
-
+    usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    if user:
+        usuario = db.query(Usuario).filter(Usuario.id == user.id).first()
+    if usuario:
+        nome_usuario = usuario.nome
     payload = {
         "title": "✦ Nova Gira Criada",
         "terreiro_id": str(gira.terreiro_id),
-        "body": f"{gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
+        "body": f"{nome_usuario} criou a gira {gira.titulo} ({acesso_label}) — {data_fmt} às {horario_fmt}",
         "url": f"/giras/{gira.id}",
     }
     send_push_to_terreiro(
@@ -117,7 +121,7 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     return _enrich(gira, db, _count_inscritos(db, gira))
 
 
-def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID) -> GiraUpdateResponse:
+def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID, usuario_id: UUID = None) -> GiraUpdateResponse:
     """
     Atualiza campos da gira.
     Promoção em lote ao aumentar vagas — delegada ao inscricao_service com FOR UPDATE.
@@ -161,12 +165,20 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
     db.commit()
     db.refresh(gira)
     
+    usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    if usuario_id:
+        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if usuario:
+        nome_usuario = usuario.nome
+    else:
+        nome_usuario = "Um usuário"
+    
     if "acesso" in campos_alterados:
         acesso_label = "pública" if gira.acesso != "fechada" else "fechada (membros)"
         payload = {
             "title": "🔄 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O acesso da gira {gira.titulo} foi alterado para: {acesso_label}",
+            "body": f"O {nome_usuario} alterou o acesso da gira {gira.titulo} para: {acesso_label}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -179,7 +191,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         payload = {
             "title": "✏️ Gira Editada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O título da gira foi alterado  de: {dados.get('titulo')} para: {gira.titulo}",
+            "body": f"O {nome_usuario} alterou o título da gira de: {dados.get('titulo')} para: {gira.titulo}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -192,7 +204,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         payload = {
             "title": "🔄 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O tipo da gira {gira.titulo} foi alterado de: {dados.get('tipo')} para: {gira.tipo}",
+            "body": f"O {nome_usuario} alterou o tipo da gira {gira.titulo} de: {dados.get('tipo')} para: {gira.tipo}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -203,9 +215,9 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
 
     if "status" in campos_alterados:
         msgs = {
-            "aberta":    ("📋 Gira Aberta",    f"A gira {gira.titulo} foi marcada como aberta!"),
-            "fechada":   ("🔒 Gira Encerrada", f"A gira {gira.titulo} foi marcada como encerrada."),
-            "concluida": ("✅ Gira Concluída",  f"A gira {gira.titulo} foi marcada como concluída."),
+            "aberta":    ("📋 Gira Aberta",    f"O {nome_usuario} marcou a gira {gira.titulo} como aberta!"),
+            "fechada":   ("🔒 Gira Encerrada", f"O {nome_usuario} marcou a gira {gira.titulo} como encerrada."),
+            "concluida": ("✅ Gira Concluída",  f"O {nome_usuario} marcou a gira {gira.titulo} como concluída."),
         }
         if (novo_status := campos_alterados["status"]) in msgs:
             titulo_push, corpo_push = msgs[novo_status]
@@ -229,7 +241,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         payload = {
             "title": "📅 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"A data/horário da gira {gira.titulo} foi alterada para: {data_fmt} às {horario_fmt}",
+            "body": f"O {nome_usuario} alterou a data/horário da gira {gira.titulo} para: {data_fmt} às {horario_fmt}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -245,7 +257,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
         payload = {
             "title": "⏰ Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"As datas da lista de espera da gira {gira.titulo} foram atualizadas: abertura: {abertura_fmt}, fechamento: {fechamento_fmt}",
+            "body": f"O {nome_usuario} atualizou as datas da lista de espera da gira {gira.titulo}: abertura: {abertura_fmt}, fechamento: {fechamento_fmt}",
             "url": f"/giras/{gira.id}",
         }
         
@@ -277,7 +289,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID)
     )
 
 
-def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
+def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID, usuario_id: UUID) -> dict:
     """Soft delete: preenche deleted_at em vez de remover fisicamente."""
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
@@ -291,9 +303,17 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID):
     gira.deleted_at = datetime.utcnow()
     db.commit()
     
+    usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    if usuario_id:
+        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if usuario:
+        nome_usuario = usuario.nome
+    else:
+        nome_usuario = "Um usuário"
+        corpo_push = f"{nome_usuario} removeu a gira {titulo}"
     payload = {
         "title": "🗑️ Gira Removida",
-        "body": f"A gira {titulo} foi removida.",
+        "body": corpo_push,
         "url": f"/giras/{gira.id}",
         "terreiro_id": str(gira.terreiro_id),
     }
