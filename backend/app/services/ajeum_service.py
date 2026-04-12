@@ -685,6 +685,14 @@ def cancelar_selecao(
       400: transição inválida (ex: tentar cancelar 'confirmado')
     """
     selecao = _get_selecao_do_terreiro(db, selecao_id, user.terreiro_id)
+    gira = db.query(Gira).join(Ajeum).join(AjeumItem).filter(
+        AjeumSelecao.id == selecao_id,
+        AjeumItem.id == selecao.item_id,
+        Ajeum.id == AjeumItem.ajeum_id,
+    ).first()
+    
+    ajeum_item = db.query(AjeumItem).filter(AjeumItem.id == selecao.item_id).first()
+
 
     # Verifica que é o próprio membro (não admin cancelando por outro)
     if str(selecao.membro_id) != str(user.id):
@@ -702,11 +710,10 @@ def cancelar_selecao(
 
     db.commit()
     db.refresh(selecao)
-    
     payload = {
         "title": "🛒 Ajeum atualizado",
-        "body": f"{user.nome} cancelou a seleção do item: {selecao.item.descricao}",
-        "url": f"/giras/{selecao.item.gira_id}",
+        "body": f"{user.nome} cancelou a seleção do item: {ajeum_item.descricao} ({ajeum_item.limite - _contar_selecoes_ativas(db, ajeum_item.id)}/{ajeum_item.limite} selecionados).",
+        "url": f"/giras/{gira.id}",
         "terreiro_id": str(user.terreiro_id),
     }
     send_push_to_terreiro(
@@ -714,7 +721,7 @@ def cancelar_selecao(
         terreiro_id = user.terreiro_id,
         payload=payload,
     )
-
+    
     logger.info(
         "[Ajeum] Seleção cancelada: selecao=%s item=%s membro=%s",
         selecao_id, selecao.item_id, user.id,
