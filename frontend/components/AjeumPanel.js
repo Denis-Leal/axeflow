@@ -11,7 +11,7 @@
  *    Após salvar, o painel muda para o modo de gestão.
  *
  *  Admin/Operador — com Ajeum:
- *    Vê os itens com contagem de vagas.
+ *    Vê os itens com contagem de itens.
  *    Pode adicionar itens novos via formulário no final da lista.
  *    Pode editar descrição/limite de cada item inline (lápis na linha).
  *    Pode deletar item (backend rejeita se há seleções ativas — exibe 409).
@@ -25,7 +25,7 @@
  *    Não vê controles de edição.
  *
  * CONCORRÊNCIA:
- *   409 em selecionar → recarrega lista + avisa vaga preenchida
+ *   409 em selecionar → recarrega lista + avisa iten preenchida
  *   409 em confirmar  → recarrega lista + avisa conflito de version
  *   409 em deletar    → exibe mensagem do backend (seleções ativas)
  *   409 em editar     → exibe mensagem do backend (limite < seleções)
@@ -409,7 +409,7 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
 
   const {
     id, descricao, limite,
-    total_selecionado, vagas_restantes, lotado,
+    total_selecionado, itens_restantes, lotado,
     meu_status, minha_selecao_id, minha_version,
   } = item;
 
@@ -634,18 +634,18 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
 
       {/* Barra de progresso */}
       <div style={{ marginTop: '0.5rem' }}>
-        <div className="vagas-bar" style={{ height: '5px' }}>
+        <div className="itens-bar" style={{ height: '5px' }}>
           <div
-            className="vagas-fill"
+            className="itens-fill"
             style={{
               width: `${pct}%`,
               background: lotado ? 'linear-gradient(90deg, #ef4444, #f97316)' : undefined,
             }}
           />
         </div>
-        {vagas_restantes > 0 && (
+        {itens_restantes > 0 && (
           <div style={{ fontSize: '0.68rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
-            {vagas_restantes} vaga{vagas_restantes !== 1 ? 's' : ''} disponível{vagas_restantes !== 1 ? 'is' : ''}
+            {itens_restantes} iten{itens_restantes !== 1 ? 's' : ''} disponível{itens_restantes !== 1 ? 'is' : ''}
           </div>
         )}
       </div>
@@ -748,7 +748,7 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
     } catch (err) {
       if (err.response?.status === 409) {
         await carregar(); // recarrega para mostrar estado atual
-        exibirToast('Esta vaga acabou de ser preenchida por outro membro. A lista foi atualizada.', 'erro');
+        exibirToast('Este item acabou de ser preenchido por outro membro. A lista foi atualizada.', 'erro');
       } else if (err.response?.status === 400) {
         exibirToast(err.response.data.detail || 'Não foi possível selecionar.', 'erro');
       } else {

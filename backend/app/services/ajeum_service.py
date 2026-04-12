@@ -702,6 +702,18 @@ def cancelar_selecao(
 
     db.commit()
     db.refresh(selecao)
+    
+    payload = {
+        "title": "🛒 Ajeum atualizado",
+        "body": f"{user.nome} cancelou a seleção do item: {selecao.item.descricao}",
+        "url": f"/giras/{selecao.item.gira_id}",
+        "terreiro_id": str(user.terreiro_id),
+    }
+    send_push_to_terreiro(
+        db=db,
+        terreiro_id = user.terreiro_id,
+        payload=payload,
+    )
 
     logger.info(
         "[Ajeum] Seleção cancelada: selecao=%s item=%s membro=%s",
