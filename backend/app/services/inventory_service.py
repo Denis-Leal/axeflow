@@ -23,7 +23,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.models.gira import Gira
+from app.models.gira import Gira, StatusGiraEnum
 from app.models.usuario import Usuario
 from app.models.inventory_owner import InventoryOwner, OwnerTypeEnum
 from app.models.inventory_item import InventoryItem, ItemCategoryEnum
@@ -47,6 +47,9 @@ from app.schemas.inventory_schema import (
     GiraFinalizarResponse,
     StockResponse,
 )
+from app.services.push_service import send_push_to_terreiro, send_push_to_user
+from app.models.inscricao import StatusInscricaoEnum
+from app.models.inscricao_membro import InscricaoMembro
 
 logger = logging.getLogger(__name__)
 
@@ -398,7 +401,12 @@ def registrar_movimentacao(
 # ══════════════════════════════════════════════════════════════════════════════
 # CONSUMO POR GIRA
 # ══════════════════════════════════════════════════════════════════════════════
-
+def is_medium_apto_para_consumo(inscricao: InscricaoMembro) -> bool:
+    return inscricao.status in [
+        StatusInscricaoEnum.confirmado,
+        StatusInscricaoEnum.compareceu,
+    ]
+    
 def registrar_consumo(
     db: Session,
     gira_id: UUID,
@@ -416,7 +424,20 @@ def registrar_consumo(
     - Gira não está finalizada
     - Item existe e pertence ao terreiro
     - Source é consistente com o owner do item
+    - Membro só pode registrar consumo se tiver confirmado presença na gira
     """
+    # Valida inscrição do membro na gira
+    inscricao = db.query(InscricaoMembro).filter(
+        InscricaoMembro.gira_id == gira_id,
+        InscricaoMembro.membro_id == user.id
+    ).first()
+    
+    if not inscricao:
+        raise HTTPException(status_code=403, detail="Você não está inscrito nesta gira.")
+
+    if not is_medium_apto_para_consumo(inscricao):
+        raise HTTPException(status_code=403, detail="Você precisa confirmar presença para registrar consumo.")
+
     # Valida gira
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
@@ -628,14 +649,11 @@ def finalizar_gira(
     from app.models.inscricao_status import StatusInscricaoEnum
 
     mediums_participantes = {
-        str(i.membro_id)
-        for i in db.query(InscricaoMembro).filter(
-            InscricaoMembro.gira_id == gira_id,
-            InscricaoMembro.status.in_([
-                StatusInscricaoEnum.confirmado,
-                StatusInscricaoEnum.compareceu,
-            ]),
+        str(im.membro_id)
+        for im in db.query(InscricaoMembro).filter(
+            InscricaoMembro.gira_id == gira_id
         ).all()
+        if is_medium_apto_para_consumo(im)  # considera apenas membros aptos a consumir
     }
 
     # IDs dos médiuns que registraram ao menos 1 consumo
@@ -664,6 +682,20 @@ def finalizar_gira(
             )
             db.add(notif)
             notificacoes_criadas += 1
+            
+        payload = {
+            "title": "Consumo não registrado",
+            "body": (
+                f"Você participou da gira '{gira.titulo}' mas não registrou consumo de itens. "
+                "Por favor, registre seu consumo para ajudar no controle do estoque do terreiro."
+            ),
+            "url": f"/giras/{gira_id}/consumo",  # link para a tela de consumo da gira
+        }
+        send_push_to_user(
+            db=db, 
+            user_id=medium_id,
+            payload=payload,
+        )
 
         # Busca nome para o response (informativo)
         from app.models.usuario import Usuario as UsuarioModel
@@ -673,6 +705,23 @@ def finalizar_gira(
 
     # Marca gira como processada
     gira.estoque_processado = True
+    gira.status = StatusGiraEnum.concluida
+    
+    payload = {
+        "title": "Gira finalizada",
+        "terreiro_id": str(gira.terreiro_id),
+        "body": (
+            f"A gira '{gira.titulo}' foi finalizada com {movimentacoes_criadas} consumos processados. "
+            f"{notificacoes_criadas} notificações criadas para médiuns sem consumo."
+        ),
+        "url": f"/giras/{gira_id}/consumo",  # link para a tela de consumo da gira
+    }
+
+    send_push_to_terreiro(
+        db=db, 
+        terreiro_id=gira.terreiro_id,
+        payload=payload,
+    )
 
     db.commit()
 

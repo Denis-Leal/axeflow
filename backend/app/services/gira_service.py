@@ -7,7 +7,7 @@ e InscricaoConsulente para giras públicas, em vez de InscricaoGira para ambas.
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from app.models.gira import Gira
+from app.models.gira import Gira, StatusGiraEnum
 from app.models.usuario import Usuario
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_membro import InscricaoMembro
@@ -15,7 +15,10 @@ from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse, GiraUp
 from app.utils.slug import generate_gira_slug
 from app.services.push_service import send_push_to_terreiro
 from app.services.inscricao_service import promover_fila_em_lote
+from app.services.inventory_service import finalizar_gira
 from datetime import datetime
+
+from app.models.gira_item_consumption import GiraItemConsumption
 
 
 def _count_inscritos(db: Session, gira: Gira) -> int:
@@ -108,6 +111,15 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
 
     return _enrich(gira, db, 0)
 
+def get_gira_consumo(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
+    """Busca gira por ID, incluindo dados para tela de consumo operacional."""
+    gira = db.query(GiraItemConsumption).filter(
+        GiraItemConsumption.gira_id == gira_id,
+        GiraItemConsumption.terreiro_id == terreiro_id,
+    ).all()
+    if not gira:
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+    return [GiraResponse.model_validate(g) for g in gira]
 
 def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     """Busca gira por ID. Retorna 404 para giras soft-deletadas."""
@@ -209,7 +221,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         }
         send_push_to_terreiro(
             db=db,
-            terreiro_id=gira.terreiro_id,
+            terreiro_id=gira.terreiro_id,   
             payload=payload,
         )
 
@@ -218,9 +230,15 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
             "aberta":    ("📋 Gira Aberta",    f"O {nome_usuario} marcou a gira {gira.titulo} como aberta!"),
             "fechada":   ("🔒 Gira Encerrada", f"O {nome_usuario} marcou a gira {gira.titulo} como encerrada."),
             "concluida": ("✅ Gira Concluída",  f"O {nome_usuario} marcou a gira {gira.titulo} como concluída."),
-        }
+        }        
+            
         if (novo_status := campos_alterados["status"]) in msgs:
             titulo_push, corpo_push = msgs[novo_status]
+            
+            if novo_status == StatusGiraEnum.concluida:
+                titulo_push = "🎉 Gira Concluída"
+                corpo_push = f"O {nome_usuario} concluiu a gira {gira.titulo}! Parabéns a todos os participantes!"
+                finalizar_gira(db, gira.id, usuario)  # Processa estoque e marca como finalizada (idempotente)
             
             payload = {
                 "title": f"{titulo_push} — {gira.titulo}",
@@ -308,6 +326,7 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID, usuario_id: UUID)
         usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if usuario:
         nome_usuario = usuario.nome
+        corpo_push = f"{nome_usuario} removeu a gira {titulo}"
     else:
         nome_usuario = "Um usuário"
         corpo_push = f"{nome_usuario} removeu a gira {titulo}"

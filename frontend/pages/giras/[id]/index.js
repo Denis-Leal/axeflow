@@ -22,13 +22,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import Sidebar from '../../components/Sidebar';
-import BottomNav from '../../components/BottomNav';
-import ConfirmModal from '../../components/ConfirmModal';
-import AjeumPanel from '../../components/AjeumPanel';
-import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao, getMe } from '../../services/api';
-import api from '../../services/api';
-import { handleApiError } from '../../services/errorHandler';
+import Sidebar from '../../../components/Sidebar';
+import BottomNav from '../../../components/BottomNav';
+import ConfirmModal from '../../../components/ConfirmModal';
+import AjeumPanel from '../../../components/AjeumPanel';
+import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao, getMe } from '../../../services/api';
+import api from '../../../services/api';
+import { handleApiError } from '../../../services/errorHandler';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
 const COR_SCORE = {

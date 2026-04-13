@@ -7,13 +7,13 @@
  *   - Listar itens com saldo atual
  *   - Exibir alertas de estoque baixo
  *   - Permitir ver histórico de movimentações
- *   - Link para /estoque (gerenciamento) e /gira/[id]/consumo (operação)
+ *   - Link para /estoque (gerenciamento) e /giras/[id]/consumo (operação)
  *
  * O que foi REMOVIDO daqui:
  *   - Criação de itens → movido para /estoque
  *   - Movimentações manuais → movido para /estoque
- *   - Registro de consumo → movido para /gira/[id]/consumo
- *   - Finalização de gira → movido para /gira/[id]/consumo
+ *   - Registro de consumo → movido para /giras/[id]/consumo
+ *   - Finalização de gira → movido para /giras/[id]/consumo
  *
  * Motivo: separação de responsabilidades e redução de sobrecarga cognitiva
  * para usuários não-técnicos (médiuns do terreiro).
@@ -282,7 +282,7 @@ export default function InventarioDashboard() {
               </Link>
               {giraAtual && giraAtual.status !== 'concluida' && (
                 <Link
-                  href={`/gira/${giraAtual.id}/consumo`}
+                  href={`/giras/${giraAtual.id}/consumo`}
                   className="btn-gold"
                   style={{ fontSize: '0.85rem', textDecoration: 'none' }}
                 >
@@ -389,7 +389,7 @@ export default function InventarioDashboard() {
                   </div>
                 </div>
                 <Link
-                  href={`/gira/${giraAtual.id}/consumo`}
+                  href={`/giras/${giraAtual.id}/consumo`}
                   className="btn-gold"
                   style={{ textDecoration: 'none', fontSize: '0.82rem', padding: '0.4rem 1rem' }}
                 >

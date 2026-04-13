@@ -20,32 +20,30 @@ import { useRouter } from 'next/router';
 import { GiraProvider } from '../contexts/GiraContext';
 import Head from 'next/head';
 import { getFirebaseMessaging } from "../services/firebase";
-import { onMessage } from "firebase/messaging";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
   const swListenerRegistered = useRef(false);
-
 useEffect(() => {
-  const channel = new BroadcastChannel('push_channel');
   async function setupFCM() {
+    if (typeof window === "undefined") return;
+
     const messaging = await getFirebaseMessaging();
     if (!messaging) return;
 
+    const { onMessage } = await import("firebase/messaging");
+
     onMessage(messaging, (payload) => {
       console.log("[Push] Recebida em foreground:", payload.data);
+
       const data = payload.data || {};
-      
       const userTerreiroId = localStorage.getItem("terreiro_id");
 
-      // 🔒 mesma regra multi-tenant do SW
       if (data.terreiro_id && data.terreiro_id !== userTerreiroId) {
-        console.warn("[Push] Ignorado (terreiro diferente)");
         return;
       }
 
-      // 🔐 garante permissão
       if (Notification.permission === "granted") {
         navigator.serviceWorker.ready.then(reg => {
           reg.showNotification(data.title, {
@@ -55,12 +53,12 @@ useEffect(() => {
           });
         });
       }
-
     });
   }
 
   setupFCM();
 }, []);
+
 useEffect(() => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker
