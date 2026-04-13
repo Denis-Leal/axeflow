@@ -23,16 +23,16 @@ export function getErrorMessage(error) {
     // Mensagens específicas por código HTTP
     switch (status) {
       case 400: return detail || 'Dados inválidos. Verifique as informações e tente novamente.';
-      case 401: return 'Sessão expirada. Faça login novamente.';
-      case 403: return 'Você não tem permissão para realizar esta ação.';
+      case 401: return detail ||'Sessão expirada. Faça login novamente.';
+      case 403: return detail ||'Você não tem permissão para realizar esta ação.';
       case 404: return detail || 'Recurso não encontrado.';
       case 409: return detail || 'Conflito: o recurso já existe.';
-      case 422: return 'Dados inválidos. Verifique os campos obrigatórios.';
-      case 429: return 'Muitas tentativas. Aguarde um momento e tente novamente.';
-      case 500: return 'Erro interno do servidor. Tente novamente em instantes.';
+      case 422: return detail || 'Dados inválidos. Verifique os campos obrigatórios.';
+      case 429: return detail || 'Muitas tentativas. Aguarde um momento e tente novamente.';
+      case 500: return detail || 'Erro interno do servidor. Tente novamente em instantes.';
       case 502:
       case 503:
-      case 504: return 'Servidor temporariamente indisponível. Tente novamente em alguns segundos.';
+      case 504: return detail || 'Servidor temporariamente indisponível. Tente novamente em alguns segundos.';
       default:  return detail || `Erro inesperado (código ${status}).`;
     }
   }

@@ -38,6 +38,14 @@ def get_gira(
 ):
     return gira_service.get_gira(db, gira_id, user.terreiro_id)
 
+@router.get("/{gira_id}/consumo", response_model=GiraResponse)
+def get_gira_consumo(
+    gira_id: UUID,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return gira_service.get_gira_consumo(db, gira_id, user.terreiro_id)
+
 
 @router.post("", response_model=GiraResponse)
 def create_gira(

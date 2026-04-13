@@ -58,3 +58,11 @@ class PushService:
         print("DEBUG devices:", len(devices))
 
         return self.send_to_many(db, devices, payload)
+    
+    def send_to_user(self, db, user_id, payload):
+
+        devices = self.repo.get_active_by_user(db, user_id)
+
+        print("DEBUG devices:", len(devices))
+
+        return self.send_to_many(db, devices, payload)
