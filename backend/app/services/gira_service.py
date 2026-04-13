@@ -239,6 +239,9 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
                 titulo_push = "🎉 Gira Concluída"
                 corpo_push = f"O {nome_usuario} concluiu a gira {gira.titulo}! Parabéns a todos os participantes!"
                 finalizar_gira(db, gira.id, usuario)  # Processa estoque e marca como finalizada (idempotente)
+                
+            if novo_status == StatusGiraEnum.aberta or novo_status == StatusGiraEnum.fechada:
+                gira.estoque_processado = False  # Permite reprocessar estoque se a gira for reaberta
             
             payload = {
                 "title": f"{titulo_push} — {gira.titulo}",
