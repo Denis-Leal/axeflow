@@ -2,9 +2,8 @@
 // BottomNav.js — AxeFlow
 // Barra de navegação inferior (mobile).
 //
-// ALTERAÇÃO: adicionados links /contato e /sobre
-//   na gaveta "Mais", junto com Membros e Configurações.
-//   Mantém o comportamento de fechar a gaveta ao clicar.
+// ALTERAÇÃO: adicionado link /inventario (Estoque) na gaveta "Mais",
+//   entre Membros e Configurações, para acesso rápido pelo celular.
 // =====================================================
 
 import { useState } from 'react';
@@ -12,7 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 // Páginas que ativam o botão "Mais" quando acessadas
-const PAGINAS_MAIS = ['/membros', '/configuracoes', '/contato', '/sobre', '/api-docs'];
+const PAGINAS_MAIS = ['/membros', '/configuracoes', '/contato', '/sobre', '/api-docs', '/inventario', '/estoque'];
 
 export default function BottomNav() {
   const router = useRouter();
@@ -20,11 +19,13 @@ export default function BottomNav() {
   const [maisAberto, setMaisAberto] = useState(false);
 
   // Verifica se a página atual pertence ao grupo "Mais"
-  const maisAtivo = PAGINAS_MAIS.includes(p);
+  const maisAtivo = PAGINAS_MAIS.some(pg => p.startsWith(pg));
 
   // Itens da gaveta "Mais" — centralizados para facilitar manutenção
   const itensMais = [
     { href: '/membros',       icon: 'bi-person-badge', label: 'Membros' },
+    // Link de estoque adicionado aqui
+    { href: '/inventario',    icon: 'bi-box-seam',     label: 'Estoque' },
     { href: '/configuracoes', icon: 'bi-gear',         label: 'Configurações' },
     { href: '/api-docs',      icon: 'bi-code-slash',   label: 'API & Integrações' },
     { href: '/contato',       icon: 'bi-chat-dots',    label: 'Contato' },

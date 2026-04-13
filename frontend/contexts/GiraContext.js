@@ -7,8 +7,12 @@
  * Persiste no localStorage sob a chave 'gira_ativa' para sobreviver
  * a recarregamentos de página.
  *
+ * ALTERAÇÃO: exposto também `atualizarStatusGira` para que a tela de
+ * consumo possa marcar a gira como 'concluida' localmente sem precisar
+ * recarregar dados do servidor — evita inconsistência de UI pós-finalização.
+ *
  * Uso em qualquer componente:
- *   const { giraAtual, setGiraAtual, limparGiraAtual } = useGiraAtual();
+ *   const { giraAtual, setGiraAtual, atualizarStatusGira, limparGiraAtual } = useGiraAtual();
  *
  * Estrutura de giraAtual:
  *   {
@@ -57,11 +61,23 @@ export function GiraProvider({ children }) {
     }
   };
 
+  /**
+   * Atualiza apenas o status da gira ativa sem substituir o objeto inteiro.
+   * Útil para marcar como 'concluida' após finalizar sem precisar recarregar.
+   *
+   * @param {string} novoStatus - 'aberta' | 'fechada' | 'concluida'
+   */
+  const atualizarStatusGira = (novoStatus) => {
+    if (!giraAtual) return;
+    const giraAtualizada = { ...giraAtual, status: novoStatus };
+    setGiraAtual(giraAtualizada);
+  };
+
   // Limpa a gira ativa (ex: logout, ou ao sair voluntariamente)
   const limparGiraAtual = () => setGiraAtual(null);
 
   return (
-    <GiraContext.Provider value={{ giraAtual, setGiraAtual, limparGiraAtual }}>
+    <GiraContext.Provider value={{ giraAtual, setGiraAtual, atualizarStatusGira, limparGiraAtual }}>
       {children}
     </GiraContext.Provider>
   );
