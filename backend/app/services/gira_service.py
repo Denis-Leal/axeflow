@@ -18,7 +18,7 @@ from app.services.inscricao_service import promover_fila_em_lote
 from app.services.inventory_service import finalizar_gira
 from datetime import datetime
 
-from app.models.gira_item_consumption import GiraItemConsumption
+from app.models.gira_item_consumption import ConsumptionStatusEnum, GiraItemConsumption
 
 
 def _count_inscritos(db: Session, gira: Gira) -> int:
@@ -242,6 +242,11 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
                 
             if novo_status == StatusGiraEnum.aberta or novo_status == StatusGiraEnum.fechada:
                 gira.estoque_processado = False  # Permite reprocessar estoque se a gira for reaberta
+                if not gira.estoque_processado:
+                    itens_consumidos_gira = db.query(GiraItemConsumption).filter(GiraItemConsumption.gira_id == gira.id).all()
+                    for item in itens_consumidos_gira:
+                        item.status = ConsumptionStatusEnum.PENDENTE
+                    db.commit()
             
             payload = {
                 "title": f"{titulo_push} — {gira.titulo}",

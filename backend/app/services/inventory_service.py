@@ -549,12 +549,22 @@ def editar_consumo(
 
     # Apenas o próprio médium pode editar (admin pode via endpoint separado)
     if str(consumo.medium_id) != str(user.id) and user.role not in ("admin", "operador"):
-        raise HTTPException(status_code=403, detail="Acesso negado")
+        raise HTTPException(status_code=403, detail="Você só pode editar seus próprios consumos.")
 
     if consumo.status != ConsumptionStatusEnum.PENDENTE:
         raise HTTPException(
             status_code=400,
             detail=f"Consumo com status '{consumo.status}' não pode ser editado.",
+        )
+        
+    # antes de editar, verificar se a quantidade disponível no estoque é suficiente para a nova quantidade, caso contrário, retornar erro 400 com mensagem informando a quantidade disponível
+    saldo = _calcular_saldo(db, consumo.inventory_item_id)
+    print(f"Saldo atual do item {consumo.inventory_item_id}: {saldo}")
+    print(f"Quantidade solicitada para edição: {data.quantity}")
+    if saldo < data.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quantidade solicitada ({data.quantity}) excede o estoque disponível ({saldo})."
         )
 
     consumo.quantity = data.quantity

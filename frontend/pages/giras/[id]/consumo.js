@@ -34,6 +34,7 @@ import { handleApiError } from '../../../services/errorHandler';
 import { useGiraAtual } from '../../../contexts/GiraContext';
 import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ function BannerStatusGira({ gira }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SEÇÃO: Registrar consumo
 // ══════════════════════════════════════════════════════════════════════════════
-function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado }) {
+function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, setModal, fecharModal }) {
   const [form, setForm] = useState({
     item_id: '',
     source: 'TERREIRO',
@@ -123,7 +124,15 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado }
 
       setTimeout(() => setSucesso(''), 5000);
     } catch (err) {
-      setErro(handleApiError(err, 'Registrar consumo'));
+      const msg = handleApiError(err, 'Registrar consumo');
+      setModal({
+        aberto: true,
+        titulo: 'Erro ao registrar consumo',
+        mensagem: msg,
+        tipoBotao: 'primary',
+        onConfirmar: () => fecharModal(),
+      });
+
     } finally {
       setLoading(false);
     }
@@ -234,13 +243,20 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado }
   );
 }
 
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SEÇÃO: Lista de consumos da gira
 // ══════════════════════════════════════════════════════════════════════════════
-function ListaConsumos({ giraId, refreshTrigger }) {
+function ListaConsumos({ giraId, refreshTrigger, setModal, fecharModal }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editingQuantity, setEditingQuantity] = useState('');
+  const [savingId, setSavingId] = useState(null);
+  const [erro, setErro] = useState('');
+
   const [consumos, setConsumos] = useState([]);
   const [loading, setLoading]   = useState(false);
 
+  
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
@@ -286,17 +302,37 @@ function ListaConsumos({ giraId, refreshTrigger }) {
                 <th style={{ textAlign: 'center' }}>Quantidade</th>
                 <th>Origem</th>
                 <th>Situação</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {consumos.map(c => {
                 const origem = LABEL_ORIGEM[c.source] || {};
                 const status = LABEL_STATUS[c.status] || {};
+                const consumoId = typeof c.id === 'object' ? c.id.id : c.id;
                 return (
-                  <tr key={c.id}>
+                  <tr key={consumoId}>
                     <td style={{ fontWeight: 600 }}>{c.medium_nome || '—'}</td>
                     <td>{c.item_name || '—'}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{c.quantity}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                      {editingId === consumoId ? (
+                        <input
+                          type="number"
+                          min="1"
+                          value={editingQuantity}
+                          onChange={e => setEditingQuantity(e.target.value)}
+                          className="form-control-custom"
+                          style={{
+                            width: '80px',
+                            textAlign: 'center',
+                            padding: '0.2rem 0.4rem',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      ) : (
+                        c.quantity
+                      )}
+                    </td>
                     <td>
                       <span style={{ fontSize: '0.78rem', color: origem.cor }}>
                         {origem.emoji} {origem.label}
@@ -310,6 +346,70 @@ function ListaConsumos({ giraId, refreshTrigger }) {
                       }}>
                         {status.label}
                       </span>
+                    </td>
+                    <td style={{ display: 'flex', gap: '0.3rem' }}>
+                      {c.status === 'PENDENTE' && (
+                        editingId === consumoId ? (
+                          <>
+                            <button
+                              className="btn-outline-gold"
+                              title="Salvar"
+                              style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}
+                              onClick={async () => {
+                                setSavingId(consumoId);
+                                setErro('');
+                                try {
+                                  await editarConsumo(giraId, consumoId, {
+                                    quantity: parseInt(editingQuantity),
+                                  });
+
+                                  setEditingId(null);
+                                  setEditingQuantity('');
+                                  carregar(); // recarrega lista
+                                } catch (err) {
+                                  const msg = handleApiError(err, 'Editar consumo');
+                                  setModal({
+                                    aberto: true,
+                                    titulo: 'Erro ao editar consumo',
+                                    mensagem: msg,
+                                    tipoBotao: 'primary',
+                                    onConfirmar: () => fecharModal(),
+                                  });
+                                } finally {
+                                  setSavingId(null);
+                                }
+                              }}
+                            >
+                              {savingId === consumoId
+                                ? <span className="spinner-border spinner-border-sm"></span>
+                                : <i className="bi bi-floppy"></i>
+                              }
+                            </button>
+
+                            <button className="btn-outline-gold"
+                                    title="Cancelar"
+                                    style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditingQuantity('');
+                              }}
+                            >
+                              <i className="bi bi-x-circle"></i>
+                            </button>
+                          </>
+                        ) : (
+                          <button className="btn-outline-gold"
+                                  title="Editar consumo"
+                                  style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}
+                            onClick={() => {
+                              setEditingId(consumoId);
+                              setEditingQuantity(c.quantity);
+                            }}
+                          >
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                        )
+                      )}
                     </td>
                   </tr>
                 );
@@ -325,7 +425,7 @@ function ListaConsumos({ giraId, refreshTrigger }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SEÇÃO: Fechar a gira
 // ══════════════════════════════════════════════════════════════════════════════
-function SecaoFecharGira({ giraId, giraAberta, onFinalizado }) {
+function SecaoFecharGira({ giraId, giraAberta, onFinalizado, setModal, fecharModal }) {
   const [loading, setLoading]     = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro]           = useState('');
@@ -341,7 +441,14 @@ function SecaoFecharGira({ giraId, giraAberta, onFinalizado }) {
       setResultado(res.data);
       onFinalizado(); // atualiza GiraContext com status 'concluida'
     } catch (err) {
-      setErro(handleApiError(err, 'Fechar gira'));
+      const msg = handleApiError(err, 'Fechar gira');
+      setModal({
+        aberto: true,
+        titulo: 'Erro ao fechar gira',
+        mensagem: msg,
+        tipoBotao: 'primary',
+        onConfirmar: () => fecharModal(),
+      });
     } finally {
       setLoading(false);
     }
@@ -473,6 +580,13 @@ export default function ConsumoGiraPage() {
   const [loading, setLoading] = useState(true);
   // Trigger para recarregar a lista de consumos após registrar um novo
   const [consumoRefresh, setConsumoRefresh] = useState(0);
+  const [modal, setModal] = useState({
+  aberto: false,
+  titulo: '',
+  mensagem: '',
+  tipoBotao: 'primary',
+  onConfirmar: null,
+});
 
   // ── Carregamento inicial ─────────────────────────────────────────────────
   useEffect(() => {
@@ -498,6 +612,9 @@ export default function ConsumoGiraPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router]);
 
+  const fecharModal = () => {
+    setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
+  };
   /**
    * Chamado após finalizar a gira com sucesso.
    * Atualiza o status no GiraContext sem recarregar a página — evita UI stale.
@@ -565,22 +682,41 @@ export default function ConsumoGiraPage() {
               itens={itens}
               giraAberta={giraAberta}
               onConsumoRegistrado={handleConsumoRegistrado}
+              setModal={setModal}
+              fecharModal={fecharModal}
             />
 
             {/* Lista de consumos */}
-            <ListaConsumos giraId={id} refreshTrigger={consumoRefresh} />
+            <ListaConsumos 
+            giraId={id} 
+            refreshTrigger={consumoRefresh} 
+            setModal={setModal}
+            fecharModal={fecharModal}
+            />
 
             {/* Encerrar gira */}
             <SecaoFecharGira
               giraId={id}
               giraAberta={giraAberta}
               onFinalizado={handleFinalizado}
+              setModal={setModal}
+              fecharModal={fecharModal}
             />
 
           </div>
         </div>
       </div>
       <BottomNav />
+
+      <ConfirmModal
+        aberto={modal.aberto}
+        titulo={modal.titulo}
+        mensagem={modal.mensagem}
+        tipoBotao={modal.tipoBotao || 'perigo'}
+        labelConfirmar={modal.labelConfirmar || 'Confirmar'}
+        onConfirmar={modal.onConfirmar}
+        onCancelar={fecharModal}
+      />
     </>
   );
 }
