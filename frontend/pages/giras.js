@@ -1,12 +1,12 @@
 /**
  * pages/giras.js — AxeFlow
  *
- * ALTERAÇÃO: adicionado botão "Entrar" em cada linha da tabela.
- *   - Define a gira como "gira ativa" via GiraContext
- *   - Redireciona para /inventario
- *   - Bloqueado para giras com status 'concluida' (não faz sentido entrar)
+ * ALTERAÇÃO: botão "Entrar" agora navega para /gira/[id]/consumo
+ * em vez de /inventario. Isso leva direto à tela operacional
+ * de consumo da gira específica, que é o fluxo correto.
  *
- * Todo o resto permanece idêntico ao original.
+ * O inventário (/inventario) é o dashboard de leitura — não a
+ * tela de operação da gira.
  */
 
 import { useEffect, useState } from 'react';
@@ -77,13 +77,17 @@ export default function Giras() {
   };
 
   /**
-   * Define a gira selecionada como ativa e navega para o inventário.
-   * Giras concluídas são bloqueadas — não faz sentido registrar consumos.
+   * Define a gira como ativa no contexto e navega para a tela de consumo.
+   *
+   * ALTERAÇÃO: destino mudado de /inventario para /gira/[id]/consumo.
+   * O /inventario é o dashboard de leitura do estoque — não o lugar
+   * certo para registrar consumos de uma gira específica.
+   * Giras concluídas são bloqueadas pois o estoque já foi processado.
    */
   const handleEntrar = (g) => {
-    if (g.status === 'concluida') return; // botão desabilitado, mas guarda dupla
+    if (g.status === 'concluida') return;
 
-    // Persiste apenas os campos necessários para o inventário
+    // Persiste dados da gira no contexto para uso nas sub-telas
     setGiraAtual({
       id:     g.id,
       titulo: g.titulo,
@@ -92,7 +96,8 @@ export default function Giras() {
       acesso: g.acesso,
     });
 
-    router.push('/inventario');
+    // Navega direto para a tela operacional da gira
+    router.push(`/giras/${g.id}/consumo`);
   };
 
   if (loading) return (
@@ -168,13 +173,17 @@ export default function Giras() {
                           <td>
                             <div className="d-flex gap-1">
                               {/*
-                                Botão "Entrar" — define gira ativa e vai para /inventario.
+                                Botão "Entrar" — define gira ativa e vai para /gira/[id]/consumo.
+                                ALTERAÇÃO: destino mudado para a tela operacional de consumo.
                                 Desabilitado para giras concluídas (estoque já processado).
                               */}
                               <button
                                 onClick={() => handleEntrar(g)}
                                 disabled={concluida}
-                                title={concluida ? 'Gira concluída — estoque já processado' : 'Entrar nesta gira (inventário)'}
+                                title={concluida
+                                  ? 'Gira concluída — estoque já processado'
+                                  : 'Registrar consumo desta gira'
+                                }
                                 style={{
                                   background: concluida ? 'rgba(148,163,184,0.08)' : 'rgba(212,175,55,0.12)',
                                   border: `1px solid ${concluida ? 'rgba(148,163,184,0.2)' : 'rgba(212,175,55,0.35)'}`,
@@ -186,7 +195,7 @@ export default function Giras() {
                                 }}
                               >
                                 <i className="bi bi-box-arrow-in-right"></i>
-                                Entrar
+                                Consumo
                               </button>
 
                               <Link href={`/giras/${g.id}`} className="btn-outline-gold"

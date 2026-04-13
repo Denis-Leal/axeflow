@@ -2,9 +2,9 @@
 // Sidebar.js — AxeFlow
 // Barra lateral de navegação (desktop).
 //
-// ALTERAÇÃO: adicionados links para /contato e /sobre
-//   na seção inferior da sidebar, acima do botão Sair.
-//   São acessíveis a todos os perfis (admin, operador, membro).
+// ALTERAÇÃO: adicionado link para /inventario (painel de estoque)
+//   na seção principal de navegação, entre Membros e o divisor.
+//   Acessível a todos os perfis autenticados.
 // =====================================================
 
 import Link from 'next/link';
@@ -15,7 +15,7 @@ import { logout } from '../services/logout';
 
 export default function Sidebar() {
   const router = useRouter();
-  const [user, setUser]         = useState(null);
+  const [user, setUser]             = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -54,6 +54,11 @@ export default function Sidebar() {
         </Link>
         <Link href="/membros" className={`nav-item-custom ${isActive('/membros')}`}>
           <i className="bi bi-person-badge"></i> Membros
+        </Link>
+
+        {/* Link de estoque — acessível a todos os membros */}
+        <Link href="/inventario" className={`nav-item-custom ${isActive('/inventario') || isActive('/estoque') || isActive('/gira/')}`}>
+          <i className="bi bi-box-seam"></i> Estoque
         </Link>
 
         {/* Divisor ornamental */}

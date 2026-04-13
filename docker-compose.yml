@@ -39,6 +39,7 @@ services:
     volumes:
       # Hot reload: código do host reflete no container em tempo real
       - ./backend:/app
+      - ./firebase.json:/app/firebase.json
     restart: unless-stopped
 
   # ── Frontend (Next.js) ─────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ services:
       - backend
     volumes:
       - ./frontend:/app
-      - /app/node_modules   # preserva node_modules do container (não sobrescreve com o do host)
+      #- /app/node_modules   # preserva node_modules do container (não sobrescreve com o do host)
       - next_build:/app/.next          # preserva .next compilado
     restart: unless-stopped
 
