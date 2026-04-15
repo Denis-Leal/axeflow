@@ -27,6 +27,7 @@ import BottomNav from '../../../components/BottomNav';
 import { getGira, listMembros, updateGira } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { Button, Card, CardHeader, CardBody, Spinner, StatCard } from '../../../components/ui';
 
 // ── Helper: monta link wa.me com mensagem pré-preenchida ──────────────────────
 function linkWhatsApp(telefone, mensagem) {
@@ -44,73 +45,108 @@ function PainelPromovidos({ promovidos, giraTitulo, onContinuar }) {
   const todosNotificados = promovidos.every(p => notificados[p.telefone]);
 
   return (
-    <div style={{
-      background: 'rgba(16,185,129,0.08)',
-      border: '1px solid rgba(16,185,129,0.35)',
-      borderRadius: '14px',
-      padding: '1.25rem',
-      marginBottom: '1.5rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
-        <span style={{ fontSize: '1.3rem' }}>🎉</span>
-        <div>
-          <div style={{ color: '#10b981', fontWeight: 700, fontSize: '0.95rem' }}>
-            {promovidos.length} pessoa{promovidos.length > 1 ? 's' : ''} promovida{promovidos.length > 1 ? 's' : ''} da lista de espera!
-          </div>
-          <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem', marginTop: '2px' }}>
-            Avise cada uma pelo WhatsApp que a vaga foi confirmada.
+    <Card
+      style={{
+        borderColor: 'rgba(16,185,129,0.35)',
+        background: 'rgba(16,185,129,0.06)',
+        marginBottom: '1.5rem',
+      }}
+    >
+
+      {/* HEADER */}
+      <CardHeader style={{ background: 'transparent', borderBottom: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <span style={{ fontSize: '1.3rem' }}>🎉</span>
+
+          <div>
+            <div style={{ color: '#10b981', fontWeight: 700, fontSize: '0.95rem' }}>
+              {promovidos.length} pessoa{promovidos.length > 1 ? 's' : ''} promovida{promovidos.length > 1 ? 's' : ''} da lista de espera!
+            </div>
+
+            <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>
+              Avise cada uma pelo WhatsApp que a vaga foi confirmada.
+            </div>
           </div>
         </div>
-      </div>
+      </CardHeader>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-        {promovidos.map(p => {
-          const jaNotificado = notificados[p.telefone];
-          const mensagemWA   = `Olá ${p.nome}! Uma vaga foi liberada na gira "${giraTitulo}". Você estava na lista de espera e agora está confirmado(a)! 🎉`;
-          return (
-            <div key={p.telefone} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0.65rem 0.85rem', borderRadius: '10px', gap: '0.75rem', flexWrap: 'wrap',
-              background: jaNotificado ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${jaNotificado ? 'rgba(16,185,129,0.3)' : 'var(--cor-borda)'}`,
-            }}>
-              <div>
-                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{p.nome}</span>
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>#{p.posicao} na fila</span>
-                {jaNotificado && (
-                  <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>✓ Notificado</span>
-                )}
-              </div>
-              <a
-                href={linkWhatsApp(p.telefone, mensagemWA)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => marcarNotificado(p.telefone)}
+      {/* BODY */}
+      <CardBody>
+
+        {/* LISTA */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+          {promovidos.map(p => {
+            const jaNotificado = notificados[p.telefone];
+            const mensagemWA = `Olá ${p.nome}! Uma vaga foi liberada na gira "${giraTitulo}". Você estava na lista de espera e agora está confirmado(a)! 🎉`;
+
+            return (
+              <Card
+                key={p.telefone}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                  background: jaNotificado ? 'rgba(37,211,102,0.08)' : 'rgba(37,211,102,0.15)',
-                  border: `1px solid ${jaNotificado ? 'rgba(37,211,102,0.2)' : 'rgba(37,211,102,0.45)'}`,
-                  color: jaNotificado ? 'rgba(37,211,102,0.5)' : '#25d366',
-                  borderRadius: '8px', padding: '0.35rem 0.85rem',
-                  textDecoration: 'none', fontWeight: 600, fontSize: '0.82rem',
-                  pointerEvents: jaNotificado ? 'none' : 'auto',
+                  padding: '0.75rem 0.85rem',
+                  borderColor: jaNotificado ? 'rgba(16,185,129,0.3)' : undefined,
+                  background: jaNotificado ? 'rgba(16,185,129,0.08)' : undefined,
                 }}
               >
-                <i className="bi bi-whatsapp"></i>
-                {jaNotificado ? 'Enviado' : 'Avisar via WhatsApp'}
-              </a>
-            </div>
-          );
-        })}
-      </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      {p.nome}
+                    </div>
 
-      <button onClick={onContinuar} className="btn-gold w-100" style={{ padding: '0.65rem' }}>
-        {todosNotificados
-          ? <><i className="bi bi-check-lg me-2"></i>Todos notificados — Continuar</>
-          : <><i className="bi bi-arrow-right me-2"></i>Continuar sem notificar todos</>
-        }
-      </button>
-    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
+                        #{p.posicao} na fila
+                      </span>
+
+                      {jaNotificado && (
+                        <Badge preset="confirmado">
+                          Notificado
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    as="a"
+                    href={linkWhatsApp(p.telefone, mensagemWA)}
+                    target="_blank"
+                    onClick={() => marcarNotificado(p.telefone)}
+                    variant={jaNotificado ? 'ghost' : 'success'}
+                    size="sm"
+                    disabled={jaNotificado}
+                  >
+                    <i className="bi bi-whatsapp"></i>
+                    {jaNotificado ? 'Enviado' : 'Avisar'}
+                  </Button>
+
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* AÇÃO FINAL */}
+        <Button
+          onClick={onContinuar}
+          fullWidth
+          variant={todosNotificados ? 'success' : 'primary'}
+        >
+          {todosNotificados
+            ? <>Todos notificados — Continuar</>
+            : <>Continuar sem notificar todos</>
+          }
+        </Button>
+
+      </CardBody>
+    </Card>
   );
 }
 
@@ -298,7 +334,7 @@ useEffect(() => {
 
   if (loading || !form) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold"></div>
+      <Spinner center />
     </div>
   );
 
@@ -319,11 +355,11 @@ useEffect(() => {
           </div>
 
           <div className="page-content">
-            <div className="card-custom" style={{ maxWidth: '680px' }}>
-              <div className="card-header">
+            <Card>
+              <CardHeader>
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>✦ Dados da Gira</span>
-              </div>
-              <div style={{ padding: '1.5rem' }}>
+              </CardHeader>
+              <CardBody style={{ padding: '1.5rem' }}>
 
                 {error && (
                   <div className="alert-custom alert-danger-custom mb-4">
@@ -343,24 +379,17 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label-custom">Tipo de Gira</label>
-                        <div style={{ display: 'flex', gap: '0.75rem' }}>
-                          {[
-                            { value: 'publica', emoji: '🌐', label: 'Aberta ao público' },
-                            { value: 'fechada', emoji: '🔒', label: 'Fechada (membros)' },
-                          ].map(opt => (
-                            <button key={opt.value} type="button"
-                              onClick={() => set('acesso', opt.value)}
-                              style={{
-                                flex: 1, padding: '0.65rem', borderRadius: '8px', cursor: 'pointer',
-                                background: form.acesso === opt.value ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
-                                border: `1.5px solid ${form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
-                                color: form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-texto)',
-                                fontWeight: 600, fontSize: '0.85rem',
-                                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                              }}>
-                              {opt.emoji} {opt.label}
-                            </button>
-                          ))}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                          <StatCard value={"pública 🌐"} sub={"Aberta ao público"} onClick={() => set('acesso', 'publica')}
+                            style={{ flex: 1, borderRadius: '8px',background: form.acesso === "publica" ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
+                                  border: `1.5px solid ${form.acesso === "publica" ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
+                                  color: form.acesso === "publica" ? 'var(--cor-acento)' : 'var(--cor-texto)',
+                                }}/>
+                          <StatCard value={"fechada 🔒"} sub={"Fechada (membros)"} onClick={() => set('acesso', 'fechada')}
+                            style={{ flex: 1, borderRadius: '8px',background: form.acesso === "fechada" ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
+                                  border: `1.5px solid ${form.acesso === "fechada" ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
+                                  color: form.acesso === "fechada" ? 'var(--cor-acento)' : 'var(--cor-texto)',
+                                }}/>
                         </div>
                       </div>
 
@@ -447,13 +476,9 @@ useEffect(() => {
                       )}
 
                       <div className="col-12" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                        <button type="submit" className="btn-gold" disabled={saving}
-                          style={{ padding: '0.65rem 2rem' }}>
-                          {saving
-                            ? <><span className="spinner-border spinner-border-sm me-2"></span>Salvando...</>
-                            : <><i className="bi bi-check-lg me-2"></i>Salvar alterações</>
-                          }
-                        </button>
+                        <Button type="submit" loading={saving} variant='primary' children={"Salvando..."} disabled={saving}>
+                          <i className="bi bi-check-lg me-2"></i>Salvar Alterações
+                        </Button>
                         <Link href={`/giras/${id}`} className="btn-outline-gold"
                           style={{ padding: '0.65rem 1.5rem', textDecoration: 'none' }}>
                           Cancelar
@@ -464,8 +489,8 @@ useEffect(() => {
                   </form>
                 )}
 
-              </div>
-            </div>
+              </CardBody>
+            </Card>
           </div>
         </div>
       </div>
