@@ -39,6 +39,8 @@ class Usuario(Base):
 
     # Relacionamento com o novo model separado de inscrição de membros
     inscricoes_membro = relationship("InscricaoMembro", back_populates="membro")
+    
+    inscricoes_consulente = relationship("InscricaoConsulente", back_populates="usuario")
 
     __table_args__ = (
         UniqueConstraint("email", "terreiro_id", name="uq_usuario_email_terreiro"),

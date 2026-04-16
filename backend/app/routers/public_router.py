@@ -73,6 +73,7 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
 
     return {
         "id":                 str(gira.id),
+        "slug":               gira.slug_publico,
         "titulo":             gira.titulo,
         "tipo":               gira.tipo,
         "data":               gira.data.isoformat(),

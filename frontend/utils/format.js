@@ -3,6 +3,12 @@
  * Funções utilitárias de formatação compartilhadas.
  */
 
+export function formatOrdinal(n) {
+  console.log(n)
+  if (n == null) return '—';
+  return `${n}º`;
+}
+
 export function formatDate(dateStr, opts = {}) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');

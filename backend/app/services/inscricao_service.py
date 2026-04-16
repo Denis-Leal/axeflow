@@ -27,7 +27,7 @@ from fastapi import HTTPException
 from uuid import UUID
 from datetime import datetime
 
-from app.models.gira import Gira
+from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
 from app.models.inscricao_consulente import InscricaoConsulente
@@ -152,6 +152,58 @@ def promover_fila_em_lote(
 
     return promovidos
 
+def find_or_create_consulente(
+    db: Session,
+    nome: str,
+    telefone: str | None,
+    source: str,
+    created_by: UUID | None = None,
+    primeira_visita: bool | None = None
+):
+    telefone_normalizado = None
+
+    if telefone:
+        if not validate_phone(telefone):
+            raise HTTPException(status_code=400, detail="Telefone inválido")
+
+        telefone_normalizado = normalize_phone(telefone)
+
+        encontrados = db.query(Consulente).filter(
+            Consulente.telefone == telefone_normalizado
+        ).all()
+
+        if len(encontrados) == 1:
+            return encontrados[0]
+
+        elif len(encontrados) > 1:
+            # ⚠️ conflito — você PRECISA decidir uma regra
+            # escolha pragmática: pegar o mais antigo
+            return sorted(encontrados, key=lambda c: c.created_at)[0]
+
+    # ── fallback: busca por nome (apenas interno deveria usar isso) ──
+    # simples, sem fuzzy por enquanto
+    possiveis = db.query(Consulente).filter(
+        Consulente.nome.ilike(f"%{nome.strip()}%")
+    ).limit(5).all()
+
+    # ⚠️ aqui você tem 3 opções:
+    # 1. ignorar e criar novo (mais simples)
+    # 2. retornar lista pro frontend decidir (melhor UX)
+    # 3. heurística automática (arriscado)
+
+    # vou assumir abordagem simples por agora:
+    novo = Consulente(
+        nome=nome.strip(),
+        telefone=telefone_normalizado,
+        primeira_visita=primeira_visita if primeira_visita is not None else True,
+        source=source,
+        created_by=created_by,
+    )
+
+    db.add(novo)
+    db.flush()
+
+    return novo
 
 def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     """
@@ -188,19 +240,9 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # ── Dupla validação de primeira_visita ────────────────────────────────────
     # Camada 1 (declarativa): checkbox do usuário
     # Camada 2 (autoritativa): existência do telefone no banco
-    consulente = db.query(Consulente).filter(Consulente.telefone == telefone).first()
-    if not consulente:
-        primeira_visita = data.primeira_visita if data.primeira_visita is not None else True
-        consulente = Consulente(
-            nome=data.nome,
-            telefone=telefone,
-            primeira_visita=primeira_visita,
-        )
-        db.add(consulente)
-        db.flush()  # gera o ID antes de usar na inscrição
-    else:
-        # Independente do que o usuário marcou, o banco sabe a verdade
-        consulente.primeira_visita = False
+    consulente = find_or_create_consulente(db, data.nome, telefone, source="link_publico", primeira_visita=data.primeira_visita)
+    if consulente.nome != data.nome.strip():
+        pass # Opcional: logar essa discrepância para análise futura (ex: "Maria" vs "Maria Silva")
 
     # ── Verifica duplicata (qualquer status, inclusive cancelado) ─────────────
     inscricao_existente = db.query(InscricaoConsulente).filter(
@@ -276,27 +318,11 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         posicao=proxima_posicao,
         status=status_inicial,
         observacoes=observacoes_sanitizadas,
+        usuario_id=None,
+        source="link_publico"
     )
     db.add(inscricao_nova)
     db.flush()  # gera o ID antes de usar no legado
-
-    # ── INSERT no legado (compatibilidade com rollback) ──────────────────────
-    # IMPORTANTE: usa o MESMO id para rastreabilidade entre as duas tabelas.
-    # Se precisar fazer rollback do código, os IDs batem.
-    inscricao_legado = InscricaoGira(
-        id=inscricao_nova.id,           # mesmo UUID
-        gira_id=gira.id,
-        consulente_id=consulente.id,
-        membro_id=None,
-        posicao=proxima_posicao,
-        status=status_inicial,
-        observacoes=observacoes_sanitizadas,
-    )
-    db.add(inscricao_legado)
-
-    # flush() antes do commit garante que ambas inserções ocorrem
-    # dentro do mesmo snapshot de transação.
-    db.flush()
 
     # ── Commit único — atomicidade total ─────────────────────────────────────
     db.commit()
@@ -306,6 +332,152 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
             "title": "👤 Nova Inscrição",
             "terreiro_id": str(gira.terreiro_id),
             "body": f"{data.nome} se inscreveu na {gira.titulo} (vaga {confirmados + 1}/{gira.limite_consulentes})",
+            "url": f"/giras/{gira.id}",
+        }
+
+    send_push_to_terreiro(
+        db=db,
+        terreiro_id=gira.terreiro_id,
+        payload=payload,
+    )
+
+    return InscricaoResponse(
+        id=inscricao_nova.id,
+        posicao=inscricao_nova.posicao,
+        status=inscricao_nova.status,
+        created_at=inscricao_nova.created_at,
+        consulente_nome=consulente.nome,
+        consulente_telefone=consulente.telefone,
+        observacoes=inscricao_nova.observacoes,
+    )
+
+def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest, usuario_id: UUID):
+    """
+    Inscrição interna feita por um usuário logado (membro do terreiro).
+    Funcionalmente similar à inscrição pública, mas sem validação de telefone
+    e com acesso controlado por autenticação.
+    """
+    # Implementação similar a inscrever_publico(), mas sem validação de telefone
+    # e com lógica de criação de consulente adaptada para membros internos.
+    # O fluxo de lock e decisão de vaga permanece o mesmo.
+     # Placeholder — implementar seguindo a mesma estrutura da função pública
+    gira = db.query(Gira).filter(
+        Gira.id == gira_id,
+        Gira.status == StatusGiraEnum.aberta,
+        Gira.deleted_at.is_(None),
+    ).first()
+    if not gira:
+        raise HTTPException(status_code=404, detail="Gira não encontrada")
+
+    agora = datetime.utcnow()
+    if agora < gira.abertura_lista:
+        raise HTTPException(status_code=400, detail="Lista ainda não foi aberta")
+    if agora > gira.fechamento_lista:
+        raise HTTPException(status_code=400, detail="Lista encerrada")
+
+    if not validate_phone(data.telefone):
+        raise HTTPException(status_code=400, detail="Telefone inválido")
+    
+    telefone = normalize_phone(data.telefone)
+    
+    consulente = find_or_create_consulente(db, data.nome, telefone, source="cadastro_manual", created_by=usuario_id)
+    
+    # ── Dupla validação de primeira_visita ────────────────────────────────────
+    # Camada 1 (declarativa): checkbox do usuário
+    # Camada 2 (autoritativa): existência do telefone no banco
+    if consulente.nome != data.nome.strip():
+        pass # Opcional: logar essa discrepância para análise futura (ex: "Maria" vs "Maria Silva")
+
+    # ── Verifica duplicata (qualquer status, inclusive cancelado) ─────────────
+    inscricao_existente = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.gira_id == gira.id,
+        InscricaoConsulente.consulente_id == consulente.id,
+    ).first()
+
+    if inscricao_existente:
+        if inscricao_existente.status == StatusNovo.cancelado:
+            # Mensagem orientativa — não expõe detalhes internos
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Sua inscrição nesta gira foi cancelada. "
+                    "Para retornar à lista, entre em contato com a administração do terreiro."
+                ),
+            )
+        # Inscrição ativa em qualquer outro status
+        raise HTTPException(status_code=400, detail="Telefone já inscrito nesta gira")
+
+    # ── Seção crítica: FOR UPDATE serializa inscrições concorrentes ───────────
+    # Bloqueia todas as inscrições desta gira para leitura consistente.
+    # Duas requisições simultâneas executarão esta seção em série,
+    # garantindo que o limite de vagas nunca seja ultrapassado.
+    """
+    ETAPA 2: Dupla escrita.
+    
+    Mantém escrita em inscricoes_gira (compatibilidade com rollback).
+    Adiciona escrita em inscricoes_consulente (nova fonte de verdade).
+    Ambas dentro da mesma transação — ou as duas inserem ou nenhuma.
+    """
+    # ... toda a lógica de validação existente permanece igual ...
+    # (busca gira, valida janela de tempo, normaliza telefone,
+    #  busca/cria consulente, verifica duplicata — SEM ALTERAÇÃO)
+
+    # ── Seção crítica: FOR UPDATE em inscricoes_consulente ───────────────────
+    # MUDANÇA: o lock agora é na nova tabela, que será a fonte de verdade.
+    # inscricoes_gira não tem o mesmo lock — mas ambas estão na mesma
+    # transação, então a consistência é garantida pelo isolamento do Postgres.
+    inscricoes_ativas = (
+        db.query(InscricaoConsulente)        # ← nova tabela para o lock
+        .filter(
+            InscricaoConsulente.gira_id == gira.id,
+            InscricaoConsulente.status.in_([
+                StatusNovo.confirmado,
+                StatusNovo.lista_espera,
+            ]),
+        )
+        .with_for_update()
+        .all()
+    )
+
+    confirmados = sum(
+        1 for i in inscricoes_ativas
+        if i.status == StatusNovo.confirmado
+    )
+    proxima_posicao = len(inscricoes_ativas) + 1
+
+    status_inicial = (
+        StatusNovo.lista_espera
+        if confirmados >= gira.limite_consulentes
+        else StatusNovo.confirmado
+    )
+    
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+
+    observacoes_sanitizadas = None
+    if data.observacoes:
+        observacoes_sanitizadas = data.observacoes.strip()[:500] or None
+
+    # ── INSERT na nova tabela (fonte de verdade) ─────────────────────────────
+    inscricao_nova = InscricaoConsulente(
+        gira_id=gira.id,
+        consulente_id=consulente.id,
+        posicao=proxima_posicao,
+        status=status_inicial,
+        observacoes=observacoes_sanitizadas,
+        usuario_id=usuario_id,
+        source="cadastro_manual"
+    )
+    db.add(inscricao_nova)
+    db.flush()  # gera o ID antes de usar no legado
+    
+    # ── Commit único — atomicidade total ─────────────────────────────────────
+    db.commit()
+    db.refresh(inscricao_nova)
+    
+    payload = {
+            "title": "👤 Nova Inscrição",
+            "terreiro_id": str(gira.terreiro_id),
+            "body": f"{usuario.nome} inscreveu o {consulente.nome} na gira {gira.titulo} (vaga {confirmados + 1}/{gira.limite_consulentes})",
             "url": f"/giras/{gira.id}",
         }
 

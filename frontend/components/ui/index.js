@@ -130,7 +130,7 @@ const sizes = {
   },
 }
 
-export function Badge({ children, preset, bg, color, style, size = 'md', ...props }) {
+export function Badge({ children, preset, bg, color, style, size = 'sm', ...props }) {
   const p = preset ? BADGE_PRESETS[preset] : { bg, color };
   return (
     <span style={{
@@ -138,7 +138,7 @@ export function Badge({ children, preset, bg, color, style, size = 'md', ...prop
       alignItems:  'center',
       gap:         '3px',
       padding:     sizes[size]?.padding || '0.25rem 0.65rem',
-      borderRadius:'20px',
+      borderRadius:'15px',
       fontSize:    sizes[size]?.labelFont || '0.72rem',
       fontWeight:  600,
       whiteSpace:  'nowrap',

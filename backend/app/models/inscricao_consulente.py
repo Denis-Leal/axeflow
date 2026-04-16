@@ -13,7 +13,7 @@ Ciclo de status:
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, Text, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, String, Text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -26,6 +26,7 @@ class InscricaoConsulente(Base):
     id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     gira_id       = Column(UUID(as_uuid=True), ForeignKey("giras.id", ondelete="CASCADE"), nullable=False)
     consulente_id = Column(UUID(as_uuid=True), ForeignKey("consulentes.id"), nullable=False)
+    usuario_id    = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
 
     # posicao: usado para exibição e auditoria.
     # Fonte autoritativa para ordenação em concorrência: created_at.
@@ -36,9 +37,11 @@ class InscricaoConsulente(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    source          = Column(String(255), nullable=True)  # Ex: "link_publico", "cadastro_manual"
 
     gira       = relationship("Gira", back_populates="inscricoes_consulente", passive_deletes=True)
     consulente = relationship("Consulente", back_populates="inscricoes")
+    usuario = relationship("Usuario", back_populates="inscricoes_consulente")
 
     __table_args__ = (
         # 1 inscrição por consulente por gira (canceladas incluídas — controle via status)
@@ -49,4 +52,6 @@ class InscricaoConsulente(Base):
         Index("ix_inscricao_consulente_posicao", "gira_id", "posicao"),
         # Ordenação autoritativa em concorrência
         Index("ix_inscricao_consulente_created_at", "gira_id", "created_at"),
+        # Ordenação por id usuario
+        Index("ix_inscricao_consulente_usuario", "usuario_id")
     )

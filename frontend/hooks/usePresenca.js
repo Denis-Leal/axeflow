@@ -15,7 +15,7 @@ export function usePresenca(giraId, acesso) {
     : `/membros/giras/${giraId}/presenca-membros-publica`;
 
   const load = useCallback(async () => {
-    if (!giraId) return;
+    if (!giraId || !acesso) return;
     setLoading(true);
     try {
       const res = await api.get(endpoint);

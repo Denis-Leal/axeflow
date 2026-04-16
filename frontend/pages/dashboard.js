@@ -104,8 +104,7 @@ function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConf
         </Link>
         {gira.slugPublico && (
           <Link
-            href={`/public/${gira.slugPublico}`}
-            target="_blank"
+            href={`/giras/${gira.slugPublico}/inscricoes`}
             style={{
               flex: 1, textAlign: 'center', padding: '0.4rem',
               borderRadius: '8px', border: '1px solid var(--cor-borda)',
@@ -113,7 +112,7 @@ function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConf
               fontSize: '0.78rem',
             }}
           >
-            <i className="bi bi-share me-1" />Compartilhar
+            <i className="bi bi-share me-1" />Inscrever
           </Link>
         )}
       </div>

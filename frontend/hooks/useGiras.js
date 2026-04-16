@@ -3,7 +3,7 @@
  * Hook de dados para giras. Separa fetch de renderização.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { listGiras, getMe } from '../services/api';
+import api, { listGiras, getGira, getMe, getGiraPublica } from '../services/api';
 
 export function useGiras() {
   const [giras, setGiras]   = useState([]);
@@ -28,4 +28,32 @@ export function useGiras() {
   useEffect(() => { load(); }, [load]);
 
   return { giras, user, loading, error, reload: load };
+}
+
+  export function useGiraPublica(slug) {
+  const [gira, setGira] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await getGiraPublica(slug);
+        setGira(res.data);
+      } catch (err) {
+        setError(err?.response?.data?.detail || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [slug]);
+
+  return { gira, loading, error };
 }

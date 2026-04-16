@@ -13,7 +13,7 @@ from uuid import UUID
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.schemas.inscricao_schema import PresencaUpdate
+from app.schemas.inscricao_schema import InscricaoPublicaRequest, PresencaUpdate
 from app.services import inscricao_service
 from app.services import audit_service
 from app.services.presenca_consulente_service import get_scores_para_gira, get_ranking_consulentes
@@ -22,7 +22,11 @@ from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.consulente import Consulente
 from app.models.gira import Gira
 from app.services.presenca_consulente_service import get_score_consulente
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
+# Rate limiter por IP — evita abuso dos endpoints sem autenticação
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["inscricoes"])
 
 
@@ -48,6 +52,34 @@ def list_inscricoes(
 
     return result
 
+@router.post("/gira/{slug}/inscrever/publico")
+@limiter.limit("10/minute")  # 10 inscrições/min por IP — previne automação de spam
+def inscrever_publico(
+    slug: str,
+    data: InscricaoPublicaRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Inscreve consulente em gira pública.
+    Rate limit mais restritivo (10/min) pois é a operação de escrita principal.
+    """
+    return inscricao_service.inscrever_publico(db, slug, data)
+
+@router.post("/gira/{gira_id}/inscrever/interno")
+@limiter.limit("10/minute")  # 10 inscrições/min por IP — previne automação de spam
+def inscrever_interno(
+    gira_id: UUID,
+    data: InscricaoPublicaRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    """
+    Inscreve consulente em gira interna.
+    Rate limit mais restritivo (10/min) pois é a operação de escrita principal.
+    """
+    return inscricao_service.inscrever_interno(db, gira_id, data, user.id)
 
 @router.patch("/inscricao/{inscricao_id}/presenca")
 def update_presenca(
