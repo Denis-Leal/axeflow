@@ -57,7 +57,7 @@ export const GIRA_DETALHE_MEMBER_STATUS = {
 };
 
 export function selectIsAdmin(role) {
-  return role === 'admin';
+  return role === 'admin' || role === 'operador';
 }
 
 export function selectHasPhone(phone) {

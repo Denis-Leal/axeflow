@@ -15,6 +15,7 @@ export function buildGiraItem(g) {
 
   return {
     id:            g.id,
+    user:          g.user,
     titulo:        g.titulo,
     tipo:          g.tipo || null,
     acesso:        g.acesso,

@@ -95,7 +95,8 @@ export const getRankingConsulentes = () => api.get('/consulentes/ranking');
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)              => api.get(`/public/gira/${slug}`);
 export const inscreverPublico = (slug, data)        => api.post(`/public/gira/${slug}/inscrever`, data);
-export const inscreverInterno = (giraId, data)      => api.post(`/gira/${giraId}/inscrever/interno`, data)
+export const inscreverInterno = (giraId, data)      => api.post(`/gira/${giraId}/inscrever/interno`, data);
+export const buscarNome       = (value)             => api.get(`/consulentes/search?q=${encodeURIComponent(value)}`);
 
 // ── Membros ───────────────────────────────────────────
 export const listMembros   = ()           => api.get('/membros');

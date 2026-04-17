@@ -1,8 +1,6 @@
 /**
  * components/gira/InscricaoTable.jsx — AxeFlow
- *
- * Tabela desktop de inscrições da GiraDetalhe.
- * Consome exclusivamente InscricaoViewModel.
+ * Tabela desktop de inscrições (padrão GiraTable)
  */
 
 import { Badge } from '../ui';
@@ -15,11 +13,8 @@ export default function InscricaoTable({
   onReativar,
 }) {
   return (
-    <div className="table-responsive">
-      <table
-        className="table table-dark table-hover align-middle"
-        style={{ fontSize: '0.85rem' }}
-      >
+    <div style={{ overflowX: 'auto' }}>
+      <table className="table-custom">
         <thead>
           <tr>
             <th>#</th>
@@ -34,10 +29,8 @@ export default function InscricaoTable({
 
         <tbody>
           {inscricoes.map((i) => (
-            <tr
-              key={i.id}
-              style={{ opacity: i.cancelado ? 0.5 : 1 }}
-            >
+            <tr key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1 }}>
+
               {/* posição */}
               <td style={cellHighlight}>
                 {i.posicao}º
@@ -63,7 +56,7 @@ export default function InscricaoTable({
               <td>
                 {i.scorePct ? (
                   <span
-                    title={`${i.comparecimentos} ✓ / ${i.faltas} ✗`}
+                    title={`${i.comparecimentos}✓ ${i.faltas}✗`}
                     style={{ fontSize: '0.75rem' }}
                   >
                     {i.scoreEmoji} {i.scorePct}
@@ -89,47 +82,44 @@ export default function InscricaoTable({
               {podeGerenciar && (
                 <td>
                   <div style={actionGroup}>
+
+                    {/* presença */}
                     {!i.cancelado && !i.naFila && (
                       <>
                         <button
-                          onClick={() =>
-                            onPresenca(i.id, 'compareceu')
-                          }
-                          style={btnSuccess}
+                          onClick={() => onPresenca?.(i.id, 'compareceu')}
                           title="Compareceu"
+                          style={btnSuccess}
                         >
                           ✓
                         </button>
 
                         <button
-                          onClick={() =>
-                            onPresenca(i.id, 'faltou')
-                          }
-                          style={btnDanger}
+                          onClick={() => onPresenca?.(i.id, 'faltou')}
                           title="Faltou"
+                          style={btnDanger}
                         >
                           ✗
                         </button>
                       </>
                     )}
 
+                    {/* cancelar / reativar */}
                     {i.cancelado ? (
                       <button
-                        onClick={() =>
-                          onReativar(i.id, i.nome)
-                        }
+                        onClick={() => onReativar?.(i.id, i.nome)}
+                        title="Reativar"
                         style={btnWarning}
                       >
-                        Reativar
+                        <i className="bi bi-arrow-counterclockwise" />
                       </button>
                     ) : (
                       <button
-                        onClick={() =>
-                          onCancelar(i.id, i.nome)
-                        }
+                        onClick={() => onCancelar?.(i.id, i.nome)}
+                        title="Cancelar"
                         style={btnNeutral}
                       >
-                        Cancelar
+                        <i className="bi bi-trash" />
                       </button>
                     )}
                   </div>
@@ -137,6 +127,19 @@ export default function InscricaoTable({
               )}
             </tr>
           ))}
+
+          {inscricoes.length === 0 && (
+            <tr>
+              <td colSpan={podeGerenciar ? 7 : 6}>
+                <div style={emptyState}>
+                  <i className="bi bi-person-x" style={emptyIcon} />
+                  <p style={{ margin: '0 0 0.5rem' }}>
+                    Nenhuma inscrição encontrada
+                  </p>
+                </div>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -144,7 +147,7 @@ export default function InscricaoTable({
 }
 
 // ─────────────────────────────────────────────
-// estilos locais (evita CSS global desnecessário)
+// estilos locais (alinhados com GiraTable)
 // ─────────────────────────────────────────────
 
 const cellHighlight = {
@@ -181,11 +184,10 @@ const actionGroup = {
 };
 
 const baseBtn = {
-  borderRadius: '5px',
-  padding: '3px 7px',
+  borderRadius: '6px',
+  padding: '0.2rem 0.5rem',
   fontSize: '0.8rem',
   cursor: 'pointer',
-  border: '1px solid transparent',
   background: 'transparent',
 };
 
@@ -215,4 +217,17 @@ const btnNeutral = {
   color: '#9ca3af',
   border: '1px solid rgba(156,163,175,0.25)',
   background: 'rgba(156,163,175,0.06)',
+};
+
+const emptyState = {
+  textAlign: 'center',
+  padding: '3rem',
+  color: 'var(--cor-texto-suave)',
+};
+
+const emptyIcon = {
+  fontSize: '2rem',
+  display: 'block',
+  marginBottom: '0.75rem',
+  opacity: 0.4,
 };

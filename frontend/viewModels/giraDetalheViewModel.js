@@ -213,9 +213,9 @@ export function buildGiraDetalheViewModel({
   const metricas = buildInscricoesMetricas(inscricoesVm);
   const membrosVm = membrosPresenca.map(buildMembroItemViewModel);
   const metricasMembros = buildMembrosMetricas(membrosVm);
-
   const vm = {
     id: giraVm.id,
+    user: giraVm.user,
     pageTitle: `${giraVm.titulo} | AxeFlow`,
     titulo: giraVm.titulo,
     acesso: giraVm.acesso,
@@ -229,6 +229,7 @@ export function buildGiraDetalheViewModel({
     responsavel: gira.responsavel_lista_nome || null,
     editHref: `/giras/editar/${giraVm.id}`,
     backHref: '/giras',
+    inscricoes: inscricoesVm,
     copyButton: {
       visible: giraVm.acesso === 'publica' && Boolean(giraVm.slugPublico),
       label: linkCopiado ? 'Link copiado!' : 'Copiar link',

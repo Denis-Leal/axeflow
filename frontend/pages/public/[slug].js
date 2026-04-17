@@ -315,8 +315,8 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function GiraPublica({ gira, erro, slug }) {
+  console.log("GiraPublica: ", gira)
   // ── Meta tags OG ─────────────────────────────────────────────────────────
-
   const dataFormatada = formatarData(gira?.data);
   const horario       = formatarHorario(gira?.horario);
 
@@ -517,6 +517,7 @@ export async function getServerSideProps({ params }) {
     }
 
     const gira = await res.json();
+    console.log("Gira pub: ", gira)
     return { props: { gira, erro: null, slug } };
 
   } catch (err) {

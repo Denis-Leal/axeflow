@@ -34,7 +34,7 @@ export function useGiras() {
   const [gira, setGira] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
+    console.log("Gira publica: ", gira)
   useEffect(() => {
     if (!slug) return;
 

@@ -130,6 +130,65 @@ const sizes = {
   },
 }
 
+export function InfoHeader({
+  title,
+  subtitleItems = [],
+  badge,
+  style,
+}) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid var(--cor-borda)',
+      borderRadius: '12px',
+      padding: '1rem',
+      marginBottom: '1rem',
+      ...style,
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '0.5rem',
+        flexWrap: 'wrap'
+      }}>
+        
+        {/* LEFT */}
+        <div>
+          <h2 style={{
+            fontFamily: 'Cinzel',
+            color: 'var(--cor-acento)',
+            margin: 0,
+            fontSize: '1.1rem'
+          }}>
+            {title}
+          </h2>
+
+          {subtitleItems.length > 0 && (
+            <div style={{
+              fontSize: '0.82rem',
+              color: 'var(--cor-texto-suave)',
+              marginTop: '4px',
+              display: 'flex',
+              gap: '0.75rem',
+              flexWrap: 'wrap'
+            }}>
+              {subtitleItems.map((item, idx) => (
+                <span key={idx}>
+                  {item.icon && <i className={`bi ${item.icon}`} />} {item.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT */}
+        {badge}
+      </div>
+    </div>
+  );
+}
+
 export function Badge({ children, preset, bg, color, style, size = 'sm', ...props }) {
   const p = preset ? BADGE_PRESETS[preset] : { bg, color };
   return (

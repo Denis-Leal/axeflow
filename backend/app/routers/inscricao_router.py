@@ -29,7 +29,29 @@ from slowapi.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["inscricoes"])
 
+# GET /consulentes/search?q=denis
+@router.get("/consulentes/search")
+def search_consulentes(
+    q: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    print("USER:", user)
+    print("TERREIRO:", getattr(user, "terreiro_id", None))
+    if not q:
+        return []
 
+    if not user or not user.terreiro_id:
+        raise HTTPException(status_code=400, detail="Usuário inválido")
+
+    return db.query(Consulente)\
+        .filter(
+            Consulente.terreiro_id == user.terreiro_id,
+            Consulente.nome.ilike(f"%{q}%")
+        )\
+        .limit(10)\
+        .all()
+        
 @router.get("/giras/{gira_id}/inscricoes")
 def list_inscricoes(
     gira_id: UUID,

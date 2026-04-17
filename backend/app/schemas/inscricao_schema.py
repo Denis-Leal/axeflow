@@ -41,6 +41,8 @@ class InscricaoResponse(BaseModel):
     consulente_telefone: Optional[str] = None
     # Exposto para o painel admin visualizar anotações do consulente
     observacoes: Optional[str] = None
+    usuario_id: Optional[UUID] = None
+    source: str
 
     class Config:
         from_attributes = True

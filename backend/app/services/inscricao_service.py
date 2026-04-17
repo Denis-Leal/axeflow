@@ -22,7 +22,7 @@ CORREÇÕES CRÍTICAS aplicadas nesta versão:
    - Promoções em lote também serializadas para evitar dupla-promoção
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from fastapi import HTTPException
 from uuid import UUID
 from datetime import datetime
@@ -69,6 +69,8 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
             consulente_nome=i.consulente.nome if i.consulente else None,
             consulente_telefone=i.consulente.telefone if i.consulente else None,
             observacoes=i.observacoes,
+            usuario_id=i.usuario_id,
+            source=i.source
         )
         for i in inscricoes
     ]
@@ -156,11 +158,51 @@ def find_or_create_consulente(
     db: Session,
     nome: str,
     telefone: str | None,
+    terreiro_id: UUID,
     source: str,
     created_by: UUID | None = None,
     primeira_visita: bool | None = None
 ):
+    
+    nome_normalizado = nome.strip()
+    
+    if not nome_normalizado:
+        raise HTTPException(status_code=400, detail="Nome é obrigatório")
+    
     telefone_normalizado = None
+    
+    # Se for cadastro_manual
+    # Telefone é opcional
+    if source == "cadastro_maunal":
+        if telefone:
+            if not validate_phone(telefone):
+                raise HTTPException(status_code=400, detail="Telefone inválido")
+            telefone = normalize_phone(telefone)
+        # burca por telefone
+        if telefone:
+            consulente_existente = db.query(Consulente).filter(
+                Consulente.telefone == telefone
+            ).first()
+        else:
+            consulente_existente = db.query(Consulente).filter(
+                Consulente.terreiro_id == terreiro_id,
+                func.lower(Consulente.nome) == nome_normalizado.lower(),
+                Consulente.deleted_at.is_(None)
+            ).first()
+            
+        if consulente_existente:
+            consulente = consulente_existente
+        else:
+            consulente = Consulente(
+                nome=nome_normalizado,
+                telefone=telefone,
+                terreiro_id=terreiro_id,
+                created_by=created_by,
+                source="cadastro_manual"
+            )
+            db.add(consulente)
+            db.flush() 
+        
 
     if telefone:
         if not validate_phone(telefone):
@@ -192,18 +234,19 @@ def find_or_create_consulente(
     # 3. heurística automática (arriscado)
 
     # vou assumir abordagem simples por agora:
-    novo = Consulente(
+    consulente = Consulente(
         nome=nome.strip(),
+        terreiro_id=terreiro_id,
         telefone=telefone_normalizado,
         primeira_visita=primeira_visita if primeira_visita is not None else True,
         source=source,
         created_by=created_by,
     )
 
-    db.add(novo)
+    db.add(consulente)
     db.flush()
 
-    return novo
+    return consulente
 
 def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     """
@@ -240,7 +283,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     # ── Dupla validação de primeira_visita ────────────────────────────────────
     # Camada 1 (declarativa): checkbox do usuário
     # Camada 2 (autoritativa): existência do telefone no banco
-    consulente = find_or_create_consulente(db, data.nome, telefone, source="link_publico", primeira_visita=data.primeira_visita)
+    consulente = find_or_create_consulente(db, data.nome, telefone, source="link_publico", terreiro_id=gira.terreiro_id, primeira_visita=data.primeira_visita)
     if consulente.nome != data.nome.strip():
         pass # Opcional: logar essa discrepância para análise futura (ex: "Maria" vs "Maria Silva")
 
@@ -349,9 +392,12 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         consulente_nome=consulente.nome,
         consulente_telefone=consulente.telefone,
         observacoes=inscricao_nova.observacoes,
+        usuario_id=inscricao_nova.usuario_id,
+        source=inscricao_nova.source
     )
 
 def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest, usuario_id: UUID):
+    print("Validar dados: ", data)
     """
     Inscrição interna feita por um usuário logado (membro do terreiro).
     Funcionalmente similar à inscrição pública, mas sem validação de telefone
@@ -374,17 +420,9 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         raise HTTPException(status_code=400, detail="Lista ainda não foi aberta")
     if agora > gira.fechamento_lista:
         raise HTTPException(status_code=400, detail="Lista encerrada")
-
-    if not validate_phone(data.telefone):
-        raise HTTPException(status_code=400, detail="Telefone inválido")
     
-    telefone = normalize_phone(data.telefone)
-    
-    consulente = find_or_create_consulente(db, data.nome, telefone, source="cadastro_manual", created_by=usuario_id)
-    
-    # ── Dupla validação de primeira_visita ────────────────────────────────────
-    # Camada 1 (declarativa): checkbox do usuário
-    # Camada 2 (autoritativa): existência do telefone no banco
+    consulente = find_or_create_consulente(db, data.nome, data.telefone, gira.terreiro_id, source="cadastro_manual", created_by=usuario_id, primeira_visita=data.primeira_visita)
+        
     if consulente.nome != data.nome.strip():
         pass # Opcional: logar essa discrepância para análise futura (ex: "Maria" vs "Maria Silva")
 
@@ -407,25 +445,6 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         # Inscrição ativa em qualquer outro status
         raise HTTPException(status_code=400, detail="Telefone já inscrito nesta gira")
 
-    # ── Seção crítica: FOR UPDATE serializa inscrições concorrentes ───────────
-    # Bloqueia todas as inscrições desta gira para leitura consistente.
-    # Duas requisições simultâneas executarão esta seção em série,
-    # garantindo que o limite de vagas nunca seja ultrapassado.
-    """
-    ETAPA 2: Dupla escrita.
-    
-    Mantém escrita em inscricoes_gira (compatibilidade com rollback).
-    Adiciona escrita em inscricoes_consulente (nova fonte de verdade).
-    Ambas dentro da mesma transação — ou as duas inserem ou nenhuma.
-    """
-    # ... toda a lógica de validação existente permanece igual ...
-    # (busca gira, valida janela de tempo, normaliza telefone,
-    #  busca/cria consulente, verifica duplicata — SEM ALTERAÇÃO)
-
-    # ── Seção crítica: FOR UPDATE em inscricoes_consulente ───────────────────
-    # MUDANÇA: o lock agora é na nova tabela, que será a fonte de verdade.
-    # inscricoes_gira não tem o mesmo lock — mas ambas estão na mesma
-    # transação, então a consistência é garantida pelo isolamento do Postgres.
     inscricoes_ativas = (
         db.query(InscricaoConsulente)        # ← nova tabela para o lock
         .filter(
@@ -495,6 +514,8 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         consulente_nome=consulente.nome,
         consulente_telefone=consulente.telefone,
         observacoes=inscricao_nova.observacoes,
+        usuario_id=inscricao_nova.usuario_id,
+        source=inscricao_nova.source
     )
 
 def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID = None) -> dict:

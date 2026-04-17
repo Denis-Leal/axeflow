@@ -4,7 +4,6 @@
  */
 
 export function formatOrdinal(n) {
-  console.log(n)
   if (n == null) return '—';
   return `${n}º`;
 }

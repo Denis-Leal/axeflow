@@ -38,6 +38,10 @@ export function useGiraDetalhe(giraId, router) {
   const [promovido, setPromovido] = useState(null);
   const [modal, setModal] = useState(createInitialModal());
 
+  const [inscricoesLoading, setInscricoesLoading] = useState(true);
+  const [membrosLoading, setMembrosLoading] = useState(true);
+  const [membrosUpdating, setMembrosUpdating] = useState({});
+
   const fecharModal = () => {
     setModal((current) => ({ ...current, aberto: false, onConfirmar: null }));
   };
@@ -82,6 +86,7 @@ export function useGiraDetalhe(giraId, router) {
         const gira = giraRes.data;
         setRawGira(gira);
         setRawInscricoes(Array.isArray(inscricoesRes.data) ? inscricoesRes.data : []);
+        setInscricoesLoading(true);
         setUserRole(meRes.data?.role || '');
 
         try {
@@ -91,14 +96,18 @@ export function useGiraDetalhe(giraId, router) {
 
           if (active) {
             setRawMembrosPresenca(Array.isArray(membrosRes.data) ? membrosRes.data : []);
+            setMembrosLoading(true);
           }
         } catch {
           if (active) setRawMembrosPresenca([]);
+          if (active) setMembrosLoading(false);
         }
       } catch {
         if (active) router.push('/giras');
       } finally {
         if (active) setLoading(false);
+        if (active) setInscricoesLoading(false);
+        if (active) setMembrosLoading(false);
       }
     }
 
@@ -138,6 +147,7 @@ export function useGiraDetalhe(giraId, router) {
   };
 
   const handlePresencaMembro = async (membroId, status) => {
+    setMembrosUpdating((prev) => ({ ...prev, [membroId]: true }));
     try {
       await updatePresencaMembro(giraId, membroId, status);
       setRawMembrosPresenca((current) =>
@@ -148,6 +158,8 @@ export function useGiraDetalhe(giraId, router) {
         'Erro ao atualizar presenca do membro',
         handleApiError(error, 'Atualizar presenca do membro')
       );
+    } finally {
+      setMembrosUpdating((prev) => ({ ...prev, [membroId]: false }));
     }
   };
 
@@ -231,6 +243,8 @@ export function useGiraDetalhe(giraId, router) {
     ordenar,
     linkCopiado,
     modal,
+    inscricoesLoading,
+    membrosLoading,
   };
 
   const actions = {
@@ -240,12 +254,12 @@ export function useGiraDetalhe(giraId, router) {
     copyLink,
     fecharModal,
     limparPromovido: () => setPromovido(null),
-    handlePresenca,
-    handlePresencaMembro,
-    handleCancelar,
-    handleReativar,
-  };
-
+    marcarPresenca: handlePresenca,
+    cancelarInscricao: handleCancelar,
+    reativarInscricao: handleReativar,
+    updateMembro: handlePresencaMembro,
+    };
+    
   return {
     state,
     actions,
@@ -254,6 +268,8 @@ export function useGiraDetalhe(giraId, router) {
       metricas,
       isAdmin: selectIsAdmin(userRole),
       lista,
+      membrosPresenca: rawMembrosPresenca,
+      membrosUpdating,
     },
   };
 }

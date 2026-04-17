@@ -1,19 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { useGiraPublica } from '../../../hooks/useGiras';
+import { useGiraPublica, useGiras } from '../../../hooks/useGiras';
 import { useIsMobile } from '../../../hooks/useMediaQuery';
 import { inscreverInterno } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import { formatDate, formatPhone, formatTime, formatDateTime } from '../../../utils/format';
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Spinner, StatCard } from '../../../components/ui';
+import debounce from 'lodash.debounce';
+import { useMemo } from 'react';
+import { buscarNome } from '../../../services/api';
+import { buildGiraItem } from '../../../viewModels/giraViewModel';
 
 function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
-    console.log("Dados formularo: ", giraId)
+  const [sugestoes, setSugestoes] = useState([]);
+
+  const buscarConsulentes = async (value) => {
+  if (value.length < 2) {
+    setSugestoes([]);
+    return;
+  }
+
+  try {
+    const res = await buscarNome(value);
+
+    console.log("Resultado da busca:", res);
+
+    setSugestoes(res.data); // ✅ CORRETO
+  } catch (err) {
+    console.error("Erro na busca:", err);
+    setSugestoes([]);
+  }
+};
+
+  const buscarDebounced = useMemo(() => {
+  return debounce((value) => {
+    buscarConsulentes(value);
+  }, 300);
+}, []);
+
+  useEffect(() => {
+    return () => {
+      buscarDebounced.cancel();
+    };
+  }, [buscarDebounced]);
+
   const [form, setForm] = useState({
     nome:           '',
     telefone:       '',
@@ -37,10 +72,8 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
       };
       const res = await inscreverInterno(giraId, payload);
       setResultado(res.data);
-      console.log("Dados rota: ", res.data)
     } catch (err) {
       // Mensagem específica para inscrição cancelada — orienta contatar o terreiro
-      console.log("Erro: ", err?.response?.data?.detail || err?.message || 'Erro inesperado')
       const detail = err?.response?.data?.detail || '';
       if (detail.includes('cancelada')) {
         setError(detail);  // usa a mensagem do backend diretamente (já amigável)
@@ -111,7 +144,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
       )}
 
       <h6 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
-        ✦ {listaEspera ? 'Entrar na Fila de Espera' : 'Realizar sua Inscrição'}
+        ✦ {listaEspera ? 'Colocar consulente na Fila de Espera' : 'Realizar inscrição do consulente'}
       </h6>
 
       {error && (
@@ -125,11 +158,37 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
         <input
           className="form-control-custom"
           value={form.nome}
-          onChange={e => setForm({ ...form, nome: e.target.value })}
+          onChange={e => {
+            const value = e.target.value;
+
+            setForm(prev => ({ ...prev, nome: value }));
+            buscarDebounced(value);
+          }}
           placeholder="Seu nome completo"
           required
         />
       </div>
+      {sugestoes.length > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '0.75rem'}}>
+          <div className="autocomplete-box" style={{ fontSize: '0.82rem', color: 'var(--cor-texto)', marginTop: '0.35rem', lineHeight: 2 }}>
+            {sugestoes.map(c => (
+              <div className="form-control-custom" style={{marginBottom: '5px'}}
+                key={c.id}
+                onClick={() => {
+                  setForm(prev => ({
+                    ...prev,
+                    nome: c.nome,
+                    telefone: c.telefone
+                  }));
+                  setSugestoes([]);
+                }}
+              >
+                {c.nome} — {formatPhone(c.telefone)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mb-3">
         <label className="form-label-custom">WhatsApp / Telefone</label>
@@ -193,10 +252,10 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
 
           <div>
             <div style={{ fontSize: '0.88rem', color: 'var(--cor-texto)', fontWeight: 500 }}>
-              É a minha primeira vez aqui 🌟
+              É a primeira vez do consulente 🌟
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', marginTop: '2px', lineHeight: 1.4 }}>
-              Marque se nunca participou de uma gira neste terreiro
+              Marque se ele nunca participou de uma gira neste terreiro
             </div>
           </div>
         </label>
@@ -229,7 +288,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
       <button
         onClick={handleSubmit}
         className="btn-gold w-100"
-        disabled={submitting || !form.nome || !form.telefone}
+        disabled={submitting || !form.nome}
         style={{
           padding: '0.85rem',
           // Cor diferenciada para lista de espera (âmbar em vez de dourado)
@@ -281,7 +340,6 @@ export default function Inscricao() {
     const agora          = new Date();
     const listaFutura    = gira.abertura_lista  && agora < new Date(gira.abertura_lista);
     const listaEncerrada = gira.fechamento_lista && agora > new Date(gira.fechamento_lista);
-
     // Percentual de ocupação (considera vagas + lista de espera para a barra visual)
     const ocupadas = gira.limite_consulentes - gira.vagas_disponiveis;
     const pct      = Math.min(100, (ocupadas / gira.limite_consulentes) * 100);
@@ -289,12 +347,6 @@ export default function Inscricao() {
     // Se vagas == 0 mas a lista está aberta → modo lista de espera
     const vagasEsgotadas = gira.vagas_disponiveis === 0;
     const podeListaEspera = vagasEsgotadas && !listaFutura && !listaEncerrada && gira.lista_aberta;
-    console.log("DEBUG STATE:", {
-        gira,
-        listaFutura,
-        listaEncerrada,
-        podeListaEspera
-        });
 
     if (loading) return <Spinner center />;
 
@@ -310,7 +362,7 @@ export default function Inscricao() {
                     <div className="topbar">
                         <div className='d-flex gap-2 align-items-center flex-wrap'>
                             <h5>{gira?.titulo}</h5>
-                            <Badge size='sm'>Ícone + Label</Badge>
+                            <Badge preset={gira.status}>{gira.status}</Badge>
                         </div>
                         <Link href={`/giras/${gira.id}`} style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none' }}>
                             <i className="bi bi-arrow-left me-1" /> Voltar
@@ -340,30 +392,30 @@ export default function Inscricao() {
 
                         {/* ── Barra de vagas ── */}
                         <div className="mb-4">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                             <span style={{ fontSize: '0.82rem', color: 'var(--cor-texto-suave)' }}>
-                            Vagas disponíveis
+                              Vagas disponíveis
                             </span>
                             <span style={{
-                            fontSize: '0.85rem', fontWeight: 700,
-                            color: vagasEsgotadas ? '#ef4444' : '#10b981',
+                              fontSize: '0.85rem', fontWeight: 700,
+                              color: vagasEsgotadas ? '#ef4444' : '#10b981',
                             }}>
-                            {gira.vagas_disponiveis} / {gira.limite_consulentes}
+                              {gira.vagas_disponiveis} / {gira.limite_consulentes}
                             </span>
-                        </div>
-                        <div className="vagas-bar">
+                          </div>
+                          <div className="vagas-bar">
                             <div className="vagas-fill" style={{ width: `${pct}%` }}></div>
-                        </div>
+                          </div>
 
-                        {/* Indicador de fila de espera — visível quando há pessoas aguardando */}
-                        {gira.listaEspera > 0 && (
+                          {/* Indicador de fila de espera — visível quando há pessoas aguardando */}
+                          {gira.lista_espera > 0 && (
                             <div style={{
-                            marginTop: '0.5rem', fontSize: '0.75rem',
-                            color: '#f59e0b', textAlign: 'right',
+                              marginTop: '0.5rem', fontSize: '0.75rem',
+                              color: '#f59e0b', textAlign: 'right',
                             }}>
-                            ⏳ {gira.lista_espera} pessoa{gira.lista_espera > 1 ? 's' : ''} na fila de espera
+                              ⏳ {gira.lista_espera} pessoa{gira.lista_espera > 1 ? 's' : ''} na fila de espera
                             </div>
-                        )}
+                          )}
                         </div>
                         {/* ── Estados da inscrição ── */}
                         {/* lista futura */}
