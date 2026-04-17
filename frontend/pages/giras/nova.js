@@ -91,7 +91,7 @@ export default function NovaGira() {
 
                 <form onSubmit={handleSubmit}>
                   {/* Tipo de acesso — primeira decisão */}
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', color: 'var(--cor-texto)' }}>
                     {[
                       { value: 'publica', emoji: '🌐', label: 'Aberta', desc: 'Consulentes externos' },
                       { value: 'fechada', emoji: '🔒', label: 'Fechada', desc: 'Somente membros' },
@@ -132,7 +132,7 @@ export default function NovaGira() {
                     <FormField label={"Tipo"}>
                       <input className="form-control-custom" value={form.tipo}
                         onChange={e => setForm({ ...form, tipo: e.target.value })}
-                        placeholder="Ex: Caboclos" />
+                        placeholder="Ex: Umbanda" />
                     </FormField>
                   </div>
 
