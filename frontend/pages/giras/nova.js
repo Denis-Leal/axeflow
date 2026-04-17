@@ -7,6 +7,7 @@ import BottomNav from '../../components/BottomNav';
 import { createGira, getMe } from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
 import api from '../../services/api';
+import { Button, FormField, Card, CardHeader, CardBody, StatCard } from '../../components/ui';
 
 export default function NovaGira() {
   const router = useRouter();
@@ -77,11 +78,11 @@ export default function NovaGira() {
           </div>
 
           <div className="page-content">
-            <div className="card-custom" style={{ maxWidth: '700px' }}>
-              <div className="card-header">
+            <Card style={{ maxWidth: '720px', margin: '0 auto' }}>
+              <CardHeader>
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>✦ Detalhes da Gira</span>
-              </div>
-              <div className="p-4">
+              </CardHeader>
+              <CardBody>
                 {error && (
                   <div className="alert-custom alert-danger-custom mb-3">
                     <i className="bi bi-exclamation-circle me-2"></i>{error}
@@ -90,73 +91,74 @@ export default function NovaGira() {
 
                 <form onSubmit={handleSubmit}>
                   {/* Tipo de acesso — primeira decisão */}
-                  <div className="mb-4">
-                    <label className="form-label-custom">Tipo de Gira *</label>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      {[
-                        { value: 'publica', emoji: '🌐', label: 'Aberta ao público', desc: 'Consulentes externos podem se inscrever pelo link' },
-                        { value: 'fechada', emoji: '🔒', label: 'Fechada (membros)', desc: 'Somente membros do terreiro participam' },
-                      ].map(opt => (
-                        <button key={opt.value} type="button"
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    {[
+                      { value: 'publica', emoji: '🌐', label: 'Aberta', desc: 'Consulentes externos' },
+                      { value: 'fechada', emoji: '🔒', label: 'Fechada', desc: 'Somente membros' },
+                    ].map(opt => {
+                      const active = form.acesso === opt.value;
+
+                      return (
+                        <Card
+                          key={opt.value}
                           onClick={() => setForm({ ...form, acesso: opt.value })}
+                          highlight={active}
                           style={{
-                            flex: 1, padding: '0.85rem', borderRadius: '10px', cursor: 'pointer',
-                            background: form.acesso === opt.value ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
-                            border: `1.5px solid ${form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
-                            textAlign: 'left', transition: 'all 0.15s',
-                          }}>
-                          <div style={{ fontSize: '1.1rem', marginBottom: '3px' }}>{opt.emoji}</div>
-                          <div style={{ color: form.acesso === opt.value ? 'var(--cor-acento)' : 'var(--cor-texto)', fontWeight: 600, fontSize: '0.85rem' }}>{opt.label}</div>
-                          <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.72rem', marginTop: '2px' }}>{opt.desc}</div>
-                        </button>
-                      ))}
-                    </div>
+                            flex: 1,
+                            padding: '0.85rem',
+                            cursor: 'pointer',
+                            background: active ? 'rgba(212,175,55,0.08)' : undefined,
+                          }}
+                        >
+                          <div style={{ fontSize: '1.2rem' }}>{opt.emoji}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                            {opt.label}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
+                            {opt.desc}
+                          </div>
+                        </Card>
+                      );
+                    })}
                   </div>
 
                   {/* Título e Tipo */}
                   <div className="row g-3 mb-3">
-                    <div className="col-8">
-                      <label className="form-label-custom">Título *</label>
+                    <FormField label={"Título"} required={true}>
                       <input className="form-control-custom" value={form.titulo}
                         onChange={e => setForm({ ...form, titulo: e.target.value })} required
                         placeholder="Ex: Gira de Caboclos" />
-                    </div>
-                    <div className="col-4">
-                      <label className="form-label-custom">Tipo</label>
+                    </FormField>
+                    <FormField label={"Tipo"}>
                       <input className="form-control-custom" value={form.tipo}
                         onChange={e => setForm({ ...form, tipo: e.target.value })}
                         placeholder="Ex: Caboclos" />
-                    </div>
+                    </FormField>
                   </div>
 
                   {/* Data, Horário e Vagas */}
                   <div className="row g-3 mb-3">
-                    <div className="col-4">
-                      <label className="form-label-custom">Data *</label>
+                    <FormField label={"Data"} required={true}>
                       <input type="date" className="form-control-custom" value={form.data}
                         onChange={e => setForm({ ...form, data: e.target.value })} required />
-                    </div>
-                    <div className="col-4">
-                      <label className="form-label-custom">Horário *</label>
+                    </FormField>
+                    <FormField label={"Horário"} required={true}>
                       <input type="time" className="form-control-custom" value={form.horario}
                         onChange={e => setForm({ ...form, horario: e.target.value })} required />
-                    </div>
+                    </FormField>
                     {form.acesso === 'publica' && (
-                      <div className="col-4">
-                        <label className="form-label-custom">Limite de Vagas *</label>
-
+                      <FormField label={"Limite de Vagas"} required={true}>
                         <input type="number" className="form-control-custom" value={form.limite_consulentes}
                           onChange={e => setForm({ ...form, limite_consulentes: e.target.value })}
                           required min={1} />
-                      </div>                      
+                      </FormField>
                     )}
                     {form.acesso === 'fechada' && (
-                      <div className="col-4">
-                        <label className="form-label-custom">Limite de Membros *</label>
+                      <FormField label={"Limite de Membros"} required={true}>
                         <input type="number" className="form-control-custom" value={form.limite_membros}
                           onChange={e => setForm({ ...form, limite_membros: e.target.value })}
                           required min={1} />
-                      </div>
+                      </FormField>
                     )}
                   </div>
 
@@ -164,13 +166,7 @@ export default function NovaGira() {
                   {form.acesso === 'publica' && (
                   <div className="row g-3 mb-4">
                     {/* Responsável pela lista */}
-                  <div className="mb-3">
-                    <label className="form-label-custom">
-                      Responsável pela Lista
-                      <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.8rem' }}>
-                        (opcional)
-                      </span>
-                    </label>
+                  <FormField label={"Responsável pela Lista (opcional)"} hint="Membro responsável por gerenciar as inscrições desta gira" required={true}>
                     <select
                       className="form-control-custom"
                       value={form.responsavel_lista_id}
@@ -184,37 +180,28 @@ export default function NovaGira() {
                         </option>
                       ))}
                     </select>
-                    <small style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>
-                      Membro responsável por gerenciar as inscrições desta gira
-                    </small>
-                  </div>
+                  </FormField>
 
                     <div className="divider-ornamental">
                       <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Lista de Inscrições</span>
                     </div>
-                    <div className="col-6">
-                      <label className="form-label-custom">Abertura da Lista *</label>
+                    <FormField label={"Abertura da Lista"} required={true}>
                       <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}
                         onChange={e => setForm({ ...form, abertura_lista: e.target.value })} required />
-                    </div>
-                    <div className="col-6">
-                      <label className="form-label-custom">Fechamento da Lista *</label>
+                    </FormField>
+                    <FormField label={"Fechamento da Lista"} required={true}>
                       <input type="datetime-local" className="form-control-custom" value={form.fechamento_lista}
                         onChange={e => setForm({ ...form, fechamento_lista: e.target.value })} required />
-                    </div>
+                    </FormField>
                   </div>
                   )}
 
-                  <button type="submit" className="btn-gold" disabled={loading} style={{ padding: '0.6rem 2rem' }}>
-                    {loading
-                      ? <span className="spinner-border spinner-border-sm me-2"></span>
-                      : <i className="bi bi-stars me-2"></i>
-                    }
-                    Criar Gira
-                  </button>
+                  <Button type="submit" loading={loading} variant='primary' fullWidth={true} disabled={loading}>
+                    <i className="bi bi-stars me-2"></i> Criar Gira
+                  </Button>
                 </form>
-              </div>
-            </div>
+              </CardBody>
+            </Card>
           </div>
         </div>
       </div>

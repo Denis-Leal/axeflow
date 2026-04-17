@@ -1,971 +1,352 @@
-/**
- * pages/giras/[id].js — AxeFlow
- *
- * CORREÇÕES aplicadas nesta versão:
- *
- * Bug 1 — AjeumPanel dentro do PainelPresencaMembros (REMOVIDO):
- *   O componente estava no return do PainelPresencaMembros, que não recebe
- *   `userRole` nem `gira` como props — causava ReferenceError em runtime.
- *   Movido para o lugar correto: após PainelPresencaMembros em ambos os
- *   branches (gira fechada e pública).
- *
- * Bug 2 — handleFecharToast não declarado:
- *   Era referenciado no ToastPromovido mas nunca declarado.
- *   Substituído por arrow function inline, igual ao padrão do restante.
- *
- * Bug 3 — userRole não lido corretamente:
- *   A variável existia mas não era passada para AjeumPanel.
- *   Adicionado isAdmin derivado de userRole no escopo correto.
- */
-
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
-import ConfirmModal from '../../../components/ConfirmModal';
 import AjeumPanel from '../../../components/AjeumPanel';
-import { getGira, listInscricoes, updatePresenca, updatePresencaMembro, cancelarInscricao, reativarInscricao, getMe } from '../../../services/api';
-import api from '../../../services/api';
-import { handleApiError } from '../../../services/errorHandler';
+import ConfirmModal from '../../../components/ConfirmModal';
+import InscricaoCard from '../../../components/inscricao/InscricaoCard';
+import InscricaoTable from '../../../components/inscricao/InscricaoTable';
+import MembrosTable from '../../../components/membro/membroTable';
+import MembroCard from '../../../components/membro/membroCard';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Spinner, StatCard, InfoHeader } from '../../../components/ui';
+import { useGiraDetalhe } from '../../../hooks/useGiraDetalhe';
+import { useIsMobile } from '../../../hooks/useMediaQuery';
+import { formatDate, formatTime } from '../../../utils/format';
+import { useMemo } from 'react';
+import { useState } from 'react';
+import {
+  buildInscricoesComScoreViewModel,
+  buildMembrosPresencaViewModel,
+  buildGiraDetalheStats,
+} from '../../../viewModels/inscricaoViewModel';
 
-// ── Paleta de cores por classificação de score ────────────────────────────────
-const COR_SCORE = {
-  verde:    { bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.35)',  text: '#10b981' },
-  amarelo:  { bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.35)',  text: '#f59e0b' },
-  laranja:  { bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.35)',  text: '#f97316' },
-  vermelho: { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',   text: '#ef4444' },
-  cinza:    { bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)', text: '#94a3b8' },
-};
+// ─── Helpers locais ──────────────────────────────────────────────────────────
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function linkWhatsApp(telefone, mensagem) {
-  const digitos = String(telefone).replace(/\D/g, '');
-  return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
-}
-
-// ── Componente: toast de promoção automática ──────────────────────────────────
-function ToastPromovido({ promovido, giraTitulo, onClose }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 20_000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  if (!promovido) return null;
-
-  const mensagemWA = (
-    `Olá ${promovido.nome}! Uma vaga foi liberada na gira "${giraTitulo}". ` +
-    `Você estava na lista de espera e agora está confirmado(a)! 🎉`
-  );
-
-  return (
-    <div style={{
-      background: 'rgba(16,185,129,0.12)',
-      border: '1px solid rgba(16,185,129,0.4)',
-      borderRadius: '12px',
-      padding: '1rem 1.25rem',
-      marginBottom: '1.25rem',
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '0.75rem',
-    }}>
-      <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>✅</span>
-
-      <div style={{ flex: 1 }}>
-        <div style={{ color: '#10b981', fontWeight: 700, fontSize: '0.9rem' }}>
-          {promovido.nome} foi promovido(a) — WhatsApp aberto automaticamente!
-        </div>
-        <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem', marginTop: '3px' }}>
-          A mensagem de confirmação de vaga foi enviada para {promovido.nome}.
-        </div>
-        <a
-          href={linkWhatsApp(promovido.telefone, mensagemWA)}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-            marginTop: '0.6rem', background: 'rgba(37,211,102,0.10)',
-            border: '1px solid rgba(37,211,102,0.3)', color: '#25d366',
-            borderRadius: '8px', padding: '0.3rem 0.75rem',
-            textDecoration: 'none', fontWeight: 600, fontSize: '0.78rem',
-          }}
-        >
-          <i className="bi bi-whatsapp"></i>
-          Reabrir WhatsApp
-        </a>
-      </div>
-
-      <button
-        onClick={onClose}
-        style={{ background: 'none', border: 'none', color: 'var(--cor-texto-suave)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0' }}
-        title="Fechar"
-      >×</button>
-    </div>
-  );
-}
-
-// ── Componentes auxiliares ────────────────────────────────────────────────────
+// Composicoes locais de Badge permanecem aqui porque representam semantica
+// especifica desta tela; o primitivo reutilizavel continua no Design System.
 function ScoreBadge({ score }) {
-  if (!score) return null;
-  const c = COR_SCORE[score.cor] || COR_SCORE.cinza;
+  if (!score) {
+    return <Badge preset="pendente">Sem historico</Badge>;
+  }
+
   return (
-    <span
-      title={`${score.comparecimentos ?? 0} presenças · ${score.faltas ?? 0} faltas · ${score.finalizadas ?? 0} giras`}
+    <Badge
+      title={score.title}
+      bg={score.bg}
+      color={score.color}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: '3px',
-        background: c.bg, border: `1px solid ${c.border}`, color: c.text,
-        borderRadius: '20px', padding: '1px 8px', fontSize: '0.7rem', fontWeight: 600,
-        whiteSpace: 'nowrap', cursor: 'help',
+        border: `1px solid ${score.border}`,
+        fontSize: '0.72rem',
       }}
     >
-      {score.emoji} {score.score !== null ? `${score.score}%` : score.label}
-    </span>
+      {score.label}
+    </Badge>
   );
 }
 
-function AlertaFalta({ score }) {
-  if (!score?.alerta) return null;
+function AlertBadge({ score }) {
+  if (!score?.alertaLabel) return null;
+
   return (
-    <span
-      title={`${score.faltas} faltas registradas — ocupando vaga sem comparecer`}
+    <Badge
+      bg="rgba(239,68,68,0.1)"
+      color="#ef4444"
       style={{
-        display: 'inline-flex', alignItems: 'center',
-        background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
-        color: '#ef4444', borderRadius: '4px', padding: '1px 6px',
-        fontSize: '0.68rem', marginLeft: '4px', cursor: 'help',
+        border: '1px solid rgba(239,68,68,0.3)',
+        borderRadius: '4px',
+        fontSize: '0.68rem',
+        padding: '1px 5px',
       }}
     >
-      ⚠ {score.faltas}x faltou
-    </span>
+      {score.alertaLabel}
+    </Badge>
   );
 }
 
-function ObservacaoBadge({ texto }) {
-  if (!texto) return null;
+function NoteBadge({ text }) {
+  if (!text) return null;
+
+  return (
+    <Badge
+      title={text}
+      bg="rgba(212,175,55,0.12)"
+      color="#d4af37"
+      style={{ marginTop: '4px', border: '1px solid rgba(212,175,55,0.22)', borderRadius: '6px' }}
+    >
+      <i className="bi bi-chat-left-text me-1" />
+      {text}
+    </Badge>
+  );
+}
+
+function ToastPromovido({ item, onClose }) {
+  if (!item) return null;
+
   return (
     <div
-      title={texto}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: '4px',
-        marginTop: '4px',
-        background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)',
-        borderRadius: '6px', padding: '3px 7px', maxWidth: '260px',
+        margin: '0 1rem 1rem',
+        padding: '0.85rem 1rem',
+        borderRadius: '10px',
+        background: 'rgba(16,185,129,0.08)',
+        border: '1px solid rgba(16,185,129,0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
       }}
     >
-      <i className="bi bi-chat-left-text" style={{ fontSize: '0.65rem', color: '#d4af37', marginTop: '2px', flexShrink: 0 }}></i>
-      <span style={{
-        fontSize: '0.72rem', color: '#d4af37', lineHeight: '1.4',
-        display: '-webkit-box', WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical', overflow: 'hidden',
-      }}>
-        {texto}
-      </span>
+      <i className="bi bi-check-circle-fill" style={{ color: '#10b981' }} />
+      <div style={{ flex: 1, fontSize: '0.82rem' }}>{item.nome} foi promovido(a) da fila.</div>
+      {item.whatsappHref && (
+        <Button as="a" href={item.whatsappHref} target="_blank" variant="success" size="sm">
+          WhatsApp
+        </Button>
+      )}
+      <Button onClick={onClose} variant="ghost" size="sm">
+        Fechar
+      </Button>
     </div>
   );
 }
 
-// ── Painel de presença de membros ─────────────────────────────────────────────
-// IMPORTANTE: este componente NÃO inclui o AjeumPanel.
-// O AjeumPanel é renderizado pelo componente pai (GiraDetalhe),
-// após este painel, porque precisa de `userRole` e `gira` que
-// só existem no escopo de GiraDetalhe.
-// ── SUBSTITUIR apenas a função PainelPresencaMembros em giras/[id].js ────────
-// Localizar: "function PainelPresencaMembros(" e substituir até o próximo
-// componente de nível raiz (function GiraDetalhe).
-//
-// MUDANÇA: adicionado indicador visual de status atual em cada linha de membro,
-// similar ao badge de status que existe na tabela de consulentes.
-// O status 'confirmado' (membro vai comparecer) agora fica visível,
-// diferenciando de 'pendente' (ainda não confirmou).
+// ─── Sub-componentes ─────────────────────────────────────────────────────────
 
-function PainelPresencaMembros({ giraId, acesso, membrosPresenca, onUpdateMembro }) {
-  // Contagens para o header do card
-  const compareceram  = membrosPresenca.filter(m => m.status === 'compareceu').length;
-  const confirmando   = membrosPresenca.filter(m => m.status === 'confirmado').length;
-  const pendentes     = membrosPresenca.filter(m => m.status === 'pendente').length;
-
+function GiraInfoHeader({ gira }) {
+  console.log("Dados da Gira: ", gira)
   return (
-    <div className="card-custom mb-4">
-      <div className="card-header">
-        <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-          {acesso === 'fechada' ? '🔒 Presença dos Membros' : '👥 Confirmação dos Membros'}
-        </span>
-        {/* Contadores resumidos no header */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '1rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
-          <span style={{ color: '#10b981' }}>✓ {compareceram} compareceram</span>
-          <span style={{ color: '#f59e0b' }}>⏳ {confirmando} confirmados</span>
-          <span style={{ color: 'var(--cor-texto-suave)' }}>— {pendentes} pendentes</span>
-          <span style={{ color: 'var(--cor-texto-suave)' }}>· {membrosPresenca.length} total</span>
-        </div>
-      </div>
+    <InfoHeader
+      title={gira.titulo}
+      subtitleItems={[
+        {
+          icon: 'bi-calendar3',
+          label: gira.titleLine,
+        },
+        {
+          label: gira.acessoIcon +' '+ gira.acessoLabel,
+        },
+        ...(gira.tipo ? [{ label: `· ${gira.tipo}` }] : []),
+      ]}
+      badge={
+        <Badge preset={gira.status}>
+          {gira.status}
+        </Badge>
+      }
+    />
+  );
+}
 
-      {/* Legenda dos status — igual ao padrão que existe em outros painéis */}
-      <div style={{
-        padding: '0.6rem 1rem',
-        background: 'rgba(212,175,55,0.04)',
-        borderBottom: '1px solid var(--cor-borda)',
-        fontSize: '0.72rem', color: 'var(--cor-texto-suave)',
-        display: 'flex', gap: '1.5rem', flexWrap: 'wrap',
-      }}>
-        <span>— <strong style={{ color: 'var(--cor-texto)' }}>Pendente</strong> — ainda não confirmou</span>
-        <span>⏳ <strong style={{ color: 'var(--cor-texto)' }}>Confirmado</strong> — membro confirmou presença</span>
-        <span>✅ <strong style={{ color: 'var(--cor-texto)' }}>Compareceu</strong> — admin finalizou após a gira</span>
-        <span>❌ <strong style={{ color: 'var(--cor-texto)' }}>Faltou</strong> — confirmou mas não apareceu</span>
-      </div>
-
-      <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        {membrosPresenca.length === 0 && (
-          <div className="empty-state"><p>Nenhum membro encontrado</p></div>
-        )}
-
-        {membrosPresenca.map(m => {
-          // Mapeamento completo de status → estilo visual
-          // Cada estado tem: fundo, borda, cor do texto e label exibida
-          const statusCfg = {
-            compareceu: {
-              bg:     'rgba(16,185,129,0.07)',
-              border: 'rgba(16,185,129,0.2)',
-              text:   '#10b981',
-              label:  '✓ Compareceu',
-              // Badge compacto exibido ao lado do nome
-              badgeBg:     'rgba(16,185,129,0.15)',
-              badgeBorder: 'rgba(16,185,129,0.4)',
-            },
-            faltou: {
-              bg:     'rgba(239,68,68,0.06)',
-              border: 'rgba(239,68,68,0.18)',
-              text:   '#ef4444',
-              label:  '✗ Faltou',
-              badgeBg:     'rgba(239,68,68,0.12)',
-              badgeBorder: 'rgba(239,68,68,0.35)',
-            },
-            confirmado: {
-              bg:     'rgba(245,158,11,0.07)',
-              border: 'rgba(245,158,11,0.2)',
-              text:   '#f59e0b',
-              label:  '⏳ Vai comparecer',
-              badgeBg:     'rgba(245,158,11,0.12)',
-              badgeBorder: 'rgba(245,158,11,0.35)',
-            },
-            pendente: {
-              bg:     'rgba(255,255,255,0.02)',
-              border: 'var(--cor-borda)',
-              text:   '#94a3b8',
-              label:  '— Pendente',
-              badgeBg:     'rgba(148,163,184,0.08)',
-              badgeBorder: 'rgba(148,163,184,0.2)',
-            },
-          }[m.status] || {
-            bg: 'transparent', border: 'var(--cor-borda)',
-            text: '#94a3b8', label: '— Pendente',
-            badgeBg: 'rgba(148,163,184,0.08)', badgeBorder: 'rgba(148,163,184,0.2)',
-          };
-
-          return (
-            <div
-              key={m.membro_id}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '0.65rem 0.75rem', borderRadius: '8px',
-                // Fundo sutil diferenciado por status — feedback visual imediato
-                background: statusCfg.bg,
-                border: `1px solid ${statusCfg.border}`,
-                gap: '0.5rem', flexWrap: 'wrap',
-              }}
-            >
-              {/* Coluna esquerda: nome, role e badge de status */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>
-                    {m.nome}
-                  </span>
-                  {/* Role do membro em texto menor */}
-                  <span style={{
-                    fontSize: '0.68rem', color: 'var(--cor-texto-suave)',
-                    textTransform: 'capitalize',
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '4px', padding: '1px 5px',
-                  }}>
-                    {m.role}
-                  </span>
-                </div>
-
-                {/* Badge de status — NOVO: exibe o status atual visualmente */}
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center',
-                  fontSize: '0.72rem', fontWeight: 600,
-                  color: statusCfg.text,
-                  background: statusCfg.badgeBg,
-                  border: `1px solid ${statusCfg.badgeBorder}`,
-                  borderRadius: '20px',
-                  padding: '1px 8px',
-                  // Largura automática — não ocupa a linha toda
-                  alignSelf: 'flex-start',
-                }}>
-                  {statusCfg.label}
-                </span>
-              </div>
-
-              {/* Coluna direita: botões de ação (admin marca presença) */}
-              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                {/* Botão ✓ Compareceu — toggle: clica novamente para voltar a pendente */}
-                <button
-                  onClick={() => onUpdateMembro(m.membro_id, m.status === 'compareceu' ? 'pendente' : 'compareceu')}
-                  title={m.status === 'compareceu' ? 'Clique para desmarcar' : 'Marcar compareceu'}
-                  style={{
-                    background: m.status === 'compareceu'
-                      ? 'rgba(16,185,129,0.3)'
-                      : 'rgba(16,185,129,0.08)',
-                    border: `1px solid ${m.status === 'compareceu'
-                      ? 'rgba(16,185,129,0.6)'
-                      : 'rgba(16,185,129,0.2)'}`,
-                    color: '#10b981',
-                    borderRadius: '6px', padding: '0.25rem 0.6rem',
-                    cursor: 'pointer', fontSize: '0.82rem',
-                  }}
-                >
-                  <i className="bi bi-check-lg"></i>
-                </button>
-
-                {/* Botão ✗ Faltou — toggle: clica novamente para voltar a pendente */}
-                <button
-                  onClick={() => onUpdateMembro(m.membro_id, m.status === 'faltou' ? 'pendente' : 'faltou')}
-                  title={m.status === 'faltou' ? 'Clique para desmarcar' : 'Marcar faltou'}
-                  style={{
-                    background: m.status === 'faltou'
-                      ? 'rgba(239,68,68,0.25)'
-                      : 'rgba(239,68,68,0.06)',
-                    border: `1px solid ${m.status === 'faltou'
-                      ? 'rgba(239,68,68,0.5)'
-                      : 'rgba(239,68,68,0.15)'}`,
-                    color: '#ef4444',
-                    borderRadius: '6px', padding: '0.25rem 0.6rem',
-                    cursor: 'pointer', fontSize: '0.82rem',
-                  }}
-                >
-                  <i className="bi bi-x-lg"></i>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+function StatsBar({ stats }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+      gap: '0.5rem',
+      marginBottom: '1rem',
+    }}>
+      <StatCard label="Inscritos" value={stats.ativas} icon="bi-person-check" />
+      <StatCard label="Compareceram" value={stats.compareceram} icon="bi-check-circle" color="#10b981" />
+      <StatCard label="Faltaram" value={stats.faltaram} icon="bi-x-circle" color="#ef4444" />
+      {stats.naFila > 0 && <StatCard label="Fila" value={stats.naFila} icon="bi-hourglass-split" color="#f59e0b" />}
+      {stats.alertas > 0 && <StatCard label="Alertas" value={stats.alertas} icon="bi-exclamation-triangle" color="#f97316" />}
     </div>
   );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────────
+// ─── Página principal ─────────────────────────────────────────────────────────
+
 export default function GiraDetalhe() {
   const router = useRouter();
-  const { id } = router.query;
+  const isMobile = useIsMobile();
 
-  const [gira, setGira]                       = useState(null);
-  const [inscricoes, setInscricoes]           = useState([]);
-  const [membrosPresenca, setMembrosPresenca] = useState([]);
-  const [userRole, setUserRole]               = useState('');  // lido via getMe()
-  const [loading, setLoading]                 = useState(true);
-  const [filtro, setFiltro]                   = useState('todos');
-  const [ordenar, setOrdenar]                 = useState('posicao');
-  const [linkCopiado, setLinkCopiado]         = useState(false);
-  const [promovido, setPromovido]             = useState(null);
-  const [modal, setModal] = useState({
-    aberto: false, titulo: '', mensagem: '',
-    apenasOk: false, tipoBotao: 'perigo',
-    labelConfirmar: 'Confirmar',
-    onConfirmar: null,
-  });
+  // const {
+  //   gira, user, loading, error,
+  //   inscricoes, inscricoesLoading,
+  //   marcarPresenca, cancelarInscricao, reativarInscricao,
+  //   membrosPresenca, membrosLoading, membrosUpdating,
+  //   updateMembro,
+  // } = useGiraDetalhe(router.query.id, router);
 
-  // isAdmin derivado de userRole no escopo correto para passar ao AjeumPanel
-  const isAdmin = ['admin'].includes(userRole);
+  const { state, actions, derived } = useGiraDetalhe(router.query.id, router);
+  const { marcarPresenca, cancelarInscricao, reativarInscricao, updateMembro } = actions;
+  const { loading, inscricoesLoading, membrosLoading } = state;
+  const { vm, isAdmin, lista, metricas, membrosPresenca, membrosUpdating } = derived;
+  const gira = vm;
+  const [abaAtiva, setAbaAtiva] = useState('consulentes'); // 'consulentes' | 'membros'
 
-  // ── Carregamento inicial ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!id) return;
-
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
-
-    // Inclui getMe() para obter userRole — necessário para o AjeumPanel
-    Promise.all([getGira(id), listInscricoes(id), getMe()])
-      .then(([giraRes, inscRes, meRes]) => {
-        const g = giraRes.data;
-        setGira(g);
-        setInscricoes(inscRes.data);
-        setUserRole(meRes.data.role);
-
-        const endpoint = g.acesso === 'fechada'
-          ? `/membros/giras/${id}/presenca-membros`
-          : `/membros/giras/${id}/presenca-membros-publica`;
-
-        return api.get(endpoint).then(r => setMembrosPresenca(r.data)).catch(() => {});
-      })
-      .catch(() => router.push('/giras'))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  const handlePresenca = async (inscricaoId, status) => {
-    try {
-      await updatePresenca(inscricaoId, status);
-      setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status } : i));
-    } catch (err) {
-      const msg = handleApiError(err, 'Atualizar presença');
-      setModal({
-        aberto: true, titulo: 'Erro ao atualizar presença', mensagem: msg,
-        apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
-        onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
-      });
-    }
-  };
-
-  const handlePresencaMembro = async (membroId, status) => {
-    try {
-      await updatePresencaMembro(id, membroId, status);
-      setMembrosPresenca(prev => prev.map(m =>
-        m.membro_id === membroId ? { ...m, status } : m
-      ));
-    } catch (err) {
-      const msg = handleApiError(err, 'Atualizar presença do membro');
-      setModal({
-        aberto: true, titulo: 'Erro ao atualizar presença do membro', mensagem: msg,
-        apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
-        onConfirmar: () => setModal(m => ({ ...m, aberto: false })),
-      });
-    }
-  };
-
-  const copyLink = async () => {
-    const link = `${window.location.origin}/public/${gira.slug_publico}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setLinkCopiado(true);
-      setTimeout(() => setLinkCopiado(false), 2500);
-    } catch {
-      window.prompt('Copie o link abaixo:', link);
-    }
-  };
-
-  const fecharModal = useCallback(() => {
-    setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
-  }, []);
-
-  const handleCancelar = (inscricaoId, nomeConsulente) => {
-    setModal({
-      aberto: true,
-      titulo: 'Cancelar inscrição',
-      mensagem: `Tem certeza que deseja cancelar a inscrição de "${nomeConsulente}"?\n\nEsta ação não pode ser desfeita.`,
-      apenasOk: false, tipoBotao: 'perigo', labelConfirmar: 'Cancelar inscrição',
-      onConfirmar: async () => {
-        fecharModal();
-        try {
-          const res = await cancelarInscricao(inscricaoId);
-          const resultado = res.data;
-
-          setInscricoes(prev => prev.map(i =>
-            i.id === inscricaoId ? { ...i, status: 'cancelado' } : i
-          ));
-
-          if (resultado?.promovido) {
-            const { nome, telefone, posicao } = resultado.promovido;
-            setInscricoes(prev => prev.map(i => {
-              if (i.consulente_telefone === telefone && i.status === 'lista_espera') {
-                return { ...i, status: 'confirmado' };
-              }
-              return i;
-            }));
-            const mensagemWA = (
-              `Olá ${nome}! Uma vaga foi liberada na gira "${gira.titulo}". ` +
-              `Você estava na lista de espera e agora está confirmado(a)! 🎉`
-            );
-            window.open(linkWhatsApp(telefone, mensagemWA), '_blank', 'noopener,noreferrer');
-            setPromovido({ nome, telefone, posicao });
-          }
-        } catch (err) {
-          const msg = handleApiError(err, 'Cancelar inscrição');
-          setModal({
-            aberto: true, titulo: 'Erro ao cancelar', mensagem: msg,
-            apenasOk: true, tipoBotao: 'perigo', labelConfirmar: 'OK',
-            onConfirmar: fecharModal,
-          });
-        }
-      },
-    });
-  };
-
-  const handleReativar = (inscricaoId, nomeConsulente) => {
-    setModal({
-      aberto: true,
-      titulo: 'Reativar inscrição',
-      mensagem: `Reativar a inscrição de "${nomeConsulente}"?\n\nSe ainda houver vaga, voltará como confirmado. Se lotada, entrará na fila de espera.`,
-      apenasOk: false, tipoBotao: 'sucesso', labelConfirmar: 'Reativar',
-      onConfirmar: async () => {
-        fecharModal();
-        const res = await reativarInscricao(inscricaoId);
-        const { status, mensagem } = res.data;
-        setInscricoes(prev => prev.map(i =>
-          i.id === inscricaoId ? { ...i, status } : i
-        ));
-        setModal({
-          aberto: true,
-          titulo: status === 'confirmado' ? '✅ Inscrição reativada' : '⏳ Adicionado à fila',
-          mensagem, apenasOk: true,
-          tipoBotao: status === 'confirmado' ? 'sucesso' : 'padrao',
-          labelConfirmar: 'OK', onConfirmar: fecharModal,
-        });
-      },
-    });
-  };
-
-  // ── Métricas ────────────────────────────────────────────────────────────────
-  const ativas        = inscricoes.filter(i => i.status !== 'cancelado');
-  const alertas       = inscricoes.filter(i => i.score_presenca?.alerta).length;
-  const comObservacao = inscricoes.filter(i => i.observacoes).length;
-  const naFila        = inscricoes.filter(i => i.status === 'lista_espera').length;
-
-  let filtradas = inscricoes.filter(i => filtro === 'todos' || i.status === filtro);
-  filtradas = [...filtradas].sort((a, b) => {
-    if (ordenar === 'posicao') return a.posicao - b.posicao;
-    if (ordenar === 'alerta') {
-      return (a.score_presenca?.alerta ? 0 : 1) - (b.score_presenca?.alerta ? 0 : 1);
-    }
-    const sa = a.score_presenca?.score ?? (ordenar === 'score_asc' ? 999 : -1);
-    const sb = b.score_presenca?.score ?? (ordenar === 'score_asc' ? 999 : -1);
-    return ordenar === 'score_asc' ? sa - sb : sb - sa;
-  });
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold"></div>
-    </div>
+  // ViewModels — só derivam quando dados chegam
+  const inscricoesVM = useMemo(
+    () => (vm?.inscricoes?.length ? buildInscricoesComScoreViewModel(vm?.inscricoes) : []),
+    [vm?.inscricoes]
   );
-  if (!gira) return null;
+  console.log("inscricoesVM-index: ", inscricoesVM)
+  const membrosVM = useMemo(
+    () => (vm?.membersPanel.lista?.length ? buildMembrosPresencaViewModel(vm?.membersPanel.lista) : []),
+    [vm?.membersPanel.lista]
+  );
+  console.log("membrosVM-index: ", membrosVM)
+  const stats = useMemo(
+    () => buildGiraDetalheStats(vm?.inscricoes || []),
+    [vm?.inscricoes]
+  );
+  console.log("stats-index: ", stats)
+  // ─── Estados de carregamento / erro ───────────────────────────────────────
+
+  if (loading) return <Spinner center />;
+
+  if (!gira) {
+    return (
+      <div className="container py-5">
+        <EmptyState
+          icon="bi-exclamation-triangle"
+          title="Gira não encontrada"
+          message="Verifique o link ou tente novamente."
+        />
+      </div>
+    );
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <>
-      <Head><title>{gira.titulo} | AxeFlow</title></Head>
+      <Head><title>Inscrições | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">
-
-          {/* ── Topbar ── */}
           <div className="topbar">
             <div>
-              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {gira.titulo}
-                <span style={{
-                  fontSize: '0.65rem', fontFamily: 'sans-serif', fontWeight: 600, letterSpacing: '0.5px',
-                  padding: '2px 8px', borderRadius: '20px',
-                  background: gira.acesso === 'fechada' ? 'rgba(148,163,184,0.12)' : 'rgba(16,185,129,0.1)',
-                  border: `1px solid ${gira.acesso === 'fechada' ? 'rgba(148,163,184,0.3)' : 'rgba(16,185,129,0.3)'}`,
-                  color: gira.acesso === 'fechada' ? '#94a3b8' : '#10b981',
-                }}>
-                  {gira.acesso === 'fechada' ? '🔒 Fechada' : '🌐 Pública'}
-                </span>
-              </h5>
-              <small style={{ color: 'var(--cor-texto-suave)' }}>
-                <i className="bi bi-calendar3 me-1"></i>
-                {new Date(gira.data + 'T00:00:00').toLocaleDateString('pt-BR')} às {gira.horario}
-                {gira.responsavel_lista_nome && (
-                  <span style={{ marginLeft: '1rem' }}>
-                    <i className="bi bi-person-check me-1"></i>
-                    Resp.: <strong style={{ color: 'var(--cor-acento)' }}>{gira.responsavel_lista_nome}</strong>
-                  </span>
-                )}
-              </small>
+              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Nova Gira</h5>
+              <small style={{ color: 'var(--cor-texto-suave)' }}>Cadastrar nova gira</small>
             </div>
-            <div className="d-flex gap-2 align-items-center flex-wrap">
-              <span className={`badge-status badge-${gira.status}`}>{gira.status}</span>
-              <Link href={`/giras/editar/${id}`} className="btn-outline-gold" style={{ fontSize: '0.85rem', textDecoration: 'none' }}>
-                <i className="bi bi-pencil me-1"></i> Editar
-              </Link>
-              {gira.acesso !== 'fechada' && (
-                <button
-                  onClick={copyLink}
-                  className="btn-outline-gold"
-                  style={{
-                    fontSize: '0.85rem',
-                    background: linkCopiado ? 'rgba(16,185,129,0.15)' : undefined,
-                    borderColor: linkCopiado ? '#10b981' : undefined,
-                    color: linkCopiado ? '#10b981' : undefined,
-                  }}
-                  title="Copiar link de inscrição"
-                >
-                  <i className={`bi ${linkCopiado ? 'bi-check-lg' : 'bi-clipboard'} me-1`}></i>
-                  {linkCopiado ? 'Link copiado!' : 'Copiar link'}
-                </button>
-              )}
-              <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none', fontSize: '0.9rem' }}>
-                ← Voltar
-              </Link>
-            </div>
+            <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none' }}>
+              ← Voltar
+            </Link>
           </div>
 
           <div className="page-content">
+                {/* Header da gira */}
+                <GiraInfoHeader gira={gira} />
 
-            {/* ── Cards de estatísticas ── */}
-            <div className="row g-3 mb-4">
-              <div className="col-6 col-md-3">
-                <div className="stat-card">
-                  <div className="stat-value">{ativas.length}</div>
-                  <div className="stat-label">
-                    {gira.acesso === 'fechada' ? 'Membros inscritos' : 'Consulentes inscritos'}
-                  </div>
+              {/* Stats */}
+                <StatsBar stats={stats} />
+
+                {/* Abas */}
+                <div style={{
+                  display: 'flex',
+                  borderBottom: '1px solid var(--cor-borda)',
+                  marginBottom: '1rem',
+                  gap: '0.25rem',
+                }}>
+                  {['consulentes', 'membros'].map(aba => (
+                    <button
+                      key={aba}
+                      onClick={() => setAbaAtiva(aba)}
+                      style={{
+                        background: abaAtiva === aba ? 'rgba(212,175,55,0.12)' : 'transparent',
+                        border: 'none',
+                        borderBottom: abaAtiva === aba ? '2px solid var(--cor-acento)' : '2px solid transparent',
+                        color: abaAtiva === aba ? 'var(--cor-acento)' : 'var(--cor-texto-suave)',
+                        padding: '0.5rem 1rem',
+                        cursor: 'pointer',
+                        fontWeight: abaAtiva === aba ? 700 : 400,
+                        fontSize: '0.88rem',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {aba === 'consulentes'
+                        ? `Consulentes (${stats.ativas})`
+                        : `Membros (${membrosVM.length})`}
+                    </button>
+                  ))}
                 </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="stat-card">
-                  <div className="stat-value" style={{ color: '#10b981' }}>
-                    {inscricoes.filter(i => i.status === 'compareceu').length}
-                  </div>
-                  <div className="stat-label">Compareceram</div>
-                </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="stat-card">
-                  <div className="stat-value" style={{ color: '#ef4444' }}>
-                    {inscricoes.filter(i => i.status === 'faltou').length}
-                  </div>
-                  <div className="stat-label">Faltaram</div>
-                </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="stat-card">
-                  {naFila > 0 ? (
-                    <>
-                      <div className="stat-value" style={{ color: '#f59e0b' }}>{naFila}</div>
-                      <div className="stat-label">⏳ Na fila de espera</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="stat-value" style={{ color: alertas > 0 ? '#f97316' : 'var(--cor-texto)' }}>
-                        {alertas}
-                      </div>
-                      <div className="stat-label">
-                        {alertas > 0 ? '⚠ Faltantes crônicos' : 'Faltantes crônicos'}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            {/* ── Alerta de faltantes crônicos ── */}
-            {alertas > 0 && (
-              <div style={{
-                background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)',
-                borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1.5rem',
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-              }}>
-                <span style={{ fontSize: '1.2rem' }}>🚨</span>
-                <div>
-                  <strong style={{ color: '#f97316', fontSize: '0.9rem' }}>
-                    {alertas} consulente{alertas > 1 ? 's' : ''} com histórico preocupante
-                  </strong>
-                  <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem' }}>
-                    Inscrito{alertas > 1 ? 's' : ''} nesta gira com 3+ faltas e taxa abaixo de 50%.
-                  </div>
-                </div>
-                <button
-                  onClick={() => setOrdenar('alerta')}
-                  style={{
-                    marginLeft: 'auto', background: 'rgba(249,115,22,0.15)',
-                    border: '1px solid rgba(249,115,22,0.4)', color: '#f97316',
-                    borderRadius: '6px', padding: '0.3rem 0.75rem', cursor: 'pointer',
-                    fontSize: '0.8rem', whiteSpace: 'nowrap',
-                  }}
-                >
-                  Ver primeiro
-                </button>
-              </div>
-            )}
+                {/* ─── Aba Consulentes ─────────────────────────────────── */}
+                {abaAtiva === 'consulentes' && (
+                  <>
+                    {inscricoesLoading && <div className="text-center py-3"><Spinner /></div>}
 
-            {/* ── Branch: gira FECHADA ── */}
-            {gira.acesso === 'fechada' ? (
-              <>
-                <PainelPresencaMembros
-                  giraId={id} acesso={gira.acesso}
-                  membrosPresenca={membrosPresenca} onUpdateMembro={handlePresencaMembro}
-                />
-
-                {/* AjeumPanel após o painel de membros — no escopo correto */}
-                <AjeumPanel
-                  giraId={id}
-                  isAdmin={isAdmin}
-                  giraStatus={gira.status}
-                />
-              </>
-            ) : (
-              <>
-                {/* ── GIRA PÚBLICA: lista de consulentes ── */}
-                <div className="card-custom mb-4">
-                  <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-                      ✦ Lista de Consulentes
-                    </span>
-
-                    {naFila > 0 && (
-                      <span style={{
-                        fontSize: '0.72rem', color: '#f59e0b',
-                        background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
-                        borderRadius: '20px', padding: '1px 8px',
-                      }}>
-                        ⏳ {naFila} na fila de espera
-                      </span>
-                    )}
-
-                    {comObservacao > 0 && (
-                      <span style={{
-                        fontSize: '0.72rem', color: '#d4af37',
-                        background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)',
-                        borderRadius: '20px', padding: '1px 8px',
-                      }}>
-                        <i className="bi bi-chat-left-text me-1"></i>
-                        {comObservacao} com observaç{comObservacao > 1 ? 'ões' : 'ão'}
-                      </span>
-                    )}
-
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        {['todos', 'confirmado', 'lista_espera', 'compareceu', 'faltou'].map(f => (
-                          <button key={f} onClick={() => setFiltro(f)} style={{
-                            background: filtro === f ? 'rgba(212,175,55,0.2)' : 'transparent',
-                            border: '1px solid ' + (filtro === f ? 'var(--cor-acento)' : 'var(--cor-borda)'),
-                            color: filtro === f ? 'var(--cor-acento)' : 'var(--cor-texto-suave)',
-                            borderRadius: '6px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.72rem',
-                          }}>
-                            {f === 'todos' ? 'Todos' : f === 'lista_espera' ? '⏳ Fila' : f.charAt(0).toUpperCase() + f.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                      <select value={ordenar} onChange={e => setOrdenar(e.target.value)} style={{
-                        background: 'var(--cor-card)', border: '1px solid var(--cor-borda)',
-                        color: 'var(--cor-texto-suave)', borderRadius: '6px',
-                        padding: '0.2rem 0.5rem', fontSize: '0.72rem', cursor: 'pointer',
-                      }}>
-                        <option value="posicao">Ordenar: Posição</option>
-                        <option value="score_asc">Score: Menor primeiro</option>
-                        <option value="score_desc">Score: Maior primeiro</option>
-                        <option value="alerta">⚠ Alertas primeiro</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Toast de promoção automática */}
-                  {promovido && (
-                    <div style={{ padding: '0.75rem 1rem 0' }}>
-                      <ToastPromovido
-                        promovido={promovido}
-                        giraTitulo={gira.titulo}
-                        onClose={() => setPromovido(null)}
+                    {!inscricoesLoading && inscricoesVM.length === 0 && (
+                      <EmptyState
+                        icon="bi-person-x"
+                        title="Nenhuma inscrição"
+                        message="Ainda não há consulentes inscritos nesta gira."
                       />
-                    </div>
-                  )}
+                    )}
 
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="table-custom">
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Nome</th>
-                          <th>Histórico</th>
-                          <th>Status</th>
-                          <th className="d-none d-md-table-cell">Inscrito em</th>
-                          <th>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filtradas.map(i => {
-                          const sc = i.score_presenca;
-                          const eListaEspera = i.status === 'lista_espera';
-                          const mensagemWA = (
-                            `Olá ${i.consulente_nome}! Uma vaga foi liberada na gira "${gira.titulo}". ` +
-                            `Você estava na fila de espera e agora está confirmado(a)! 🎉`
-                          );
+                    {!inscricoesLoading && inscricoesVM.length > 0 && (
+                      isMobile ? (
+                        /* Mobile: cards */
+                        <div>
+                          {inscricoesVM.map(i => (
+                            <InscricaoCard
+                              key={i.id}
+                              inscricao={i}
+                              giraTitulo={gira.titulo}
+                              podeGerenciar={isAdmin}
+                              onPresenca={marcarPresenca}
+                              onCancelar={cancelarInscricao}
+                              onReativar={reativarInscricao}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        /* Desktop: tabela */
+                        <InscricaoTable
+                          inscricoes={inscricoesVM}
+                          podeGerenciar={isAdmin}
+                          onPresenca={marcarPresenca}
+                          onCancelar={cancelarInscricao}
+                          onReativar={reativarInscricao}
+                        />
+                      )
+                    )}
+                  </>
+                )}
 
-                          return (
-                            <tr key={i.id} style={{
-                              background: sc?.alerta
-                                ? 'rgba(239,68,68,0.04)'
-                                : eListaEspera ? 'rgba(245,158,11,0.03)' : 'transparent',
-                            }}>
-                              <td style={{ color: eListaEspera ? '#f59e0b' : 'var(--cor-acento)', fontFamily: 'Cinzel', fontWeight: 700 }}>
-                                {i.posicao}º
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <strong>{i.consulente_nome}</strong>
-                                  <AlertaFalta score={sc} />
-                                </div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
-                                  {i.consulente_telefone}
-                                </div>
-                                <ObservacaoBadge texto={i.observacoes} />
-                              </td>
-                              <td>
-                                {sc ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <ScoreBadge score={sc} />
-                                    {sc.finalizadas > 0 ? (
-                                      <span style={{ fontSize: '0.68rem', color: 'var(--cor-texto-suave)' }}>
-                                        {sc.comparecimentos}✓ {sc.faltas}✗ / {sc.finalizadas} giras
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: '0.68rem', color: 'var(--cor-texto-suave)' }}>
-                                        Sem histórico anterior
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>—</span>
-                                )}
-                              </td>
-                              <td>
-                                {eListaEspera ? (
-                                  <span style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                    padding: '0.3rem 0.7rem', borderRadius: '20px',
-                                    fontSize: '0.75rem', fontWeight: 600,
-                                    background: 'rgba(245,158,11,0.15)', color: '#f59e0b',
-                                    border: '1px solid rgba(245,158,11,0.3)',
-                                  }}>
-                                    ⏳ fila de espera
-                                  </span>
-                                ) : (
-                                  <span className={`badge-status badge-${i.status}`}>{i.status}</span>
-                                )}
-                              </td>
-                              <td className="d-none d-md-table-cell" style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem' }}>
-                                {new Date(i.created_at).toLocaleString('pt-BR')}
-                              </td>
-                              <td>
-                                {i.status === 'cancelado' ? (
-                                  <button
-                                    onClick={() => handleReativar(i.id, i.consulente_nome || 'este consulente')}
-                                    title="Reativar inscrição"
-                                    style={{
-                                      background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)',
-                                      color: 'var(--cor-acento)', borderRadius: '6px', padding: '0.25rem 0.6rem',
-                                      cursor: 'pointer', fontSize: '0.78rem',
-                                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                    }}
-                                  >
-                                    <i className="bi bi-arrow-counterclockwise"></i>
-                                    Reativar
-                                  </button>
-                                ) : (
-                                  <div className="d-flex gap-1">
-                                    {eListaEspera && i.consulente_telefone && (
-                                      <a
-                                        href={linkWhatsApp(i.consulente_telefone, mensagemWA)}
-                                        target="_blank" rel="noopener noreferrer"
-                                        title="Avisar via WhatsApp que a vaga foi liberada"
-                                        style={{
-                                          display: 'inline-flex', alignItems: 'center',
-                                          background: 'rgba(37,211,102,0.12)', border: '1px solid rgba(37,211,102,0.35)',
-                                          color: '#25d366', borderRadius: '6px',
-                                          padding: '0.25rem 0.5rem', fontSize: '0.85rem', textDecoration: 'none',
-                                        }}
-                                      >
-                                        <i className="bi bi-whatsapp"></i>
-                                      </a>
-                                    )}
-                                    {!eListaEspera && (
-                                      <>
-                                        <button onClick={() => handlePresenca(i.id, 'compareceu')} title="Marcar presença"
-                                          style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
-                                          <i className="bi bi-check-lg"></i>
-                                        </button>
-                                        <button onClick={() => handlePresenca(i.id, 'faltou')} title="Marcar falta"
-                                          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
-                                          <i className="bi bi-x-lg"></i>
-                                        </button>
-                                      </>
-                                    )}
-                                    <button
-                                      onClick={() => handleCancelar(i.id, i.consulente_nome || 'este consulente')}
-                                      title="Cancelar inscrição"
-                                      style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
-                                    >
-                                      <i className="bi bi-trash"></i>
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {filtradas.length === 0 && (
-                          <tr><td colSpan="6">
-                            <div className="empty-state">
-                              <i className="bi bi-people d-block"></i>
-                              <p>Nenhum consulente {filtro !== 'todos' ? `com status "${filtro}"` : 'inscrito'}</p>
-                            </div>
-                          </td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                {/* ─── Aba Membros ─────────────────────────────────────── */}
+                {abaAtiva === 'membros' && (
+                  <>
+                    {membrosLoading && <div className="text-center py-3"><Spinner /></div>}
 
-                  {/* Legenda dos scores */}
-                  <div style={{
-                    padding: '0.75rem 1rem', borderTop: '1px solid var(--cor-borda)',
-                    display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center',
-                  }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>Score de presença:</span>
-                    {[
-                      { emoji: '✅', label: 'Confiável ≥80%', cor: 'verde' },
-                      { emoji: '⚠️', label: 'Regular 50–79%', cor: 'amarelo' },
-                      { emoji: '🔶', label: 'Risco 20–49%', cor: 'laranja' },
-                      { emoji: '🚫', label: 'Problemático <20%', cor: 'vermelho' },
-                      { emoji: '🆕', label: 'Novo (< 2 giras)', cor: 'cinza' },
-                    ].map(s => {
-                      const c = COR_SCORE[s.cor];
-                      return (
-                        <span key={s.cor} style={{
-                          fontSize: '0.7rem', color: c.text,
-                          background: c.bg, border: `1px solid ${c.border}`,
-                          borderRadius: '20px', padding: '1px 8px',
-                        }}>
-                          {s.emoji} {s.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
+                    {!membrosLoading && membrosVM.length === 0 && (
+                      <EmptyState
+                        icon="bi-people"
+                        title="Nenhum membro"
+                        message="Nenhum membro registrado para esta gira."
+                      />
+                    )}
 
-                {/* Painel de presença dos membros (complementar em giras públicas) */}
-                <PainelPresencaMembros
-                  giraId={id} acesso={gira.acesso}
-                  membrosPresenca={membrosPresenca} onUpdateMembro={handlePresencaMembro}
-                />
-
-                {/* AjeumPanel após o painel de membros — no escopo correto */}
-                <AjeumPanel
-                  giraId={id}
-                  isAdmin={isAdmin}
-                  giraStatus={gira.status}
-                />
-              </>
-            )}
-
+                    {!membrosLoading && membrosVM.length > 0 && (
+                      isMobile ? (
+                        /* Mobile: cards compactos */
+                        <div>
+                          {membrosVM.map(m => (
+                            <MembroCard
+                              key={m.membroId}
+                              membro={m}
+                              podeGer={isAdmin}
+                              onUpdate={updateMembro}
+                              updating={membrosUpdating}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        /* Desktop: tabela */
+                        <MembrosTable
+                          membros={membrosVM}
+                          podeGer={isAdmin}
+                          onUpdateMembro={updateMembro}
+                          updating={membrosUpdating}
+                        />
+                      )
+                    )}
+                  </>
+                )}
+            <BottomNav></BottomNav>
           </div>
         </div>
       </div>
-      <BottomNav />
-
-      <ConfirmModal
-        aberto={modal.aberto}
-        titulo={modal.titulo}
-        mensagem={modal.mensagem}
-        apenasOk={modal.apenasOk}
-        tipoBotao={modal.tipoBotao}
-        labelConfirmar={modal.labelConfirmar}
-        onConfirmar={modal.onConfirmar}
-        onCancelar={fecharModal}
-      />
     </>
   );
 }

@@ -14,6 +14,7 @@ from datetime import datetime
 from app.core.database import get_db
 from app.models.gira import Gira, StatusGiraEnum
 from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from app.models.inscricao_consulente import InscricaoConsulente
 from app.schemas.inscricao_schema import InscricaoPublicaRequest
 from app.services import inscricao_service
 from slowapi import Limiter
@@ -50,16 +51,16 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
 
     # Conta apenas inscrições de CONSULENTES (consulente_id IS NOT NULL).
     # Membros confirmados são contados em pool separado e não ocupam vagas do público.
-    total_consulentes_confirmados = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira.id,
-        InscricaoGira.consulente_id.isnot(None),        # apenas externos
-        InscricaoGira.status == StatusInscricaoEnum.confirmado,
+    total_consulentes_confirmados = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.gira_id == gira.id,
+        InscricaoConsulente.consulente_id.isnot(None),        # apenas externos
+        InscricaoConsulente.status == StatusInscricaoEnum.confirmado,
     ).count()
 
-    lista_espera = db.query(InscricaoGira).filter(
-        InscricaoGira.gira_id == gira.id,
-        InscricaoGira.consulente_id.isnot(None),        # apenas externos
-        InscricaoGira.status == StatusInscricaoEnum.lista_espera,
+    lista_espera = db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.gira_id == gira.id,
+        InscricaoConsulente.consulente_id.isnot(None),        # apenas externos
+        InscricaoConsulente.status == StatusInscricaoEnum.lista_espera,
     ).count()
 
     vagas_disponiveis = max(0, gira.limite_consulentes - total_consulentes_confirmados)
@@ -73,6 +74,7 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
 
     return {
         "id":                 str(gira.id),
+        "slug":               gira.slug_publico,
         "titulo":             gira.titulo,
         "tipo":               gira.tipo,
         "data":               gira.data.isoformat(),

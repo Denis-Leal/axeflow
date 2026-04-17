@@ -64,10 +64,10 @@ useEffect(() => {
     navigator.serviceWorker
       .register('/firebase-messaging-sw.js')
       .then((registration) => {
-        console.log('[SW] registrado:', registration);
+        console.log('[SW] registrado:');
       })
       .catch((err) => {
-        console.error('[SW] erro ao registrar:', err);
+        console.error('[SW] erro ao registrar:');
       });
   }
 }, []);
