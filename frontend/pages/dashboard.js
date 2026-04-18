@@ -23,6 +23,7 @@ import { buildDashboardViewModel } from '../viewModels/giraViewModel';
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 
 function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConfirmar }) {
+  console.log("Tipo de gira: ", gira)
   if (!gira) return null;
 
   return (
@@ -46,13 +47,15 @@ function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConf
         </div>
 
         {/* Barra de vagas */}
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
-            <span>Vagas</span>
-            <span style={{ fontWeight: 700 }}>{gira.vagasOcupadas}</span>
+        {gira.acesso == "publica" && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
+              <span>Vagas</span>
+              <span style={{ fontWeight: 700 }}>{gira.vagasOcupadas}</span>
+            </div>
+            <ProgressBar ratio={gira.ratio} />
           </div>
-          <ProgressBar ratio={gira.ratio} />
-        </div>
+        )}
 
         {/* Ação principal: confirmar presença */}
         {gira.podeCofirmar && (

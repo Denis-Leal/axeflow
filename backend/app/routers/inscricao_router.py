@@ -166,6 +166,15 @@ def reativar_inscricao(
     )
     return result
 
+@router.get("/consulentes")
+def lista_consulentes(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    consulentes = db.query(Consulente).filter(
+        Consulente.terreiro_id == user.terreiro_id
+    ).all()
+    return consulentes
 
 @router.get("/consulentes/ranking")
 def ranking_presenca(
