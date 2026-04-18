@@ -19,7 +19,7 @@ export default function MembroCard({ membro, podeGer, onUpdate, updating }) {
       background:   'rgba(255,255,255,0.02)',
     }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{membro.nome}</div>
+        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{membro.nome}</div>
         <div style={{ fontSize: '0.74rem', color: 'var(--cor-texto-suave)' }}>{membro.role}</div>
       </div>
       <Badge preset={membro.status}>{membro.statusLabel}</Badge>
