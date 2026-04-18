@@ -373,13 +373,20 @@ def confirmar_presenca_propria(
         if presenca.status == StatusInscricaoEnum.confirmado:
             db.delete(presenca)
             db.commit()
+            
+            payload = {
+                "title": "❌ Presença Cancelada",
+                "terreiro_id": str(gira.terreiro_id),
+                "body": f"{user.nome} cancelou a presença na {gira.titulo}",
+                "url": f"/giras/{gira.id}",
+            }
 
             send_push_to_terreiro(
+                db=db,
                 terreiro_id=gira.terreiro_id,
-                title="❌ Presença Cancelada",
-                body=f"{user.nome} cancelou a presença na {gira.titulo}",
-                url=f"/giras/{gira.id}",
+                payload=payload,
             )
+            
             return {"ok": True, "status": "pendente", "acao": "cancelado"}
 
         # Admin já marcou compareceu/faltou — membro não pode reverter
@@ -398,13 +405,20 @@ def confirmar_presenca_propria(
     )
     db.add(presenca)
     db.commit()
+    
+    payload = {
+        "title": "✅ Presença Confirmada",
+        "terreiro_id": str(gira.terreiro_id),
+        "body": f"{user.nome} confirmou presença na {gira.titulo}",
+        "url": f"/giras/{gira.id}",
+    }
 
     send_push_to_terreiro(
+        db=db,
         terreiro_id=gira.terreiro_id,
-        title="✅ Presença Confirmada",
-        body=f"{user.nome} confirmou presença na {gira.titulo}",
-        url=f"/giras/{gira.id}",
+        payload=payload,
     )
+
     return {"ok": True, "status": "confirmado", "acao": "confirmado"}
 
 
