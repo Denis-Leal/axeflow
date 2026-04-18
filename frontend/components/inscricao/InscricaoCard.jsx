@@ -37,7 +37,7 @@ export default function InscricaoCard({
         }}
       >
         <div>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--cor-texto)' }}>
             {i.posicao}º — {i.nome}
           </div>
 

@@ -216,8 +216,8 @@ export default function GiraDetalhe() {
         <div className="main-content">
           <div className="topbar">
             <div>
-              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Nova Gira</h5>
-              <small style={{ color: 'var(--cor-texto-suave)' }}>Cadastrar nova gira</small>
+              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Inscrições</h5>
+              <small style={{ color: 'var(--cor-texto-suave)' }}>Lista de inscritos na gira</small>
             </div>
             <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none' }}>
               ← Voltar
