@@ -82,6 +82,31 @@ export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, o
         >
           <i className="bi bi-list-ul" /> Inscrições
         </Link>
+        {/* Inscrever */}
+        {gira.slugPublico && (
+          <Link
+            href={`/giras/${gira.slugPublico}/inscricoes`}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex:           '1',
+              minWidth:       '100px',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              gap:            '0.35rem',
+              padding:        '0.45rem 0.75rem',
+              background:     'rgba(102, 55, 212, 0.12)',
+              border:         '1px solid rgba(212,175,55,0.35)',
+              borderRadius:   '8px',
+              color:          'var(--cor-acento)',
+              fontWeight:     600,
+              fontSize:       '0.82rem',
+              textDecoration: 'none',
+            }}
+          >
+            <i className="bi bi-person-plus"></i>Inscrever
+          </Link>
+        )}
 
         {/* Consumo */}
         {!gira.concluida && (

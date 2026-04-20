@@ -69,7 +69,7 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
             consulente_telefone=i.consulente.telefone if i.consulente else None,
             observacoes=i.observacoes,
             usuario_id=i.usuario_id,
-            source=i.consulente.source
+            source=i.consulente.source if i.consulente else None
         )
         for i in inscricoes
     ]

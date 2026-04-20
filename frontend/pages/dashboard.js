@@ -115,7 +115,7 @@ function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConf
               fontSize: '0.78rem',
             }}
           >
-            <i className="bi bi-share me-1" />Inscrever
+            <i className="bi bi-person-plus me-1" />Inscrever
           </Link>
         )}
       </div>
