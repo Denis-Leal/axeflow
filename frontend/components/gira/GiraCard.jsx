@@ -4,8 +4,10 @@
  * Recebe ViewModel — sem dados crus da API.
  */
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 import { Badge, ProgressBar, Button } from '../ui';
 import { useRouter } from 'next/router';
+
 export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, onDelete }) {
   const router = useRouter();
   return (
@@ -109,12 +111,21 @@ export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, o
 
         {/* Link público */}
         {gira.slugPublico && (
-          <a
-            href={`/public/${gira.slugPublico}`}
-            onClick={(e) => e.stopPropagation()}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Página pública"
+          <button
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('CLICK COPY');
+
+                const url = `${window.location.origin}/public/${gira.slugPublico}`;
+
+                navigator.clipboard.writeText(url)
+                  .then(() => {
+                    toast.success('Link copiado para a área de transferência');
+                  })
+                  .catch((err) => {
+                    toast.error('Erro ao copiar o link.', { autoClose: 4000 });
+                  });
+              }}
             style={{
               padding:     '0.45rem 0.6rem',
               background:  'transparent',
@@ -126,8 +137,8 @@ export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, o
               textDecoration: 'none',
             }}
           >
-            <i className="bi bi-share" />
-          </a>
+            <i className="bi bi-copy"></i>
+          </button>
         )}
 
         {/* Editar */}
