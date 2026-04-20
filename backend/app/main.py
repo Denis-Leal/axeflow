@@ -28,7 +28,8 @@ from app.models.terreiro import Terreiro
 from app.models.usuario import Usuario
 from app.models.gira import Gira
 from app.models.consulente import Consulente
-from app.models.inscricao import InscricaoGira
+from app.models.inscricao_consulente import InscricaoConsulente
+from app.models.inscricao_membro import InscricaoMembro
 from app.models.push_subscription import PushSubscription
 
 #Sistema de inventário e consumo por gira
@@ -144,7 +145,8 @@ def metrics():
     from app.core.database import SessionLocal
     from app.models.terreiro import Terreiro
     from app.models.gira import Gira
-    from app.models.inscricao import InscricaoGira
+    from app.models.inscricao_consulente import InscricaoConsulente
+    from app.models.inscricao_membro import InscricaoMembro
     from app.models.consulente import Consulente
     from app.models.usuario import Usuario
 
@@ -155,7 +157,8 @@ def metrics():
             "usuarios":          db.query(Usuario).filter(Usuario.ativo == True).count(),
             "giras_ativas":      db.query(Gira).filter(Gira.deleted_at.is_(None)).count(),
             "giras_total":       db.query(Gira).count(),
-            "inscricoes_total":  db.query(InscricaoGira).count(),
+            "inscricoes_consulentes_total":  db.query(InscricaoConsulente).count(),
+            "inscricoes_membro_total":  db.query(InscricaoMembro).count(),
             "consulentes_total": db.query(Consulente).count(),
         }
     finally:

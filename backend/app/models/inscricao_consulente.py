@@ -17,7 +17,7 @@ from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from app.models.inscricao_status import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 
 
 class InscricaoConsulente(Base):

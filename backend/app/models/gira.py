@@ -7,7 +7,6 @@ separados. back_populates agora aponta para:
   - inscricoes_consulente (InscricaoConsulente) — giras públicas
   - inscricoes_membro     (InscricaoMembro)     — giras fechadas
 
-O relacionamento legado `inscricoes` (InscricaoGira) é mantido
 temporariamente enquanto a tabela inscricoes_gira ainda existe.
 Remover após a migration 0008 ser aplicada em produção.
 """
@@ -58,15 +57,6 @@ class Gira(Base):
 
     terreiro          = relationship("Terreiro", back_populates="giras")
     responsavel_lista = relationship("Usuario", back_populates="giras_responsavel")
-
-    # ── Relacionamentos legados (inscricoes_gira) ─────────────────────────────
-    # Mantido enquanto a tabela inscricoes_gira ainda existir.
-    # Remover após aplicar a migration 0008 em produção.
-    inscricoes = relationship(
-        "InscricaoGira",
-        back_populates="gira",
-        cascade="all, delete-orphan",
-    )
 
     # ── Novos relacionamentos separados por domínio ───────────────────────────
     inscricoes_consulente = relationship(

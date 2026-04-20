@@ -2,10 +2,6 @@
 presenca_consulente_service.py — AxeFlow
 Score de presença: o core real do sistema.
 Calcula confiabilidade de cada consulente com base no histórico.
-
-CORREÇÃO: todas as queries de ranking/score agora usam InscricaoConsulente
-(nova fonte de verdade) em vez de InscricaoGira (tabela legado).
-A tabela legado não recebe mais inscrições novas desde a migration 0007.
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -14,7 +10,7 @@ from app.models.consulente import Consulente
 
 # CORREÇÃO: importa o novo model, não o legado
 from app.models.inscricao_consulente import InscricaoConsulente
-from app.models.inscricao_status import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.gira import Gira
 
 
@@ -75,9 +71,6 @@ def calcular_score(total: int, comparecimentos: int, faltas: int) -> dict:
 def get_score_consulente(db: Session, consulente_id: UUID, terreiro_id: UUID) -> dict:
     """
     Score completo de um consulente neste terreiro.
-
-    CORREÇÃO: usa InscricaoConsulente (nova tabela) filtrando pelas giras
-    do terreiro, em vez de InscricaoGira (legado) que não recebe novas inscrições.
     """
     # IDs das giras deste terreiro (para filtrar inscrições do consulente)
     gira_ids = [
@@ -86,7 +79,6 @@ def get_score_consulente(db: Session, consulente_id: UUID, terreiro_id: UUID) ->
     if not gira_ids:
         return calcular_score(0, 0, 0)
 
-    # CORREÇÃO: InscricaoConsulente substituindo InscricaoGira
     inscricoes = (
         db.query(InscricaoConsulente)
         .filter(
@@ -165,10 +157,6 @@ def get_ranking_consulentes(db: Session, terreiro_id: UUID) -> list:
     """
     Lista todos os consulentes do terreiro com score calculado.
     Ordena: problemáticos primeiro (precisam de atenção), depois por taxa asc.
-
-    CORREÇÃO: usa InscricaoConsulente (nova fonte de verdade) em vez de
-    InscricaoGira (legado). A tabela legado não recebe novas inscrições desde
-    a migration 0007_separar_inscricoes, portanto os dados estavam desatualizados.
 
     CAMPO: total_inscricoes agora é populado corretamente (inscrições não
     canceladas), resolvendo o bug da coluna "Giras" aparecer como 0 no frontend.

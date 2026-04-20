@@ -48,7 +48,7 @@ from app.schemas.inventory_schema import (
     StockResponse,
 )
 from app.services.push_service import send_push_to_terreiro, send_push_to_user
-from app.models.inscricao import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.inscricao_membro import InscricaoMembro
 
 logger = logging.getLogger(__name__)
@@ -656,7 +656,7 @@ def finalizar_gira(
     # Identifica todos os médiuns que participaram da gira (via InscricaoMembro)
     # e não registraram nenhum consumo
     from app.models.inscricao_membro import InscricaoMembro
-    from app.models.inscricao_status import StatusInscricaoEnum
+    from app.utils.enuns import StatusInscricaoEnum
 
     mediums_participantes = {
         str(im.membro_id)

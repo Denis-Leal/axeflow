@@ -17,8 +17,21 @@ from app.models.terreiro import Terreiro
 from app.models.usuario import Usuario
 from app.models.gira import Gira
 from app.models.consulente import Consulente
-from app.models.inscricao import InscricaoGira
+from app.models.inscricao_consulente import InscricaoConsulente
+from app.models.inscricao_membro import InscricaoMembro
 from app.models.push_subscription import PushSubscription
+from app.models.device import Device
+from app.models.notification_log import NotificationLog
+from app.models.audit_log import AuditLog
+from app.models.api_key import ApiKey
+from app.models.password_reset_token import PasswordResetToken
+from app.models.ajeum import Ajeum, AjeumItem, AjeumSelecao
+from app.models.inventory_item import InventoryItem
+from app.models.inventory_owner import InventoryOwner
+from app.models.inventory_movement import InventoryMovement
+from app.models.inventory_alert import InventoryAlert
+from app.models.gira_item_consumption import GiraItemConsumption
+
 
 config = context.config
 

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from app.core.database import get_db
 from app.models.gira import Gira, StatusGiraEnum
-from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.schemas.inscricao_schema import InscricaoPublicaRequest
 from app.services import inscricao_service
