@@ -32,10 +32,10 @@ def upgrade() -> None:
     #
     # Exemplo: atribuir todos ao mesmo terreiro (TEMPORÁRIO)
     #
-    op.execute("""
-        UPDATE consulentes
-        SET terreiro_id = '398dd422-a0e3-4ad8-8169-67a868d73a05'
-    """)
+    # op.execute("""
+    #     UPDATE consulentes
+    #     SET terreiro_id = '398dd422-a0e3-4ad8-8169-67a868d73a05'
+    # """)
 
     # ⚠️ Se não fizer isso, o próximo passo VAI FALHAR
 

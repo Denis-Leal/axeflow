@@ -15,3 +15,4 @@ class Terreiro(Base):
 
     usuarios = relationship("Usuario", back_populates="terreiro")
     giras = relationship("Gira", back_populates="terreiro")
+    consulente = relationship("Consulente", back_populates="terreiro")
