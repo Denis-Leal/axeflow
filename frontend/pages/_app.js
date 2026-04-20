@@ -20,6 +20,8 @@ import { useRouter } from 'next/router';
 import { GiraProvider } from '../contexts/GiraContext';
 import Head from 'next/head';
 import { getFirebaseMessaging } from "../services/firebase";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -146,6 +148,19 @@ useEffect(() => {
       <GiraProvider>
         <Component {...pageProps} />
       </GiraProvider>
+      {/* ✅ AQUI é o lugar certo */}
+      <ToastContainer
+        position="top-center"
+        autoClose={2500}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="dark"
+        toastClassName="toast-custom"
+        bodyClassName="toast-body-custom"
+        progressClassName="toast-progress-custom"
+      />
     </>
   );
 }
