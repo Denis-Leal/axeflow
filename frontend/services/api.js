@@ -135,6 +135,7 @@ export const criarItemMedium       = (data)                => api.post('/invento
 export const getSaldoItem          = (itemId)              => api.get(`/inventory/items/${itemId}/stock`);
 export const getHistoricoItem      = (itemId, limit = 20)  => api.get(`/inventory/items/${itemId}/history`, { params: { limit } });
 export const registrarMovimentacao = (itemId, data)        => api.post(`/inventory/items/${itemId}/movements`, data);
+export const listarItensMediuns    = (ownerId)             => api.get('/inventory/items/by-owner', { params: ownerId ? { owner_id: ownerId } : {} });
 
 // Consumo por gira
 export const listarConsumos        = (giraId)              => api.get(`/giras/${giraId}/consumption`);

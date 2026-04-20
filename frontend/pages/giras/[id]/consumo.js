@@ -208,9 +208,11 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, 
               onChange={e => set('item_id', e.target.value)}
               style={{ appearance: 'auto' }}
             >
-              <option value="">— Selecione o item usado —</option>
+              <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                — Selecione o item usado —
+              </option>
               {itens.map(i => (
-                <option key={i.id} value={i.id}>
+                <option key={i.id} value={i.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
                   {i.name} (saldo: {i.current_stock ?? '?'})
                 </option>
               ))}

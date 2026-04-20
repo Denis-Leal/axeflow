@@ -22,8 +22,10 @@ import Head from 'next/head';
 import { getFirebaseMessaging } from "../services/firebase";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 export default function App({ Component, pageProps }) {
+  const isMobile = useIsMobile();
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
   const swListenerRegistered = useRef(false);
@@ -149,8 +151,9 @@ useEffect(() => {
         <Component {...pageProps} />
       </GiraProvider>
       {/* ✅ AQUI é o lugar certo */}
+      {/* O ToastContainer deve ser colocado no nível mais alto possível para garantir que os toasts sejam exibidos corretamente em todas as páginas. */}
       <ToastContainer
-        position="top-center"
+        position={isMobile ? 'bottom-center' : 'top-right'}
         autoClose={2500}
         hideProgressBar={false}
         closeOnClick

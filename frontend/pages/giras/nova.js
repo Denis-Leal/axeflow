@@ -173,9 +173,11 @@ export default function NovaGira() {
                       onChange={e => setForm({ ...form, responsavel_lista_id: e.target.value })}
                       style={{ appearance: 'auto' }}
                     >
-                      <option value="">— Nenhum responsável definido —</option>
+                      <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                        — Nenhum responsável definido —
+                      </option>
                       {membros.map(m => (
-                        <option key={m.id} value={m.id}>
+                        <option key={m.id} value={m.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
                           {m.nome} ({m.role})
                         </option>
                       ))}

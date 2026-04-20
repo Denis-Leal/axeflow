@@ -92,13 +92,18 @@ function BadgeEstoque({ saldo, threshold }) {
 
 // ── Label amigável da categoria ───────────────────────────────────────────────
 const LABEL_CATEGORIA = {
-  bebida:       '🥤 Bebida',
-  charuto:      '🚬 Charuto',
-  cigarro:      '🚬 Cigarro',
-  cigarro_palha:'🌿 Cigarro de palha',
-  pemba:        '🪨 Pemba',
-  vela:         '🕯️ Vela',
-  outros:       '📦 Outros',
+  fumo:               '🚬 Fumo',
+  bebidas:            '🥤 Bebidas',
+  velas:              '🕯️ Velas',
+  ervas:              '🌿 Ervas e Defumação',
+  pos_e_elementos:    '🪨 Pós e Elementos',
+  alimentos:          '🍞 Alimentos',
+  oferendas:          '🛐 Oferendas',
+  ritualistica:       '🔮 Itens Ritualísticos',
+  imagem:             '🗿 Imagens e Representações',
+  limpeza_espiritual: '✨ Limpeza Espiritual',
+  limpeza:            '🧼 Limpeza (Ambiente)',
+  outros:             '📦 Outros',
 };
 
 // ── Modal de histórico de movimentações ──────────────────────────────────────

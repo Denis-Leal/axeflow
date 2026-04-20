@@ -105,6 +105,32 @@ def criar_item_medium(
     }
 
 
+# No router de inventory ou users
+@router.get("/inventory/items/by-owner")
+def listar_itens_por_dono(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    """
+    Admin/operador: retorna itens de todos os médiuns do terreiro.
+    Médium comum: retorna apenas os próprios itens.
+    """
+    is_privileged = user.role in ("admin", "operador")
+
+    if is_privileged:
+        owner_id = None  # todos os médiuns
+    else:
+        owner_id = user.id
+
+    itens = inventory_service.listar_itens(
+        db,
+        terreiro_id=user.terreiro_id,
+        owner_id=owner_id,
+    )
+
+    # Filtra apenas itens de médiuns (exclui terreiro)
+    return [i for i in itens if i["owner_id"] != str(user.terreiro_id)]
+
 @router.get("/inventory/items")
 def listar_itens(
     owner_id: Optional[UUID] = None,

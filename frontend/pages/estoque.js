@@ -17,17 +17,23 @@ import { buildItensEstoqueViewModel } from '../viewModels/estoqueViewModel';
 import { handleApiError } from '../services/errorHandler';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
+import { toast } from 'react-toastify';
 
 // ─── Constantes de display ────────────────────────────────────────────────────
 
 const CATEGORIAS = [
-  { value: 'bebida',        label: '🥤 Bebida' },
-  { value: 'charuto',       label: '🚬 Charuto' },
-  { value: 'cigarro',       label: '🚬 Cigarro' },
-  { value: 'cigarro_palha', label: '🌿 Cigarro de palha' },
-  { value: 'pemba',         label: '🪨 Pemba' },
-  { value: 'vela',          label: '🕯️ Vela' },
-  { value: 'outros',        label: '📦 Outros' },
+  { value: 'fumo',                label: '🚬 Fumo' },
+  { value: 'bebidas',             label: '🥤 Bebidas' },
+  { value: 'velas',               label: '🕯️ Velas' },
+  { value: 'ervas',               label: '🌿 Ervas e Defumação' },
+  { value: 'pos_e_elementos',     label: '🪨 Pós e Elementos' },
+  { value: 'alimentos',           label: '🍞 Alimentos' },
+  { value: 'oferendas',           label: '🛐 Oferendas' },
+  { value: 'ritualistica',        label: '🔮 Itens Ritualísticos' },
+  { value: 'imagem',              label: '🗿 Imagens e Representações' },
+  { value: 'limpeza_espiritual',  label: '✨ Limpeza Espiritual' },
+  { value: 'limpeza',             label: '🧼 Limpeza (Ambiente)' },
+  { value: 'outros',              label: '📦 Outros' },
 ];
 
 const TIPOS_MOVIMENTACAO = [
@@ -68,7 +74,7 @@ function CardSelecao({ opcoes, selecionado, onSelecionar }) {
 
 function FormCriarItem({ onCriar }) {
   const [form, setForm] = useState({
-    name: '', category: 'vela', minimum_threshold: 0, unit_cost: '', owner: 'terreiro',
+    name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: 'terreiro',
   });
   const [saving, setSaving]   = useState(false);
   const [erro, setErro]       = useState('');
@@ -83,8 +89,9 @@ function FormCriarItem({ onCriar }) {
     setSucesso('');
     try {
       const nome = await onCriar(form);
+      toast.success(`"${nome}" adicionado ao estoque!`);
       setSucesso(`"${nome}" adicionado ao estoque!`);
-      setForm({ name: '', category: 'vela', minimum_threshold: 0, unit_cost: '', owner: 'terreiro' });
+      setForm({ name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: 'terreiro' });
       setTimeout(() => setSucesso(''), 4000);
     } catch (err) {
       setErro(handleApiError(err, 'Criar item'));
@@ -116,7 +123,7 @@ function FormCriarItem({ onCriar }) {
             <label className="form-label-custom">Categoria *</label>
             <select className="form-control-custom" value={form.category}
               onChange={e => set('category', e.target.value)} style={{ appearance: 'auto' }}>
-              {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              {CATEGORIAS.map(c => <option key={c.value} value={c.value} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>{c.label}</option>)}
             </select>
           </div>
 
@@ -224,9 +231,9 @@ function FormMovimentacao({ itensVM, onMover }) {
             <label className="form-label-custom">Qual item? *</label>
             <select className="form-control-custom" value={form.item_id} required
               onChange={e => set('item_id', e.target.value)} style={{ appearance: 'auto' }}>
-              <option value="">— Selecione um item —</option>
+              <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>— Selecione um item —</option>
               {itensVM.map(i => (
-                <option key={i.id} value={i.id}>{i.label}</option>
+                <option key={i.id} value={i.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>{i.label}</option>
               ))}
             </select>
             {itemVM && (

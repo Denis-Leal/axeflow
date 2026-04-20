@@ -409,9 +409,9 @@ useEffect(() => {
                         <label className="form-label-custom">Status</label>
                         <select className="form-control-custom" value={form.status}
                           onChange={e => set('status', e.target.value)}>
-                          <option value="aberta">Aberta</option>
-                          <option value="fechada">Fechada</option>
-                          <option value="concluida">Concluída</option>
+                          <option value="aberta" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Aberta</option>
+                          <option value="fechada" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Fechada</option>
+                          <option value="concluida" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Concluída</option>
                         </select>
                       </div>
 
@@ -454,9 +454,13 @@ useEffect(() => {
                             <label className="form-label-custom">Responsável pela lista</label>
                             <select className="form-control-custom" value={form.responsavel_lista_id}
                               onChange={e => set('responsavel_lista_id', e.target.value)}>
-                              <option value="">— Nenhum —</option>
+                              <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                                — Nenhum —
+                              </option>
                               {membros.map(m => (
-                                <option key={m.id} value={m.id}>{m.nome}</option>
+                                <option key={m.id} value={m.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                                  {m.nome}
+                                </option>
                               ))}
                             </select>
                           </div>

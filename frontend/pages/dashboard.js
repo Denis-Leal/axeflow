@@ -138,7 +138,7 @@ function PresencaItem({ gira, jaConfirmei, confirmando, onConfirmar }) {
       marginBottom:'0.4rem',
     }}>
       <div>
-        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{gira.titulo}</span>
+        <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--cor-texto)' }}>{gira.titulo}</span>
         <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
           {gira.dataCompacta} às {gira.horarioFmt}
         </span>
@@ -237,12 +237,12 @@ export default function Dashboard() {
 
             {/* ── Confirmação de presenças (outras giras) ── */}
             {vm.pendentesConfirmacao.length > 1 && (
-              <div className="card-custom mb-4">
-                <div className="card-header">
+              <Card>
+                <CardHeader >
                   <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
                     ✦ Confirmar Presença
                   </span>
-                </div>
+                </CardHeader>
                 <div style={{ padding: '0.75rem 1rem' }}>
                   {/* Pula a proxima (já mostrada acima) */}
                   {vm.pendentesConfirmacao.slice(1).map(g => (
@@ -255,7 +255,7 @@ export default function Dashboard() {
                     />
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* ── Histórico (colapsável no mobile) ── */}

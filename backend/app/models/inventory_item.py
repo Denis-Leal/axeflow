@@ -25,13 +25,18 @@ from app.core.database import Base
 
 
 class ItemCategoryEnum(str, enum.Enum):
-    bebida          = "bebida"
-    charuto         = "charuto"
-    cigarro         = "cigarro"
-    cigarro_palha   = "cigarro_palha"
-    pemba           = "pemba"
-    vela            = "vela"
-    outros          = "outros"
+    fumo                = "fumo"
+    bebidas             = "bebidas"
+    velas               = "velas"
+    ervas               = "ervas"
+    pos_e_elementos     = "pos_e_elementos"
+    alimentos           = "alimentos"
+    oferendas           = "oferendas"
+    ritualistica        = "ritualistica"
+    imagem              = "imagem"
+    limpeza_espiritual  = "limpeza_espiritual"
+    limpeza             = "limpeza"
+    outros              = "outros"
 
 
 class InventoryItem(Base):

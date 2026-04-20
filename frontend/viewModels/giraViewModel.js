@@ -66,7 +66,11 @@ export function buildDashboardViewModel(giras, user, presencasFechadas, presenca
       podeCofirmar:  g.status !== 'concluida',
       membrosInfo:   membros,
     };
-  });
+  }).sort((a, b) => new Date(a.data) - new Date(b.data)); // ordena por data
+
+  // Próxima gira ativa: a mais próxima que ainda não foi concluída, considerando o usuário logado antes de navegar para a URL específica.
+  // Se não bater, redireciona para /giras (seguro).
+  
 
   const proximasAtivas = todas.filter(g => !g.concluida);
   const proxima = proximasAtivas[0] || null;

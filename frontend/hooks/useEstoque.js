@@ -40,6 +40,7 @@ export function useEstoque() {
       minimum_threshold: parseInt(form.minimum_threshold) || 0,
       unit_cost:         form.unit_cost ? parseFloat(form.unit_cost) : null,
     };
+    console.log('Criando item com payload:', payload);
     const fn = form.owner === 'terreiro' ? criarItemTerreiro : criarItemMedium;
     await fn(payload);
     await reload();

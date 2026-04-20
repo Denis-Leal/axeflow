@@ -682,9 +682,9 @@ export default function Membros() {
                 <label className="form-label-custom">Perfil</label>
                 <select className="form-control-custom" value={form.role}
                   onChange={e => setForm({ ...form, role: e.target.value })}>
-                  <option value="membro">Membro</option>
-                  <option value="operador">Operador</option>
-                  <option value="admin">Admin</option>
+                  <option value="membro" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Membro</option>
+                  <option value="operador" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Operador</option>
+                  <option value="admin" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Admin</option>
                 </select>
               </div>
             </div>
@@ -730,9 +730,9 @@ export default function Membros() {
                 <label className="form-label-custom">Perfil</label>
                 <select className="form-control-custom" value={editForm.role}
                   onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-                  <option value="membro">Membro</option>
-                  <option value="operador">Operador</option>
-                  <option value="admin">Admin</option>
+                  <option value="membro" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Membro</option>
+                  <option value="operador" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Operador</option>
+                  <option value="admin" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Admin</option>
                 </select>
               </div>
             </div>
