@@ -656,7 +656,7 @@ def finalizar_gira(
     # Identifica todos os médiuns que participaram da gira (via InscricaoMembro)
     # e não registraram nenhum consumo
     from app.models.inscricao_membro import InscricaoMembro
-    from app.models.inscricao_status import StatusInscricaoEnum
+    from app.utils.enuns import StatusInscricaoEnum
 
     mediums_participantes = {
         str(im.membro_id)
