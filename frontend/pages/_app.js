@@ -153,7 +153,7 @@ useEffect(() => {
       {/* ✅ AQUI é o lugar certo */}
       {/* O ToastContainer deve ser colocado no nível mais alto possível para garantir que os toasts sejam exibidos corretamente em todas as páginas. */}
       <ToastContainer
-        position={isMobile ? 'bottom-center' : 'top-right'}
+        position={isMobile ? 'top-center' : 'top-right'}
         autoClose={2500}
         hideProgressBar={false}
         closeOnClick
