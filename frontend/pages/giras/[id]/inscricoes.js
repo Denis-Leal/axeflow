@@ -178,7 +178,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
                   setForm(prev => ({
                     ...prev,
                     nome: c.nome,
-                    telefone: c.telefone
+                    telefone: c.telefone || prev.telefone, // mantém o telefone digitado se o cadastro não tiver telefone
                   }));
                   setSugestoes([]);
                 }}

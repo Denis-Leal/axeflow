@@ -165,7 +165,7 @@ def find_or_create_consulente(
     
     # Se for cadastro_manual
     # Telefone é opcional
-    if source == "cadastro_maunal":
+    if source == "cadastro_manual":
         if telefone:
             if not validate_phone(telefone):
                 raise HTTPException(status_code=400, detail="Telefone inválido")
@@ -178,8 +178,7 @@ def find_or_create_consulente(
         else:
             consulente_existente = db.query(Consulente).filter(
                 Consulente.terreiro_id == terreiro_id,
-                func.lower(Consulente.nome) == nome_normalizado.lower(),
-                Consulente.deleted_at.is_(None)
+                func.lower(Consulente.nome) == nome_normalizado.lower()
             ).first()
             
         if consulente_existente:
@@ -413,7 +412,8 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     if agora > gira.fechamento_lista:
         raise HTTPException(status_code=400, detail="Lista encerrada")
     
-    consulente = find_or_create_consulente(db, data.nome, data.telefone, gira.terreiro_id, source="cadastro_manual", created_by=usuario_id, primeira_visita=data.primeira_visita)
+    telefone = data.telefone.strip() if data.telefone else None
+    consulente = find_or_create_consulente(db, data.nome, telefone, gira.terreiro_id, source="cadastro_manual", created_by=usuario_id, primeira_visita=data.primeira_visita)
         
     if consulente.nome != data.nome.strip():
         pass # Opcional: logar essa discrepância para análise futura (ex: "Maria" vs "Maria Silva")
