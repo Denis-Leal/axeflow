@@ -29,7 +29,7 @@ from datetime import datetime
 
 from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
-from app.models.inscricao import InscricaoGira, StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_status import StatusInscricaoEnum as StatusNovo
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
@@ -51,7 +51,6 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    # ANTES: db.query(InscricaoGira)
     # AGORA: db.query(InscricaoConsulente)
     inscricoes = (
         db.query(InscricaoConsulente)
@@ -100,13 +99,6 @@ def _promover_lista_espera_novo(
 
     # Promove na nova tabela
     proximo.status = StatusNovo.confirmado
-
-    # Sincroniza com legado
-    legado = db.query(InscricaoGira).filter(
-        InscricaoGira.id == proximo.id
-    ).first()
-    if legado:
-        legado.status = StatusInscricaoEnum.confirmado
 
     db.flush()
     return proximo
@@ -610,7 +602,7 @@ def update_presenca(
 ) -> dict:
     """Atualiza status de presença (compareceu / faltou)."""
     """
-    MUDANÇA: atualiza InscricaoConsulente + InscricaoGira (dupla escrita).
+    MUDANÇA: atualiza InscricaoConsulente.
     Garante consistência durante o período de transição.
     """
     # Busca na nova tabela (fonte de verdade)
@@ -633,13 +625,6 @@ def update_presenca(
 
     # Atualiza a nova tabela
     inscricao.status = data.status
-
-    # Atualiza o legado também (mantém sincronismo durante transição)
-    inscricao_legado = db.query(InscricaoGira).filter(
-        InscricaoGira.id == inscricao_id
-    ).first()
-    if inscricao_legado:
-        inscricao_legado.status = data.status
 
     db.commit()
     return {"ok": True, "status": inscricao.status}
@@ -689,13 +674,6 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
         nome_usuario = "Um usuário"
     # Cancela na nova tabela
     inscricao.status = StatusNovo.cancelado
-
-    # Sincroniza com legado
-    inscricao_legado = db.query(InscricaoGira).filter(
-        InscricaoGira.id == inscricao_id
-    ).first()
-    if inscricao_legado:
-        inscricao_legado.status = StatusInscricaoEnum.cancelado
 
     # Promoção da fila — agora usa InscricaoConsulente
     promovido_inscricao = None
