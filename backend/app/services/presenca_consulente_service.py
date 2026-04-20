@@ -10,7 +10,7 @@ from app.models.consulente import Consulente
 
 # CORREÇÃO: importa o novo model, não o legado
 from app.models.inscricao_consulente import InscricaoConsulente
-from app.models.inscricao_status import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.gira import Gira
 
 

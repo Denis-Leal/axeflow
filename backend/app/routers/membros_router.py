@@ -26,7 +26,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role, hash_password
 from app.models.usuario import Usuario
 from app.models.inscricao_membro import InscricaoMembro
-from app.models.inscricao_status import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.services.email_service import send_convite_membro
 from app.services.push_service import send_push_to_terreiro
 from app.models.terreiro import Terreiro

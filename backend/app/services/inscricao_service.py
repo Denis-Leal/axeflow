@@ -31,7 +31,7 @@ from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
 from app.utils.enuns import StatusInscricaoEnum
 from app.models.inscricao_consulente import InscricaoConsulente
-from app.models.inscricao_status import StatusInscricaoEnum as StatusNovo
+from app.utils.enuns import StatusInscricaoEnum as StatusNovo
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
 from app.services.push_service import send_push_to_terreiro
