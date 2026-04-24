@@ -1,22 +1,13 @@
-/**
- * hooks/useConsulentes.js — AxeFlow
- *
- * Dependências: services/api (getRankingConsulentes, listConsulentes)
- * Impacto: pages/consulentes.js — remove fetch inline
- *
- * Lista carrega imediatamente.
- * Ranking é lazy: só dispara ao chamar loadRanking().
- */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 export function useConsulentes() {
-  const [consulentes, setConsulentes]       = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [ranking, setRanking]               = useState([]);
-  const [loadingRanking, setLoadingRanking] = useState(false);
+  const [consulentes, setConsulentes]           = useState([]);
+  const [loading, setLoading]                   = useState(true);
+  const [ranking, setRanking]                   = useState([]);
+  const [loadingRanking, setLoadingRanking]     = useState(false);
   const [rankingCarregado, setRankingCarregado] = useState(false);
-  const [error, setError]                   = useState(null);
+  const [error, setError]                       = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -45,9 +36,22 @@ export function useConsulentes() {
     }
   }, [rankingCarregado, loadingRanking]);
 
+  const editarConsulente = useCallback(async (id, dados) => {
+    const res = await api.put(`/consulentes/${id}`, dados);
+    setConsulentes(prev => prev.map(c => c.id === id ? res.data : c));
+    return res.data;
+  }, []);
+
+  const deletarConsulente = useCallback(async (id) => {
+    await api.delete(`/consulentes/${id}`);
+    setConsulentes(prev => prev.filter(c => c.id !== id));
+  }, []);
+
   return {
     consulentes, loading, error,
     ranking, loadingRanking, rankingCarregado,
     loadRanking,
+    editarConsulente,
+    deletarConsulente,
   };
 }

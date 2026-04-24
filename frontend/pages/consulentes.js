@@ -1,15 +1,5 @@
 /**
  * pages/consulentes.js — AxeFlow
- *
- * Dependências:
- *   hooks/useConsulentes             → dados (lista imediata + ranking lazy)
- *   hooks/useMediaQuery              → useIsMobile
- *   viewModels/consulenteViewModel   → buildConsulentesListViewModel,
- *                                      buildRankingConsulentesViewModel,
- *                                      buildRankingConsulentesStats, COR_SCORE
- *
- * Padrão: hook → viewModel → card (mobile) | table (desktop)
- * Lazy loading do ranking preservado via loadRanking().
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
@@ -25,6 +15,8 @@ import {
   buildRankingConsulentesStats,
   COR_SCORE,
 } from '../viewModels/consulenteViewModel';
+import { toast } from 'react-toastify';
+import {handleApiError} from '../services/errorHandler';
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
@@ -61,35 +53,23 @@ function ScoreBadge({ item }) {
 
 // ─── Card mobile — aba Lista ──────────────────────────────────────────────────
 
-function ConsulenteCard({ consulente }) {
+function ConsulenteCard({ consulente, onEdit, onDelete }) {
   return (
     <div style={{
-      background:   'var(--cor-card)',
-      border:       '1px solid var(--cor-borda)',
-      borderRadius: '10px',
-      padding:      '0.75rem',
-      marginBottom: '0.5rem',
-      display:      'flex',
-      alignItems:   'center',
-      gap:          '0.75rem',
+      background: 'var(--cor-card)', border: '1px solid var(--cor-borda)',
+      borderRadius: '10px', padding: '0.75rem', marginBottom: '0.5rem',
+      display: 'flex', alignItems: 'center', gap: '0.75rem',
     }}>
       <Avatar inicial={consulente.inicial} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Link
-          href={`/consulentes/${consulente.id}`}
-          style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--cor-texto)', textDecoration: 'none' }}
-        >
+        <Link href={`/consulentes/${consulente.id}`} style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--cor-texto)', textDecoration: 'none' }}>
           {consulente.nome}
         </Link>
         <div style={{ fontSize: '0.76rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
           {consulente.telefone}
         </div>
         {consulente.obs && (
-          <div style={{
-            fontSize: '0.72rem', color: '#d4af37', marginTop: '4px',
-            background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)',
-            borderRadius: '5px', padding: '2px 7px',
-          }}>
+          <div style={{ fontSize: '0.72rem', color: '#d4af37', marginTop: '4px', background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: '5px', padding: '2px 7px' }}>
             {consulente.obs}
           </div>
         )}
@@ -97,17 +77,17 @@ function ConsulenteCard({ consulente }) {
           {consulente.totalInscricoes} inscrições · {consulente.totalGiras} giras
         </div>
       </div>
-      <Link
-        href={`/consulentes/${consulente.id}`}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'transparent', border: '1px solid rgba(212,175,55,0.35)',
-          color: 'var(--cor-acento)', borderRadius: '6px',
-          padding: '0.3rem 0.5rem', textDecoration: 'none', fontSize: '0.8rem',
-        }}
-      >
-        <i className="bi bi-person-lines-fill" />
-      </Link>
+      <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <Link href={`/consulentes/${consulente.id}`} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--cor-acento)', borderRadius: '6px', padding: '0.3rem 0.5rem', textDecoration: 'none', fontSize: '0.8rem' }}>
+          <i className="bi bi-person-lines-fill" />
+        </Link>
+        <button onClick={() => onEdit(consulente)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+          <i className="bi bi-pencil" />
+        </button>
+        <button onClick={() => onDelete(consulente)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+          <i className="bi bi-trash" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -118,29 +98,19 @@ function RankingConsulenteCard({ item }) {
   const c = item.corStyle;
   return (
     <div style={{
-      background:   item.alerta ? 'rgba(249,115,22,0.04)' : 'var(--cor-card)',
-      border:       `1px solid ${item.alerta ? 'rgba(249,115,22,0.25)' : 'var(--cor-borda)'}`,
-      borderRadius: '10px',
-      padding:      '0.75rem',
-      marginBottom: '0.5rem',
+      background: item.alerta ? 'rgba(249,115,22,0.04)' : 'var(--cor-card)',
+      border: `1px solid ${item.alerta ? 'rgba(249,115,22,0.25)' : 'var(--cor-borda)'}`,
+      borderRadius: '10px', padding: '0.75rem', marginBottom: '0.5rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
         <Avatar inicial={item.inicial} size={32} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <Link
-              href={`/consulentes/${item.id}`}
-              style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--cor-texto)', textDecoration: 'none' }}
-            >
+            <Link href={`/consulentes/${item.id}`} style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--cor-texto)', textDecoration: 'none' }}>
               {item.nome}
             </Link>
             {item.alerta && (
-              <span style={{
-                fontSize: '0.68rem', color: '#f97316',
-                background: 'rgba(249,115,22,0.12)',
-                border: '1px solid rgba(249,115,22,0.3)',
-                borderRadius: '4px', padding: '1px 5px',
-              }}>
+              <span style={{ fontSize: '0.68rem', color: '#f97316', background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '4px', padding: '1px 5px' }}>
                 ⚠ {item.faltas}x faltou
               </span>
             )}
@@ -149,13 +119,9 @@ function RankingConsulenteCard({ item }) {
         </div>
         <ScoreBadge item={item} />
       </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.76rem', flexWrap: 'wrap' }}>
         <span style={{ color: '#10b981' }}>✓ {item.comparecimentos}</span>
-        <span style={{
-          color: item.faltas >= 3 ? '#ef4444' : 'var(--cor-texto-suave)',
-          fontWeight: item.faltas >= 3 ? 700 : 400,
-        }}>
+        <span style={{ color: item.faltas >= 3 ? '#ef4444' : 'var(--cor-texto-suave)', fontWeight: item.faltas >= 3 ? 700 : 400 }}>
           ✗ {item.faltas}
         </span>
         <span style={{ color: 'var(--cor-texto-suave)' }}>{item.finalizadas} giras</span>
@@ -174,7 +140,7 @@ function RankingConsulenteCard({ item }) {
 
 // ─── Tabela desktop — aba Lista ───────────────────────────────────────────────
 
-function ConsulentesTable({ consulentes }) {
+function ConsulentesTable({ consulentes, onEdit, onDelete }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="table-custom">
@@ -202,17 +168,17 @@ function ConsulentesTable({ consulentes }) {
               <td style={{ color: 'var(--cor-texto-suave)' }}>{c.totalInscricoes}</td>
               <td style={{ fontSize: '0.8rem', color: '#d4af37', maxWidth: 200 }}>{c.obs || '—'}</td>
               <td>
-                <Link
-                  href={`/consulentes/${c.id}`}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center',
-                    background: 'transparent', border: '1px solid rgba(212,175,55,0.35)',
-                    color: 'var(--cor-acento)', borderRadius: '8px',
-                    padding: '0.2rem 0.6rem', textDecoration: 'none', fontSize: '0.8rem',
-                  }}
-                >
-                  <i className="bi bi-person-lines-fill" />
-                </Link>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <Link href={`/consulentes/${c.id}`} style={{ display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--cor-acento)', borderRadius: '8px', padding: '0.2rem 0.6rem', textDecoration: 'none', fontSize: '0.8rem' }}>
+                    <i className="bi bi-person-lines-fill" />
+                  </Link>
+                  <button onClick={() => onEdit(c)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    <i className="bi bi-pencil" />
+                  </button>
+                  <button onClick={() => onDelete(c)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    <i className="bi bi-trash" />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -332,54 +298,152 @@ function ScoreLegenda() {
   );
 }
 
+// ─── Modal de Edição ──────────────────────────────────────────────────────────
+
+function ModalEditar({ consulente, onClose, onSave }) {
+  const [form, setForm] = useState({
+    nome:     consulente.nome        || '',
+    telefone: consulente.telefoneCru || '',
+    notas:    consulente.obs         || '',
+  });
+  const [salvando, setSalvando] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.nome.trim()) return;
+    setSalvando(true);
+    try {
+      await onSave(consulente.id, form);
+      toast.success('Consulente atualizado com sucesso');
+      onClose();
+    }
+    catch (err) {
+      console.log('[ModalEditar] Erro ao salvar consulente:', err);
+      const message = handleApiError(err, 'Erro ao atualizar consulente') || 'Erro ao atualizar consulente';
+      toast.error(message);
+    } finally {
+      setSalvando(false);
+    }
+    
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: 'var(--cor-card)', border: '1px solid var(--cor-borda)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '420px' }}>
+        <h6 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1.25rem' }}>
+          Editar Consulente
+        </h6>
+        {[
+          { label: 'Nome',     key: 'nome',     type: 'text', placeholder: 'Nome completo' },
+          { label: 'Telefone', key: 'telefone', type: 'tel',  placeholder: '5511999999999' },
+          { label: 'Notas',    key: 'notas',    type: 'text', placeholder: 'Observações internas' },
+        ].map(({ label, key, type, placeholder }) => (
+          <div key={key} style={{ marginBottom: '0.875rem' }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', display: 'block', marginBottom: '4px' }}>
+              {label}
+            </label>
+            <input
+              className="form-control-custom"
+              type={type}
+              placeholder={placeholder}
+              value={form[key]}
+              onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+              style={{ width: '100%' }}
+            />
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={salvando || !form.nome.trim()} style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--cor-acento)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: salvando ? 0.6 : 1 }}>
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal de Confirmação de Delete ──────────────────────────────────────────
+
+function ModalConfirmarDelete({ nome, onClose, onConfirm }) {
+  const [deletando, setDeletando] = useState(false);
+
+  const handleConfirm = async () => {
+    setDeletando(true);
+    try {
+      await onConfirm();
+      toast.success('Consulente deletado com sucesso');
+      onClose();
+    } catch (err) {
+      const message = handleApiError(err, 'Erro ao deletar consulente') || 'Erro ao deletar consulente';
+      toast.error(message);
+    }
+     finally {
+      setDeletando(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: 'var(--cor-card)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '380px' }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>🗑️</div>
+        <h6 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>Deletar consulente?</h6>
+        <p style={{ fontSize: '0.85rem', color: 'var(--cor-texto-suave)', marginBottom: '1.25rem' }}>
+          <strong style={{ color: 'var(--cor-texto)' }}>{nome}</strong> será removido permanentemente, incluindo todas as inscrições e histórico de presença.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} disabled={deletando} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: deletando ? 0.6 : 1 }}>
+            {deletando ? 'Deletando...' : 'Deletar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function Consulentes() {
   const router   = useRouter();
   const isMobile = useIsMobile();
 
+  // ── Uma única chamada ao hook ──
   const {
     consulentes, loading,
     ranking, loadingRanking, rankingCarregado,
     loadRanking,
+    editarConsulente,
+    deletarConsulente,
   } = useConsulentes();
 
-  const [aba, setAba]   = useState('lista');
-  const [busca, setBusca] = useState('');
+  const [aba, setAba]             = useState('lista');
+  const [busca, setBusca]         = useState('');
+  const [modalEditar, setModalEditar] = useState(null);
+  const [modalDelete, setModalDelete] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) router.push('/login');
   }, [router]);
 
-  // Lazy load do ranking ao abrir a aba
   useEffect(() => {
     if (aba === 'ranking') loadRanking();
   }, [aba, loadRanking]);
 
-  // ViewModels
-  const consultesVM = useMemo(
-    () => buildConsulentesListViewModel(consulentes),
-    [consulentes]
-  );
-  const rankingVM = useMemo(
-    () => buildRankingConsulentesViewModel(ranking),
-    [ranking]
-  );
-  const rankingStats = useMemo(
-    () => buildRankingConsulentesStats(ranking),
-    [ranking]
-  );
+  const consultesVM = useMemo(() => buildConsulentesListViewModel(consulentes), [consulentes]);
+  const rankingVM   = useMemo(() => buildRankingConsulentesViewModel(ranking),  [ranking]);
+  const rankingStats = useMemo(() => buildRankingConsulentesStats(ranking),     [ranking]);
+
   const rankingFiltrado = useMemo(
-    () => rankingVM.filter(c =>
-      c.nome?.toLowerCase().includes(busca.toLowerCase())
-    ),
+    () => rankingVM.filter(c => c.nome?.toLowerCase().includes(busca.toLowerCase())),
     [rankingVM, busca]
   );
   const listaFiltrada = useMemo(
-    () => consultesVM.filter(c =>
-      c.nome?.toLowerCase().includes(busca.toLowerCase())
-    ),
+    () => consultesVM.filter(c => c.nome?.toLowerCase().includes(busca.toLowerCase())),
     [consultesVM, busca]
   );
 
@@ -392,11 +456,26 @@ export default function Consulentes() {
   return (
     <>
       <Head><title>Consulentes | AxeFlow</title></Head>
+
+      {modalEditar && (
+        <ModalEditar
+          consulente={modalEditar}
+          onClose={() => setModalEditar(null)}
+          onSave={editarConsulente}
+        />
+      )}
+      {modalDelete && (
+        <ModalConfirmarDelete
+          nome={modalDelete.nome}
+          onClose={() => setModalDelete(null)}
+          onConfirm={() => deletarConsulente(modalDelete.id)}
+        />
+      )}
+
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">
 
-          {/* Topbar */}
           <div className="topbar">
             <div>
               <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Consulentes</h5>
@@ -404,7 +483,6 @@ export default function Consulentes() {
             </div>
           </div>
 
-          {/* Abas */}
           <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid var(--cor-borda)', padding: '0 1.5rem', background: 'var(--cor-card)' }}>
             {[
               { id: 'lista',   label: 'Consulentes', icone: 'bi-people' },
@@ -435,7 +513,6 @@ export default function Consulentes() {
 
           <div className="page-content">
 
-            {/* Busca (ambas as abas) */}
             <div style={{ marginBottom: '1rem' }}>
               <input
                 className="form-control-custom"
@@ -446,20 +523,29 @@ export default function Consulentes() {
               />
             </div>
 
-            {/* ── ABA: LISTA ── */}
             {aba === 'lista' && (
               <div className="card-custom">
                 {isMobile ? (
                   listaFiltrada.length > 0
-                    ? listaFiltrada.map(c => <ConsulenteCard key={c.id} consulente={c} />)
+                    ? listaFiltrada.map(c => (
+                        <ConsulenteCard
+                          key={c.id}
+                          consulente={c}
+                          onEdit={setModalEditar}
+                          onDelete={setModalDelete}
+                        />
+                      ))
                     : <div className="empty-state"><i className="bi bi-people d-block" /><p>Nenhum consulente encontrado</p></div>
                 ) : (
-                  <ConsulentesTable consulentes={listaFiltrada} />
+                  <ConsulentesTable
+                    consulentes={listaFiltrada}
+                    onEdit={setModalEditar}
+                    onDelete={setModalDelete}
+                  />
                 )}
               </div>
             )}
 
-            {/* ── ABA: RANKING ── */}
             {aba === 'ranking' && (
               <div>
                 {loadingRanking && (
@@ -470,12 +556,11 @@ export default function Consulentes() {
 
                 {!loadingRanking && rankingCarregado && (
                   <>
-                    {/* Stats */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
                       {[
-                        { label: 'Total',           value: rankingStats.total,        cor: 'var(--cor-acento)', sub: 'consulentes' },
-                        { label: '✅ Confiáveis',   value: rankingStats.confiaveis,   cor: '#10b981',           sub: 'taxa ≥ 80%' },
-                        { label: '⚠ Alertas',       value: rankingStats.alertas,      cor: '#f97316',           sub: '3+ faltas, <50%' },
+                        { label: 'Total',            value: rankingStats.total,        cor: 'var(--cor-acento)', sub: 'consulentes' },
+                        { label: '✅ Confiáveis',    value: rankingStats.confiaveis,   cor: '#10b981',           sub: 'taxa ≥ 80%' },
+                        { label: '⚠ Alertas',        value: rankingStats.alertas,      cor: '#f97316',           sub: '3+ faltas, <50%' },
                         { label: '🆕 Sem histórico', value: rankingStats.semHistorico, cor: '#94a3b8',           sub: '< 2 giras' },
                       ].map(card => (
                         <div key={card.label} className="stat-card">
@@ -486,7 +571,6 @@ export default function Consulentes() {
                       ))}
                     </div>
 
-                    {/* Banner de alertas */}
                     {rankingStats.alertas > 0 && (
                       <div style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span style={{ fontSize: '1.2rem' }}>🚨</span>
@@ -499,7 +583,6 @@ export default function Consulentes() {
                       </div>
                     )}
 
-                    {/* Mobile: cards | Desktop: tabela */}
                     <div className="card-custom">
                       {isMobile ? (
                         rankingFiltrado.length > 0

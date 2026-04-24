@@ -25,6 +25,8 @@ from app.services.presenca_consulente_service import get_score_consulente
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.schemas.consulente_schema import ConsulentePutSchema
+
 # Rate limiter por IP — evita abuso dos endpoints sem autenticação
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["inscricoes"])
@@ -182,7 +184,46 @@ def ranking_presenca(
     db: Session = Depends(get_db),
 ):
     return get_ranking_consulentes(db, user.terreiro_id)
+@router.put("/consulentes/{consulente_id}")
+def atualizar_consulente(
+    consulente_id: UUID,
+    dados: ConsulentePutSchema,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
+    if user.role not in ["admin", "operador"]:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    consulente = db.query(Consulente).filter(
+        Consulente.id == consulente_id,
+        Consulente.terreiro_id == user.terreiro_id,
+    ).first()
+    if not consulente:
+        raise HTTPException(status_code=404, detail="Consulente não encontrado")
+    
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
+        setattr(consulente, campo, valor)
+    
+    db.commit()
+    db.refresh(consulente)
+    return consulente
 
+@router.delete("/consulentes/{consulente_id}", status_code=204)
+def deletar_consulente(
+    consulente_id: UUID,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
+    if user.role not in ["admin", "operador"]:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    consulente = db.query(Consulente).filter(
+        Consulente.id == consulente_id,
+        Consulente.terreiro_id == user.terreiro_id,
+    ).first()
+    if not consulente:
+        raise HTTPException(status_code=404, detail="Consulente não encontrado")
+    
+    db.delete(consulente)
+    db.commit()
 
 @router.get("/consulentes/{consulente_id}/perfil")
 def perfil_consulente(
