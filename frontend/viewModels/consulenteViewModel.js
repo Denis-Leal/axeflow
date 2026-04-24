@@ -32,7 +32,8 @@ export function buildConsulentesListViewModel(consulentes) {
 
 export function buildRankingConsulentesViewModel(ranking) {
   return ranking.map(c => {
-    const sc  = c.score_presenca || {};
+    const sc  = c || {};
+    console.log(`Consulente ${c.nome} - Score:`, sc);
     const cor = sc.cor || 'cinza';
     return {
       id:              c.id,

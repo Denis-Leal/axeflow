@@ -24,6 +24,7 @@ from app.models.gira import Gira
 from app.services.presenca_consulente_service import get_score_consulente
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import func, case
 
 from app.schemas.consulente_schema import ConsulentePutSchema
 
@@ -173,10 +174,44 @@ def lista_consulentes(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    consulentes = db.query(Consulente).filter(
-        Consulente.terreiro_id == user.terreiro_id
-    ).all()
-    return consulentes
+    resultados = (
+        db.query(
+            Consulente.id,
+            Consulente.nome,
+            Consulente.telefone,
+
+            func.count(InscricaoConsulente.id).label("total_inscricoes"),
+
+            func.sum(
+                case(
+                    (InscricaoConsulente.status == "compareceu", 1),
+                    else_=0
+                )
+            ).label("total_giras"),
+        )
+        .outerjoin(
+            InscricaoConsulente,
+            InscricaoConsulente.consulente_id == Consulente.id
+        )
+        .filter(Consulente.terreiro_id == user.terreiro_id)
+        .group_by(
+            Consulente.id,
+            Consulente.nome,
+            Consulente.telefone,
+        )
+        .all()
+    )
+
+    return [
+        {
+            "id": r.id,
+            "nome": r.nome,
+            "telefone": r.telefone,
+            "total_inscricoes": r.total_inscricoes,
+            "total_giras": r.total_giras,
+        }
+        for r in resultados
+    ]
 
 @router.get("/consulentes/ranking")
 def ranking_presenca(
@@ -184,6 +219,7 @@ def ranking_presenca(
     db: Session = Depends(get_db),
 ):
     return get_ranking_consulentes(db, user.terreiro_id)
+
 @router.put("/consulentes/{consulente_id}")
 def atualizar_consulente(
     consulente_id: UUID,
