@@ -227,14 +227,10 @@ def update_notas_consulente(
     from app.models.inscricao_consulente import InscricaoConsulente
 
     consulente = (
-        db.query(Consulente)
-        .join(InscricaoConsulente, InscricaoConsulente.consulente_id == Consulente.id)
-        .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
-        .filter(
+        db.query(Consulente).filter(
             Consulente.id == consulente_id,
-            GiraModel.terreiro_id == user.terreiro_id,
-        )
-        .first()
+            Consulente.terreiro_id == user.terreiro_id,
+        ).first()
     )
     if not consulente:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
