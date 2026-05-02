@@ -15,6 +15,7 @@ import { useRouter } from 'next/router';
 import { useEstoque } from '../hooks/useEstoque';
 import { buildItensEstoqueViewModel } from '../viewModels/estoqueViewModel';
 import { handleApiError } from '../services/errorHandler';
+import { getMe, listMembros } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import { toast } from 'react-toastify';
@@ -76,29 +77,44 @@ function CardSelecao({ opcoes, selecionado, onSelecionar }) {
 
 // ─── Formulário: criar item ───────────────────────────────────────────────────
 
-function FormCriarItem({ onCriar }) {
+function FormCriarItem({ onCriar, isAdmin, membros }) {
+  const defaultOwner = isAdmin ? 'terreiro' : 'medium';
+
   const [form, setForm] = useState({
-    name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: 'terreiro',
+    name: '', category: 'velas', minimum_threshold: 0, unit_cost: '',
+    owner: defaultOwner, medium_user_id: '',
   });
-  const [saving, setSaving]   = useState(false);
-  const [erro, setErro]       = useState('');
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro]     = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.owner === 'medium' && isAdmin && !form.medium_user_id) {
+      setErro('Selecione o médium para quem o item será cadastrado.');
+      return;
+    }
     setSaving(true);
     setErro('');
     try {
       const nome = await onCriar(form);
       toast.success(`"${nome}" adicionado ao estoque!`);
-      setForm({ name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: 'terreiro' });
+      setForm({ name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: defaultOwner, medium_user_id: '' });
     } catch (err) {
       setErro(handleApiError(err, 'Criar item'));
     } finally {
       setSaving(false);
     }
   };
+
+  // Opções do CardSelecao — admin vê terreiro + médium, membro vê só médium
+  const opcoesOwner = isAdmin
+    ? [
+        { value: 'terreiro', label: 'O terreiro', emoji: '🏛️', desc: 'Item do estoque coletivo', cor: 'var(--cor-acento)', bg: 'rgba(212,175,55,0.1)', border: 'rgba(212,175,55,0.35)' },
+        { value: 'medium',   label: 'Um médium',  emoji: '🙋', desc: 'Item pessoal de um médium', cor: '#a78bfa',          bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.35)' },
+      ]
+    : null; // membro não vê o seletor
 
   return (
     <Card style={{ marginBottom: '1.5rem' }}>
@@ -132,16 +148,38 @@ function FormCriarItem({ onCriar }) {
             </select>
           </FormField>
 
-          <FormField label="Este item pertence a:">
-            <CardSelecao
-              opcoes={[
-                { value: 'terreiro', label: 'O terreiro', emoji: '🏛️', desc: 'Item do estoque coletivo', cor: 'var(--cor-acento)', bg: 'rgba(212,175,55,0.1)', border: 'rgba(212,175,55,0.35)' },
-                { value: 'medium',   label: 'A mim',      emoji: '🙋', desc: 'Item pessoal do médium',   cor: '#a78bfa',          bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.35)' },
-              ]}
-              selecionado={form.owner}
-              onSelecionar={v => set('owner', v)}
-            />
-          </FormField>
+          {/* Seletor de destino: visível apenas para admin */}
+          {isAdmin && (
+            <FormField label="Este item pertence a:">
+              <CardSelecao
+                opcoes={opcoesOwner}
+                selecionado={form.owner}
+                onSelecionar={v => set('owner', v)}
+              />
+            </FormField>
+          )}
+
+          {/* Dropdown de médium: admin selecionando owner=medium */}
+          {isAdmin && form.owner === 'medium' && (
+            <FormField label="Selecionar médium" required>
+              <select
+                className="form-control-custom"
+                value={form.medium_user_id}
+                required
+                onChange={e => set('medium_user_id', e.target.value)}
+                style={{ appearance: 'auto' }}
+              >
+                <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                  — Selecione o médium —
+                </option>
+                {membros.map(m => (
+                  <option key={m.id} value={m.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
 
           <FormField
             label="Alerta de estoque baixo"
@@ -264,9 +302,18 @@ export default function EstoquePage() {
   const router = useRouter();
   const { itens, loading, criarItem, mover } = useEstoque();
 
+  const [isAdmin, setIsAdmin]   = useState(false);
+  const [membros, setMembros]   = useState([]);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) router.push('/login');
+    if (!token) { router.push('/login'); return; }
+
+    // Carrega role do usuário e lista de membros em paralelo
+    Promise.all([getMe(), listMembros()]).then(([meRes, membrosRes]) => {
+      setIsAdmin(meRes.data.role === 'admin');
+      setMembros(membrosRes.data);
+    }).catch(() => {});
   }, [router]);
 
   const itensVM = useMemo(() => buildItensEstoqueViewModel(itens), [itens]);
@@ -289,7 +336,7 @@ export default function EstoquePage() {
             </Button>
           </div>
           <div className="page-content">
-            <FormCriarItem onCriar={criarItem} />
+            <FormCriarItem onCriar={criarItem} isAdmin={isAdmin} membros={membros} />
             <FormMovimentacao itensVM={itensVM} onMover={mover} />
           </div>
         </div>

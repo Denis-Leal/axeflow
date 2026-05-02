@@ -1,14 +1,15 @@
 /**
  * hooks/useEstoque.js — AxeFlow
  *
- * Dependências: services/api (listarItens, criarItemTerreiro, criarItemMedium, registrarMovimentacao)
- * Impacto: pages/estoque.js — remove fetch inline
+ * Dependências: services/api (listarItens, criarItemTerreiro, criarItemMedium, criarItemMediumAdmin, registrarMovimentacao)
+ * Impacto: pages/estoque.js
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
   listarItens,
   criarItemTerreiro,
   criarItemMedium,
+  criarItemMediumAdmin,
   registrarMovimentacao,
 } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
@@ -33,6 +34,13 @@ export function useEstoque() {
 
   useEffect(() => { reload(); }, [reload]);
 
+  /**
+   * criarItem — roteia para a função correta conforme owner e role.
+   *
+   * form.owner === 'terreiro'          → criarItemTerreiro   (admin only)
+   * form.owner === 'medium' + isAdmin  → criarItemMediumAdmin(payload, form.medium_user_id)
+   * form.owner === 'medium'            → criarItemMedium     (próprio usuário)
+   */
   const criarItem = useCallback(async (form) => {
     const payload = {
       name:              form.name.trim(),
@@ -40,9 +48,15 @@ export function useEstoque() {
       minimum_threshold: parseInt(form.minimum_threshold) || 0,
       unit_cost:         form.unit_cost ? parseFloat(form.unit_cost) : null,
     };
-    console.log('Criando item com payload:', payload);
-    const fn = form.owner === 'terreiro' ? criarItemTerreiro : criarItemMedium;
-    await fn(payload);
+
+    if (form.owner === 'terreiro') {
+      await criarItemTerreiro(payload);
+    } else if (form.owner === 'medium' && form.medium_user_id) {
+      await criarItemMediumAdmin(payload, form.medium_user_id);
+    } else {
+      await criarItemMedium(payload);
+    }
+
     await reload();
     return payload.name;
   }, [reload]);

@@ -129,17 +129,19 @@ export const healthCheck = () => api.get('/health')
 
 // ── Inventário ────────────────────────────────────────────────────────────────
 // Itens de estoque
-export const listarItens           = (ownerId)             => api.get('/inventory/items', { params: ownerId ? { owner_id: ownerId } : {} });
+export const listarItens           = (user_id)             => api.get('/inventory/items', { params: user_id ? { user_id: user_id } : {} });
 export const criarItemTerreiro     = (data)                => api.post('/inventory/items/terreiro', data);
 export const criarItemMedium       = (data)                => api.post('/inventory/items/medium', data);
+export const criarItemMediumAdmin  = (data, userId)        => api.post(`/inventory/items/medium/admin?user_id=${userId}`, data);
 export const getSaldoItem          = (itemId)              => api.get(`/inventory/items/${itemId}/stock`);
 export const getHistoricoItem      = (itemId, limit = 20)  => api.get(`/inventory/items/${itemId}/history`, { params: { limit } });
 export const registrarMovimentacao = (itemId, data)        => api.post(`/inventory/items/${itemId}/movements`, data);
-export const listarItensMediuns    = (ownerId)             => api.get('/inventory/items/by-owner', { params: ownerId ? { owner_id: ownerId } : {} });
+export const listarItensMediuns    = (user_id)             => api.get('/inventory/items/by-owner', { params: user_id ? { user_id: user_id } : {} });
 
 // Consumo por gira
 export const listarConsumos        = (giraId)              => api.get(`/giras/${giraId}/consumption`);
 export const registrarConsumo      = (giraId, data)        => api.post(`/giras/${giraId}/consumption`, data);
+export const registrarConsumoAdmin = (giraId, data, userId) => api.post(`/giras/${giraId}/consumption?medium_id=${userId}`, data);
 export const editarConsumo         = (giraId, cid, data)   => api.patch(`/giras/${giraId}/consumption/${cid}`, data);
 
 // Finalização

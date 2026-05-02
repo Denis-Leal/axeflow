@@ -24,7 +24,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.models.gira import Gira, StatusGiraEnum
-from app.models.usuario import Usuario
+from app.models.usuario import RoleEnum, Usuario
 from app.models.inventory_owner import InventoryOwner, OwnerTypeEnum
 from app.models.inventory_item import InventoryItem, ItemCategoryEnum
 from app.models.inventory_movement import InventoryMovement, MovementTypeEnum
@@ -113,25 +113,24 @@ def _verificar_owner_do_item(
     item: InventoryItem,
     user: Usuario,
     source: ConsumptionSourceEnum,
+    target_user_id: UUID | None = None,   # <-- novo parâmetro
 ) -> None:
     """
     Valida que o source do consumo é consistente com o owner do item.
-
-    MEDIUM  → item deve pertencer ao médium (owner.reference_id == user.id)
-    TERREIRO → item deve pertencer ao terreiro (owner do tipo TERREIRO)
-
-    Raises 400 se inconsistente.
+    target_user_id: quando admin registra para outro médium, usar o ID do médium alvo.
     """
+    owner_id_para_validar = target_user_id if target_user_id is not None else user.id
+ 
     if source == ConsumptionSourceEnum.MEDIUM:
         if (
             item.owner.type != OwnerTypeEnum.MEDIUM
-            or str(item.owner.reference_id) != str(user.id)
+            or str(item.owner.reference_id) != str(owner_id_para_validar)
         ):
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"O item '{item.name}' não pertence ao seu estoque. "
-                    "Para consumo de MEDIUM, use um item do seu próprio inventário."
+                    f"O item '{item.name}' não pertence ao estoque do médium selecionado. "
+                    "Para consumo de MEDIUM, use um item do inventário do médium correto."
                 ),
             )
     elif source == ConsumptionSourceEnum.TERREIRO:
@@ -233,13 +232,17 @@ def criar_item_medium(
     db: Session,
     data: InventoryItemCreate,
     user: Usuario,
+    target_user_id: UUID | None = None,   # <-- novo parâmetro
 ) -> InventoryItem:
     """
-    Cria item de estoque para o médium autenticado.
-    Qualquer membro autenticado pode criar itens para si mesmo.
+    Cria item de estoque para um médium.
+ 
+    - target_user_id=None  → usa o próprio usuário autenticado (fluxo padrão)
+    - target_user_id=<id>  → usa o usuário alvo (fluxo admin)
     """
-    owner = get_or_create_medium_owner(db, user.id)
-
+    owner_user_id = target_user_id if target_user_id is not None else user.id
+    owner = get_or_create_medium_owner(db, owner_user_id)
+ 
     item = InventoryItem(
         terreiro_id       = user.terreiro_id,
         owner_id          = owner.id,
@@ -251,29 +254,30 @@ def criar_item_medium(
     db.add(item)
     db.commit()
     db.refresh(item)
-
+ 
     return item
 
 
 def listar_itens(
     db: Session,
     terreiro_id: UUID,
-    owner_id: Optional[UUID] = None,
+    user_id: Optional[UUID] = None,  # para futura validação de acesso
     incluir_saldo: bool = True,
 ) -> list[dict]:
     """
     Lista itens de estoque com saldo calculado.
 
-    owner_id: filtrar por owner específico (None = todos do terreiro).
+    owner: filtrar por owner específico (None = todos do terreiro).
     incluir_saldo: se False, retorna sem calcular saldo (mais rápido para listas grandes).
     """
     query = db.query(InventoryItem).filter(
         InventoryItem.terreiro_id == terreiro_id,
         InventoryItem.deleted_at.is_(None),
     )
-    if owner_id:
-        query = query.filter(InventoryItem.owner_id == owner_id)
-
+    if user_id:
+        query = query.join(InventoryOwner, InventoryItem.owner_id == InventoryOwner.id).filter(InventoryOwner.reference_id == user_id)
+    if not user_id:
+        query = query.filter(InventoryItem.owner.has(type=OwnerTypeEnum.TERREIRO))
     itens = query.all()
     result = []
 
@@ -412,32 +416,28 @@ def registrar_consumo(
     gira_id: UUID,
     data: GiraConsumptionCreate,
     user: Usuario,
+    target_user_id: UUID | None = None,   # <-- novo parâmetro
 ) -> GiraItemConsumption:
     """
-    Registra consumo de um item por um médium em uma gira.
-
-    NÃO afeta o estoque — apenas registra a intenção.
-    O estoque é debitado no fechamento da gira.
-
-    Validações:
-    - Gira existe e pertence ao terreiro
-    - Gira não está finalizada
-    - Item existe e pertence ao terreiro
-    - Source é consistente com o owner do item
-    - Membro só pode registrar consumo se tiver confirmado presença na gira
+    target_user_id=None  → usa o próprio usuário autenticado (fluxo padrão)
+    target_user_id=<id>  → admin registrando para outro médium
     """
-    # Valida inscrição do membro na gira
-    inscricao = db.query(InscricaoMembro).filter(
-        InscricaoMembro.gira_id == gira_id,
-        InscricaoMembro.membro_id == user.id
-    ).first()
-    
-    if not inscricao:
-        raise HTTPException(status_code=403, detail="Você não está inscrito nesta gira.")
-
-    if not is_medium_apto_para_consumo(inscricao):
-        raise HTTPException(status_code=403, detail="Você precisa confirmar presença para registrar consumo.")
-
+    medium_id = target_user_id if target_user_id is not None else user.id
+ 
+    # Admin bypasseia a validação de inscrição para o médium alvo.
+    # Para usuários normais, a inscrição é obrigatória.
+    if user.role != RoleEnum.admin:
+        inscricao = db.query(InscricaoMembro).filter(
+            InscricaoMembro.gira_id == gira_id,
+            InscricaoMembro.membro_id == medium_id
+        ).first()
+ 
+        if not inscricao:
+            raise HTTPException(status_code=403, detail="Você não está inscrito nesta gira.")
+ 
+        if not is_medium_apto_para_consumo(inscricao):
+            raise HTTPException(status_code=403, detail="Você precisa confirmar presença para registrar consumo.")
+ 
     # Valida gira
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
@@ -446,14 +446,13 @@ def registrar_consumo(
     ).first()
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
-
-    # Impede registro após finalização
+ 
     if getattr(gira, "estoque_processado", False):
         raise HTTPException(
             status_code=400,
             detail="Esta gira já foi finalizada. Não é possível registrar mais consumos.",
         )
-
+ 
     # Valida item
     item = db.query(InventoryItem).filter(
         InventoryItem.id == data.inventory_item_id,
@@ -462,34 +461,33 @@ def registrar_consumo(
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item de inventário não encontrado")
-
-    # Garante que o item pertence ao owner correto para o source informado
-    _verificar_owner_do_item(item, user, ConsumptionSourceEnum(data.source))
-
+ 
+    # Passa target para validação de owner do item
+    _verificar_owner_do_item(item, user, ConsumptionSourceEnum(data.source), target_user_id=medium_id)
+ 
     consumo = GiraItemConsumption(
         terreiro_id       = user.terreiro_id,
         gira_id           = gira_id,
-        medium_id         = user.id,
+        medium_id         = medium_id,          # <-- médium alvo, não o admin
         inventory_item_id = data.inventory_item_id,
         source            = data.source,
         quantity          = data.quantity,
         status            = ConsumptionStatusEnum.PENDENTE,
     )
     db.add(consumo)
-
+ 
     try:
         db.commit()
     except Exception:
         db.rollback()
-        # UNIQUE constraint violada: já existe consumo deste médium+item na gira
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Você já registrou consumo do item '{item.name}' nesta gira. "
+                f"Já existe consumo do item '{item.name}' registrado para este médium nesta gira. "
                 "Para alterar, edite o consumo existente."
             ),
         )
-
+ 
     db.refresh(consumo)
     return consumo
 

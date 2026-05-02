@@ -24,12 +24,12 @@ Tabela de endpoints:
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.models.usuario import Usuario
+from app.models.usuario import RoleEnum, Usuario
 from app.schemas.inventory_schema import (
     InventoryItemCreate,
     InventoryItemUpdate,
@@ -104,7 +104,32 @@ def criar_item_medium(
         "name": item.name,
     }
 
-
+@router.post(
+    "/inventory/items/medium/admin",
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_item_medium_admin(
+    data: InventoryItemCreate,
+    user_id: UUID = Query(..., description="ID do médium alvo"),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    """
+    Cria item de estoque para um médium específico.
+    Exclusivo para admins — qualquer outro role recebe 403.
+    """
+    if user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem criar itens para outros médiuns.",
+        )
+ 
+    item = inventory_service.criar_item_medium(db, data, user, target_user_id=user_id)
+    return {
+        "ok":   True,
+        "id":   str(item.id),
+        "name": item.name,
+    }
 # No router de inventory ou users
 @router.get("/inventory/items/by-owner")
 def listar_itens_por_dono(
@@ -125,7 +150,7 @@ def listar_itens_por_dono(
     itens = inventory_service.listar_itens(
         db,
         terreiro_id=user.terreiro_id,
-        owner_id=owner_id,
+        user_id=owner_id,
     )
 
     # Filtra apenas itens de médiuns (exclui terreiro)
@@ -133,7 +158,7 @@ def listar_itens_por_dono(
 
 @router.get("/inventory/items")
 def listar_itens(
-    owner_id: Optional[UUID] = None,
+    user_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
@@ -144,7 +169,7 @@ def listar_itens(
     return inventory_service.listar_itens(
         db,
         terreiro_id = user.terreiro_id,
-        owner_id    = owner_id,
+        user_id    = user_id,
     )
 
 
@@ -228,26 +253,27 @@ def registrar_movimentacao(
 def registrar_consumo(
     gira_id: UUID,
     data: GiraConsumptionCreate,
+    medium_id: UUID | None = Query(default=None, description="Admin: registrar consumo para outro médium"),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
     """
     Registra consumo de item por médium em uma gira.
-
-    NÃO afeta o estoque imediatamente.
-    O estoque é debitado apenas ao finalizar a gira.
-
-    source:
-      MEDIUM   → débito do estoque do próprio médium
-      TERREIRO → débito do estoque do terreiro
-
-    Erros possíveis:
-      404: gira ou item não encontrado
-      400: gira já finalizada, source inconsistente com owner do item
-      409: consumo duplicado (mesmo médium+item na mesma gira)
+    
+    medium_id ausente → usa o próprio usuário autenticado (fluxo padrão).
+    medium_id presente → exclusivo para admin; registra para o médium indicado.
     """
-    consumo = inventory_service.registrar_consumo(db, gira_id, data, user)
-
+    if medium_id is not None and user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem registrar consumo para outros médiuns.",
+        )
+ 
+    target_user_id = medium_id if medium_id is not None else user.id
+ 
+    consumo = inventory_service.registrar_consumo(
+        db, gira_id, data, user, target_user_id=target_user_id
+    )
     return {
         "ok":       True,
         "id":       str(consumo.id),

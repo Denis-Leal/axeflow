@@ -26,9 +26,12 @@ import {
   listarItens,
   listarConsumos,
   registrarConsumo,
+  registrarConsumoAdmin,
   editarConsumo,
   finalizarGira,
   getGira,
+  getMe,
+  listMembros,
 } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import { useGiraAtual } from '../../../contexts/GiraContext';
@@ -46,10 +49,14 @@ function formatarData(dataStr) {
 }
 
 // ── Labels amigáveis para origem do consumo ───────────────────────────────────
-const LABEL_ORIGEM = {
+const getLabelOrigem = (isAdmin) => ({
   TERREIRO: { label: 'Item do terreiro', emoji: '🏛️', cor: '#60a5fa' },
-  MEDIUM:   { label: 'Meu item (médium)', emoji: '🙋', cor: '#a78bfa' },
-};
+  MEDIUM: {
+    label: isAdmin ? 'Um médium' : 'Meu item (médium)',
+    emoji: '🙋',
+    cor: '#a78bfa'
+  },
+});
 
 // ── Labels amigáveis para status do consumo ───────────────────────────────────
 const LABEL_STATUS = {
@@ -93,33 +100,69 @@ function BannerStatusGira({ gira }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SEÇÃO: Registrar consumo
 // ══════════════════════════════════════════════════════════════════════════════
-function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, setModal, fecharModal }) {
+function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, setModal, fecharModal, isAdmin, membros, onSelectMedium, me }) {
   const [form, setForm] = useState({
     item_id: '',
     source: 'TERREIRO',
     quantity: 1,
+    medium_id: '',
   });
   const [loading, setLoading] = useState(false);
   const [erro, setErro]       = useState('');
   const [sucesso, setSucesso] = useState('');
+  const LABEL_ORIGEM = getLabelOrigem(isAdmin);
+  const set = (k, v) => {
+  setForm(f => {
+    const next = { ...f, [k]: v };
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+    if (k === 'source') {
+      if (v === 'MEDIUM') {
+        if (!isAdmin && me?.id) {
+          next.medium_id = me.id;
+          onSelectMedium(me.id);
+        }
+      } else {
+        next.medium_id = '';
+        onSelectMedium(null);
+      }
+    }
+
+    if (k === 'medium_id' && v) {
+      next.source = 'MEDIUM';
+      onSelectMedium(v);
+    }
+
+    return next;
+  });
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isAdmin && !form.medium_id) {
+      setErro('Selecione o médium para registrar o consumo.');
+      return;
+    }
+
     setLoading(true);
     setErro('');
     setSucesso('');
 
     try {
-      await registrarConsumo(giraId, {
+      const payload = {
         inventory_item_id: form.item_id,
         source:            form.source,
         quantity:          parseInt(form.quantity),
-      });
+      };
+
+      if (isAdmin && form.medium_id) {
+        await registrarConsumoAdmin(giraId, payload, form.medium_id);
+      } else {
+        await registrarConsumo(giraId, payload);
+      }
 
       setSucesso('Consumo registrado! Será debitado do estoque ao fechar a gira.');
-      setForm(f => ({ ...f, quantity: 1 }));
+      setForm(f => ({ ...f, quantity: 1, medium_id: '' }));
       onConsumoRegistrado();
 
       setTimeout(() => setSucesso(''), 5000);
@@ -159,7 +202,7 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, 
     <div className="card-custom mb-4">
       <div className="card-header">
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
-          ✦ O que você usou?
+          {isAdmin ? '✦ Registrar consumo de médium' : '✦ O que você usou?'}
         </span>
       </div>
       <div style={{ padding: '1.25rem' }}>
@@ -168,7 +211,6 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, 
         {sucesso && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2"></i>{sucesso}</div>}
 
         <form onSubmit={handleSubmit}>
-
           {/* Origem do item */}
           <div className="mb-4">
             <label className="form-label-custom">De onde veio o item?</label>
@@ -197,6 +239,34 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, 
               })}
             </div>
           </div>
+
+          
+          {/* Seletor de médium — visível apenas para admin */}
+          {isAdmin && form.source === 'MEDIUM' && (
+            <div className="mb-4">
+              <label className="form-label-custom">Para qual médium? *</label>
+              <select
+                className="form-control-custom"
+                value={form.medium_id}
+                required
+                onChange={(e) => {
+                  const value = e.target.value;
+                  set('medium_id', value);
+                  onSelectMedium(value); // notifica o pai sobre a mudança de médium
+                }}
+                style={{ appearance: 'auto' }}
+              >
+                <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                  — Selecione o médium —
+                </option>
+                {membros.map(m => (
+                  <option key={m.id} value={m.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Item usado */}
           <div className="mb-3">
@@ -249,12 +319,12 @@ function FormRegistrarConsumo({ giraId, itens, giraAberta, onConsumoRegistrado, 
 // ══════════════════════════════════════════════════════════════════════════════
 // SEÇÃO: Lista de consumos da gira
 // ══════════════════════════════════════════════════════════════════════════════
-function ListaConsumos({ giraId, refreshTrigger, setModal, fecharModal }) {
+function ListaConsumos({ giraId, refreshTrigger, setModal, fecharModal, isAdmin }) {
   const [editingId, setEditingId] = useState(null);
   const [editingQuantity, setEditingQuantity] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [erro, setErro] = useState('');
-
+  const LABEL_ORIGEM = getLabelOrigem(isAdmin);
   const [consumos, setConsumos] = useState([]);
   const [loading, setLoading]   = useState(false);
 
@@ -576,43 +646,59 @@ export default function ConsumoGiraPage() {
   const router                                = useRouter();
   const { id }                                = router.query;
   const { giraAtual, setGiraAtual, atualizarStatusGira } = useGiraAtual();
-
+  const [selectedMediumId, setSelectedMediumId] = useState(null);
   const [gira, setGira]       = useState(null);
+  const [me, setMe] = useState(null);
   const [itens, setItens]     = useState([]);
   const [loading, setLoading] = useState(true);
-  // Trigger para recarregar a lista de consumos após registrar um novo
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [membros, setMembros] = useState([]);
   const [consumoRefresh, setConsumoRefresh] = useState(0);
   const [modal, setModal] = useState({
-  aberto: false,
-  titulo: '',
-  mensagem: '',
-  tipoBotao: 'primary',
-  onConfirmar: null,
-});
+    aberto: false,
+    titulo: '',
+    mensagem: '',
+    tipoBotao: 'primary',
+    onConfirmar: null,
+  });
 
   // ── Carregamento inicial ─────────────────────────────────────────────────
+useEffect(() => {
+  if (!id) return;
+
+  const token = localStorage.getItem('token');
+  if (!token) {
+    router.push('/login');
+    return;
+  }
+
+  Promise.all([getGira(id), getMe(), listMembros()])
+    .then(([giraRes, meRes, membrosRes]) => {
+      const g = giraRes.data;
+      setGira(g);
+      setIsAdmin(meRes.data.role === 'admin');
+      setMembros(membrosRes.data);
+      setMe(meRes.data);
+      if (giraAtual?.id === id) {
+        setGiraAtual({ ...giraAtual, status: g.status, titulo: g.titulo });
+      }
+    })
+    .catch(() => router.push('/giras'))
+    .finally(() => setLoading(false));
+}, [id]);
+
+  // carrega itens separado
   useEffect(() => {
     if (!id) return;
-
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
-
-    Promise.all([getGira(id), listarItens()])
-      .then(([giraRes, itensRes]) => {
-        const g = giraRes.data;
-        setGira(g);
-        setItens(itensRes.data);
-
-        // Sincroniza GiraContext com dados frescos do servidor
-        if (giraAtual?.id === id) {
-          setGiraAtual({ ...giraAtual, status: g.status, titulo: g.titulo });
-        }
-      })
-      .catch(() => router.push('/giras'))
-      .finally(() => setLoading(false));
-  // Intencionalmente sem giraAtual nas deps para evitar loop
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, router]);
+    console.log('Carregando itens para a gira', id, 'com medium_id:', selectedMediumId);
+    if (selectedMediumId) {
+      listarItens(selectedMediumId)
+        .then(res => setItens(res.data));
+    } else {
+      listarItens() // SEM parâmetro
+        .then(res => setItens(res.data));
+    }
+  }, [id, selectedMediumId]); 
 
   const fecharModal = () => {
     setModal(m => ({ ...m, aberto: false, onConfirmar: null }));
@@ -686,6 +772,10 @@ export default function ConsumoGiraPage() {
               onConsumoRegistrado={handleConsumoRegistrado}
               setModal={setModal}
               fecharModal={fecharModal}
+              isAdmin={isAdmin}
+              membros={membros}
+              onSelectMedium={setSelectedMediumId}
+              me={me}
             />
 
             {/* Lista de consumos */}
@@ -694,6 +784,7 @@ export default function ConsumoGiraPage() {
             refreshTrigger={consumoRefresh} 
             setModal={setModal}
             fecharModal={fecharModal}
+            isAdmin={isAdmin}
             />
 
             {/* Encerrar gira */}
