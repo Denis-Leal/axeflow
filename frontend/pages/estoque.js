@@ -18,6 +18,10 @@ import { handleApiError } from '../services/errorHandler';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import { toast } from 'react-toastify';
+import {
+  Button, Card, CardHeader, CardBody,
+  FormField, Spinner,
+} from '../components/ui';
 
 // ─── Constantes de display ────────────────────────────────────────────────────
 
@@ -78,7 +82,6 @@ function FormCriarItem({ onCriar }) {
   });
   const [saving, setSaving]   = useState(false);
   const [erro, setErro]       = useState('');
-  const [sucesso, setSucesso] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -86,13 +89,10 @@ function FormCriarItem({ onCriar }) {
     e.preventDefault();
     setSaving(true);
     setErro('');
-    setSucesso('');
     try {
       const nome = await onCriar(form);
       toast.success(`"${nome}" adicionado ao estoque!`);
-      setSucesso(`"${nome}" adicionado ao estoque!`);
       setForm({ name: '', category: 'velas', minimum_threshold: 0, unit_cost: '', owner: 'terreiro' });
-      setTimeout(() => setSucesso(''), 4000);
     } catch (err) {
       setErro(handleApiError(err, 'Criar item'));
     } finally {
@@ -101,34 +101,38 @@ function FormCriarItem({ onCriar }) {
   };
 
   return (
-    <div className="card-custom mb-4">
-      <div className="card-header">
+    <Card style={{ marginBottom: '1.5rem' }}>
+      <CardHeader>
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           ✦ Cadastrar novo item
         </span>
-      </div>
-      <div style={{ padding: '1.25rem' }}>
-        {erro    && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2" />{erro}</div>}
-        {sucesso && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2" />{sucesso}</div>}
+      </CardHeader>
+      <CardBody>
+        {erro && (
+          <div className="alert-custom alert-danger-custom mb-3">
+            <i className="bi bi-exclamation-circle me-2" />{erro}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label-custom">Nome do item *</label>
+          <FormField label="Nome do item" required>
             <input className="form-control-custom" value={form.name} required
               placeholder="Ex: Vela branca, Cachaça, Charuto"
               onChange={e => set('name', e.target.value)} />
-          </div>
+          </FormField>
 
-          <div className="mb-3">
-            <label className="form-label-custom">Categoria *</label>
+          <FormField label="Categoria" required>
             <select className="form-control-custom" value={form.category}
               onChange={e => set('category', e.target.value)} style={{ appearance: 'auto' }}>
-              {CATEGORIAS.map(c => <option key={c.value} value={c.value} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>{c.label}</option>)}
+              {CATEGORIAS.map(c => (
+                <option key={c.value} value={c.value} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                  {c.label}
+                </option>
+              ))}
             </select>
-          </div>
+          </FormField>
 
-          <div className="mb-3">
-            <label className="form-label-custom">Este item pertence a:</label>
+          <FormField label="Este item pertence a:">
             <CardSelecao
               opcoes={[
                 { value: 'terreiro', label: 'O terreiro', emoji: '🏛️', desc: 'Item do estoque coletivo', cor: 'var(--cor-acento)', bg: 'rgba(212,175,55,0.1)', border: 'rgba(212,175,55,0.35)' },
@@ -137,44 +141,34 @@ function FormCriarItem({ onCriar }) {
               selecionado={form.owner}
               onSelecionar={v => set('owner', v)}
             />
-          </div>
+          </FormField>
 
-          <div className="mb-3">
-            <label className="form-label-custom">
-              Alerta de estoque baixo
-              <span style={{ fontWeight: 400, marginLeft: '0.4rem', color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>(opcional)</span>
-            </label>
+          <FormField
+            label="Alerta de estoque baixo"
+            hint="Você será avisado quando o estoque chegar a esse número. Deixe 0 para não receber alertas."
+          >
             <input type="number" min="0" className="form-control-custom"
               value={form.minimum_threshold}
               onChange={e => set('minimum_threshold', e.target.value)}
               style={{ maxWidth: '160px' }} />
-            <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', marginTop: '4px' }}>
-              Você será avisado quando o estoque chegar a esse número. Deixe 0 para não receber alertas.
-            </div>
-          </div>
+          </FormField>
 
-          <div className="mb-4">
-            <label className="form-label-custom">
-              Custo por unidade (R$)
-              <span style={{ fontWeight: 400, marginLeft: '0.4rem', color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>(opcional)</span>
-            </label>
+          <FormField
+            label="Custo por unidade (R$)"
+            hint="Usado para calcular o custo total do estoque."
+          >
             <input type="number" step="0.01" min="0" className="form-control-custom"
               value={form.unit_cost} placeholder="0,00"
               onChange={e => set('unit_cost', e.target.value)}
               style={{ maxWidth: '160px' }} />
-            <div style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', marginTop: '4px' }}>
-              Usado para calcular o custo total do estoque.
-            </div>
-          </div>
+          </FormField>
 
-          <button className="btn-gold" type="submit" disabled={saving}>
-            {saving
-              ? <><span className="spinner-border spinner-border-sm me-2" />Salvando...</>
-              : <><i className="bi bi-plus-lg me-2" />Cadastrar item</>}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} disabled={saving}>
+            {!saving && <i className="bi bi-plus-lg" />} Cadastrar item
+          </Button>
         </form>
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -184,7 +178,6 @@ function FormMovimentacao({ itensVM, onMover }) {
   const [form, setForm] = useState({ item_id: '', type: 'IN', quantity: 1, notes: '' });
   const [saving, setSaving]   = useState(false);
   const [erro, setErro]       = useState('');
-  const [sucesso, setSucesso] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -193,13 +186,11 @@ function FormMovimentacao({ itensVM, onMover }) {
     if (!form.item_id) { setErro('Selecione um item.'); return; }
     setSaving(true);
     setErro('');
-    setSucesso('');
     try {
       await onMover(form.item_id, form);
       const tipo = TIPOS_MOVIMENTACAO.find(t => t.value === form.type);
-      setSucesso(`${tipo?.label} de ${form.quantity} ${form.quantity > 1 ? 'unidades' : 'unidade'} registrada!`);
+      toast.success(`${tipo?.label} de ${form.quantity} ${form.quantity > 1 ? 'unidades' : 'unidade'} registrada!`);
       setForm(f => ({ ...f, quantity: 1, notes: '' }));
-      setTimeout(() => setSucesso(''), 4000);
     } catch (err) {
       setErro(handleApiError(err, 'Registrar movimentação'));
     } finally {
@@ -207,33 +198,35 @@ function FormMovimentacao({ itensVM, onMover }) {
     }
   };
 
-  // ViewModel do item selecionado — já processado
   const itemVM = itensVM.find(i => i.id === form.item_id);
 
   return (
-    <div className="card-custom mb-4">
-      <div className="card-header">
+    <Card style={{ marginBottom: '1.5rem' }}>
+      <CardHeader>
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           ✦ Registrar entrada ou saída
         </span>
-      </div>
-      <div style={{ padding: '1.25rem' }}>
-        {erro    && <div className="alert-custom alert-danger-custom mb-3"><i className="bi bi-exclamation-circle me-2" />{erro}</div>}
-        {sucesso && <div className="alert-custom alert-success-custom mb-3"><i className="bi bi-check-circle me-2" />{sucesso}</div>}
+      </CardHeader>
+      <CardBody>
+        {erro && (
+          <div className="alert-custom alert-danger-custom mb-3">
+            <i className="bi bi-exclamation-circle me-2" />{erro}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="form-label-custom">O que aconteceu com o estoque? *</label>
+          <FormField label="O que aconteceu com o estoque?" required>
             <CardSelecao opcoes={TIPOS_MOVIMENTACAO} selecionado={form.type} onSelecionar={v => set('type', v)} />
-          </div>
+          </FormField>
 
-          <div className="mb-3">
-            <label className="form-label-custom">Qual item? *</label>
+          <FormField label="Qual item?" required>
             <select className="form-control-custom" value={form.item_id} required
               onChange={e => set('item_id', e.target.value)} style={{ appearance: 'auto' }}>
               <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>— Selecione um item —</option>
               {itensVM.map(i => (
-                <option key={i.id} value={i.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>{i.label}</option>
+                <option key={i.id} value={i.id} style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
+                  {i.label}
+                </option>
               ))}
             </select>
             {itemVM && (
@@ -242,33 +235,26 @@ function FormMovimentacao({ itensVM, onMover }) {
                 Saldo atual: <strong style={{ color: itemVM.cor }}>{itemVM.saldoLabel}</strong>
               </div>
             )}
-          </div>
+          </FormField>
 
-          <div className="mb-3">
-            <label className="form-label-custom">Quantidade *</label>
+          <FormField label="Quantidade" required>
             <input type="number" min="1" className="form-control-custom" required
               value={form.quantity} onChange={e => set('quantity', e.target.value)}
               style={{ maxWidth: '160px' }} />
-          </div>
+          </FormField>
 
-          <div className="mb-4">
-            <label className="form-label-custom">
-              Observação
-              <span style={{ fontWeight: 400, marginLeft: '0.4rem', color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>(opcional)</span>
-            </label>
+          <FormField label="Observação" hint="Ex: Compra no mercadão, descarte por vencimento...">
             <input className="form-control-custom" value={form.notes}
-              placeholder="Ex: Compra no mercadão, descarte por vencimento..."
+              placeholder="Opcional"
               onChange={e => set('notes', e.target.value)} maxLength={500} />
-          </div>
+          </FormField>
 
-          <button className="btn-gold" type="submit" disabled={saving}>
-            {saving
-              ? <><span className="spinner-border spinner-border-sm me-2" />Salvando...</>
-              : <><i className="bi bi-arrow-left-right me-2" />Registrar</>}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} disabled={saving}>
+            {!saving && <i className="bi bi-arrow-left-right" />} Registrar
+          </Button>
         </form>
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -283,14 +269,9 @@ export default function EstoquePage() {
     if (!token) router.push('/login');
   }, [router]);
 
-  // ViewModel — derivado apenas quando itens mudam
   const itensVM = useMemo(() => buildItensEstoqueViewModel(itens), [itens]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold" />
-    </div>
-  );
+  if (loading) return <Spinner center />;
 
   return (
     <>
@@ -303,9 +284,9 @@ export default function EstoquePage() {
               <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Gerenciar Estoque</h5>
               <small style={{ color: 'var(--cor-texto-suave)' }}>Cadastre itens e registre entradas e saídas</small>
             </div>
-            <Link href="/inventario" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none', fontSize: '0.9rem' }}>
+            <Button variant="ghost" size="sm" href="/inventario" as="a">
               ← Ver painel de estoque
-            </Link>
+            </Button>
           </div>
           <div className="page-content">
             <FormCriarItem onCriar={criarItem} />
