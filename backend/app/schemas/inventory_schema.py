@@ -99,7 +99,7 @@ class InventoryItemResponse(BaseModel):
 class InventoryMovementCreate(BaseModel):
     """Movimentação manual (admin): entrada, saída ou ajuste."""
     type:     str = Field(..., pattern="^(IN|OUT|ADJUSTMENT)$")
-    quantity: int = Field(..., ge=1)
+    quantity: int = Field(..., description="Delta da movimentação (pode ser negativo)")
     notes:    Optional[str] = Field(default=None, max_length=500)
 
 

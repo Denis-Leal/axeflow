@@ -74,10 +74,7 @@ def _calcular_saldo(db: Session, item_id: UUID) -> int:
     """
     result = db.execute(
         text("""
-            SELECT
-                COALESCE(SUM(CASE WHEN type IN ('IN', 'ADJUSTMENT') THEN quantity ELSE 0 END), 0)
-                - COALESCE(SUM(CASE WHEN type = 'OUT' THEN quantity ELSE 0 END), 0)
-                AS saldo
+            SELECT SUM(quantity) AS saldo
             FROM inventory_movements
             WHERE inventory_item_id = :item_id
         """),
@@ -362,7 +359,6 @@ def get_historico_item(
         .all()
     )
 
-
 def registrar_movimentacao(
     db: Session,
     item_id: UUID,
@@ -373,6 +369,7 @@ def registrar_movimentacao(
     Registra movimentação manual (não gerada por finalização de gira).
     Valida que o item pertence ao terreiro do usuário.
     """
+        
     item = db.query(InventoryItem).filter(
         InventoryItem.id == item_id,
         InventoryItem.terreiro_id == user.terreiro_id,
@@ -380,15 +377,57 @@ def registrar_movimentacao(
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item não encontrado")
+    print(f"Registrando movimentação: item_id={item_id} type={data.type} quantity={data.quantity}")
+    
+    if data.quantity < 0:
+        raise HTTPException(status_code=400, detail="A quantidade da movimentação não pode ser negativa. Use o tipo 'OUT' para reduzir o estoque.")
+    
+    if data.type == MovementTypeEnum.ADJUSTMENT:
+        saldo_atual = _calcular_saldo(db, item_id)
+        
+        novo_saldo = data.quantity
+        
+        if novo_saldo < 0:
+            raise HTTPException(status_code=400, detail="O saldo ajustado não pode ser negativo.")
 
-    mov = InventoryMovement(
+        delta = novo_saldo - saldo_atual # positivo para ajuste de aumento, negativo para ajuste de redução
+        
+        if delta == 0:
+            raise HTTPException(status_code=400, detail="O saldo ajustado é igual ao saldo atual. Nenhuma movimentação necessária.")
+
+        mov = InventoryMovement(
+            inventory_item_id = item_id,
+            type              = MovementTypeEnum.ADJUSTMENT,
+            quantity          = delta,  # agora pode ser negativo
+            gira_id           = None,
+            created_by        = user.id,
+            notes             = data.notes,
+        )
+    elif data.type == MovementTypeEnum.IN:
+        quantity = data.quantity
+        
+        mov = InventoryMovement(
         inventory_item_id = item_id,
         type              = data.type,
-        quantity          = data.quantity,
+        quantity          = quantity,
         gira_id           = None,  # movimentação manual, sem gira
         created_by        = user.id,
         notes             = data.notes,
     )
+
+    elif data.type == MovementTypeEnum.OUT:
+        quantity = -data.quantity
+        
+        mov = InventoryMovement(
+        inventory_item_id = item_id,
+        type              = data.type,
+        quantity          = quantity,
+        gira_id           = None,  # movimentação manual, sem gira
+        created_by        = user.id,
+        notes             = data.notes,
+    )
+        
+    
     db.add(mov)
     db.flush()
 

@@ -83,9 +83,6 @@ class InventoryMovement(Base):
     criador     = relationship("Usuario", foreign_keys=[created_by])
 
     __table_args__ = (
-        # Garante que quantidade nunca é zero ou negativa — sinal está no type
-        CheckConstraint("quantity > 0", name="ck_movement_quantity_positive"),
-
         # Índice primário: histórico de movimentações de um item (cálculo de saldo)
         Index("ix_movement_item_created", "inventory_item_id", "created_at"),
 
