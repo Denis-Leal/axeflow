@@ -25,7 +25,7 @@ gira_id nullable:
 """
 import uuid
 import enum
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -75,7 +75,7 @@ class InventoryMovement(Base):
     # Nota opcional para ajustes manuais (ex: "contagem física: 5 unidades")
     notes               = Column(String(500), nullable=True)
 
-    created_at          = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     # Relacionamentos
     item        = relationship("InventoryItem", back_populates="movements")

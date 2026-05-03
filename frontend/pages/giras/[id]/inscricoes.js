@@ -17,6 +17,29 @@ import { buscarNome } from '../../../services/api';
 import { buildGiraItem } from '../../../viewModels/giraViewModel';
 
 function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
+  const formatTelefone = (value) => {
+    // Remove tudo que não for número
+    let digits = value.replace(/\D/g, '');
+
+    // Limita a 11 dígitos
+    digits = digits.slice(0, 11);
+
+    // Aplica máscara dinâmica
+    if (digits.length <= 2) {
+      return `(${digits}`;
+    }
+
+    if (digits.length <= 6) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+
+    if (digits.length <= 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+
+    // Celular com 9 dígitos
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
   const [sugestoes, setSugestoes] = useState([]);
 
   const buscarConsulentes = async (value) => {
@@ -195,7 +218,10 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
         <input
           className="form-control-custom"
           value={form.telefone}
-          onChange={e => setForm({ ...form, telefone: e.target.value })}
+          onChange={(e) => {
+            const formatted = formatTelefone(e.target.value);
+            setForm({ ...form, telefone: formatted });
+          }}
           type="tel"
           placeholder="(11) 99999-9999"
           required
@@ -425,7 +451,7 @@ export default function Inscricao() {
                             <i className="bi bi-hourglass-split" style={{ color: '#f59e0b', fontSize: '1.5rem' }}></i>
                             <div style={{ color: '#fcd34d', fontWeight: 600, marginTop: '0.5rem' }}>Lista ainda não abriu</div>
                             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                            Abre em {new Date(gira.abertura_lista).toLocaleString('pt-BR')}
+                            Abre em {new Date(gira.abertura_lista).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                             </div>
                         </div>
 

@@ -10,7 +10,7 @@ CORREÇÕES aplicadas:
     separado de context para facilitar queries e dashboards
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, DateTime, Integer, Text, Index
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -46,7 +46,7 @@ class AuditLog(Base):
     # UUID gerado por requisição — correlaciona logs de uma mesma chamada
     trace_id   = Column(String(36), nullable=True, index=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
     __table_args__ = (
         # Query mais comum: filtrar por contexto + período para dashboards

@@ -12,7 +12,7 @@ Ciclo de status:
   lista_espera → confirmado (quando vaga abre) | cancelado
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, String, Text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -35,9 +35,9 @@ class InscricaoConsulente(Base):
     status      = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado, nullable=False)
     observacoes = Column(Text, nullable=True)  # anotação do consulente ao se inscrever
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     source          = Column(String(255), nullable=True)  # Ex: "link_publico", "cadastro_manual"
 
     gira       = relationship("Gira", back_populates="inscricoes_consulente", passive_deletes=True)

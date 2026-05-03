@@ -11,7 +11,7 @@ temporariamente enquanto a tabela inscricoes_gira ainda existe.
 Remover após a migration 0008 ser aplicada em produção.
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Date, Time, ForeignKey, Enum, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -41,16 +41,16 @@ class Gira(Base):
     horario              = Column(Time, nullable=False)
     limite_consulentes   = Column(Integer, nullable=True)
     limite_membros       = Column(Integer, nullable=True)
-    abertura_lista       = Column(DateTime, nullable=True)
-    fechamento_lista     = Column(DateTime, nullable=True)
+    abertura_lista       = Column(DateTime(timezone=True), nullable=True)
+    fechamento_lista     = Column(DateTime(timezone=True), nullable=True)
     responsavel_lista_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
     status               = Column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
     acesso               = Column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
     slug_publico         = Column(String(255), unique=True, nullable=True)
-    created_at           = Column(DateTime, default=datetime.utcnow)
-    updated_at           = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at           = Column(DateTime, nullable=True)
-    
+    created_at           = Column(DateTime(timezone=True), default=utcnow)
+    updated_at           = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    deleted_at           = Column(DateTime(timezone=True), nullable=True)
+
     # Flag de idempotência: True após finalizar_gira() processar o estoque.
     # SELECT FOR UPDATE nesta linha previne dupla finalização concorrente.
     estoque_processado   = Column(Boolean, nullable=False, default=False)

@@ -200,13 +200,35 @@ function mappedGira(g) {
     horario:              g.horario ? g.horario.slice(0, 5) : '',
     limite_consulentes:   g.limite_consulentes || 20,
     limite_membros:       g.limite_membros || null,
-    abertura_lista:       g.abertura_lista ? g.abertura_lista.slice(0, 16) : '',
-    fechamento_lista:     g.fechamento_lista ? g.fechamento_lista.slice(0, 16) : '',
+    abertura_lista:       utcToLocalDatetime(g.abertura_lista),
+    fechamento_lista:     utcToLocalDatetime(g.fechamento_lista),
     responsavel_lista_id: g.responsavel_lista_id || '',
     status:               g.status || 'aberta',
   };
 }
 // ── Página principal ──────────────────────────────────────────────────────────
+
+/**
+ * Converte valor de <input type="datetime-local"> (BRT local) para ISO UTC.
+ * Ex: "2026-05-03T10:50" (BRT) → "2026-05-03T13:50:00Z" (UTC)
+ */
+function localDatetimeToUTC(localStr) {
+  if (!localStr) return null;
+  return new Date(localStr).toISOString();
+}
+
+/**
+ * Converte ISO UTC do banco para valor de <input type="datetime-local"> em BRT.
+ * Ex: "2026-05-02T08:00:00+00:00" → "2026-05-02T05:00" (BRT para exibir no input)
+ */
+function utcToLocalDatetime(utcStr) {
+  if (!utcStr) return '';
+  const d = new Date(utcStr);
+  // Formata como YYYY-MM-DDTHH:MM no fuso local do browser
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function EditarGira() {
   const router = useRouter();
   const { id } = router.query;
@@ -280,8 +302,8 @@ useEffect(() => {
             status:  form.status,
             limite_consulentes: form.acesso !== 'fechada' ? parseInt(form.limite_consulentes) : null,
             limite_membros: form.acesso === 'fechada' ? parseInt(form.limite_membros) : null,
-            abertura_lista: form.acesso !== 'fechada' ? form.abertura_lista || null : null,
-            fechamento_lista: form.acesso !== 'fechada' ? form.fechamento_lista || null : null,
+            abertura_lista: form.acesso !== 'fechada' ? localDatetimeToUTC(form.abertura_lista) : null,
+            fechamento_lista: form.acesso !== 'fechada' ? localDatetimeToUTC(form.fechamento_lista) : null,
             responsavel_lista_id: form.acesso !== 'fechada' ? form.responsavel_lista_id || null : null,
           };
 

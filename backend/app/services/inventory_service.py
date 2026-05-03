@@ -14,7 +14,7 @@ CONCORRÊNCIA:
   - Criação de consumo tem UNIQUE constraint no banco como última barreira
 """
 import logging
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -170,7 +170,7 @@ def _verificar_alerta_estoque(db: Session, item_id: UUID) -> None:
     else:
         # Resolve alerta aberto se estoque voltou acima do threshold
         if alerta_aberto:
-            alerta_aberto.resolved_at = datetime.utcnow()
+            alerta_aberto.resolved_at = utcnow()
             logger.info(
                 "[Inventory] Alerta de estoque resolvido: item=%s saldo=%d",
                 item_id, saldo,

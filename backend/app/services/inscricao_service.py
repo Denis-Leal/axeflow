@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from fastapi import HTTPException
 from uuid import UUID
-from datetime import datetime
+from app.utils.datetime_utils import utcnow, ensure_utc
 
 from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
@@ -180,7 +180,7 @@ def find_or_create_consulente(
             if consulente.deleted_at:
                 # 🔄 REATIVAÇÃO
                 consulente.deleted_at = None
-                consulente.updated_at = datetime.utcnow()
+                consulente.updated_at = utcnow()
 
                 # opcional: atualizar dados
                 consulente.nome = nome_normalizado
@@ -241,10 +241,11 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    agora = datetime.utcnow()
-    if agora < gira.abertura_lista:
+    agora = utcnow()
+    print("Validar janela de inscrição: agora =", agora, "abertura =", ensure_utc(gira.abertura_lista), "fechamento =", ensure_utc(gira.fechamento_lista))
+    if agora < ensure_utc(gira.abertura_lista):
         raise HTTPException(status_code=400, detail="Lista ainda não foi aberta")
-    if agora > gira.fechamento_lista:
+    if agora > ensure_utc(gira.fechamento_lista):
         raise HTTPException(status_code=400, detail="Lista encerrada")
 
     if not validate_phone(data.telefone):
@@ -389,10 +390,10 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     if not gira:
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    agora = datetime.utcnow()
-    if agora < gira.abertura_lista:
+    agora = utcnow()
+    if agora < ensure_utc(gira.abertura_lista):
         raise HTTPException(status_code=400, detail="Lista ainda não foi aberta")
-    if agora > gira.fechamento_lista:
+    if agora > ensure_utc(gira.fechamento_lista):
         raise HTTPException(status_code=400, detail="Lista encerrada")
     
     telefone = data.telefone.strip() if data.telefone else None

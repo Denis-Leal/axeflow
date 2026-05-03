@@ -10,12 +10,16 @@ export function formatOrdinal(n) {
 
 export function formatDate(dateStr, opts = {}) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
+  // Campos Date do backend chegam como 'YYYY-MM-DD' (sem horário, sem timezone).
+  // Anexamos 'T00:00:00Z' para forçar interpretação em UTC — assim servidor e
+  // browser produzem o mesmo resultado independente do timezone local.
+  const d = new Date(dateStr + 'T00:00:00Z');
   return d.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: opts.short ? 'short' : 'long',
     year: opts.noYear ? undefined : 'numeric',
     weekday: opts.weekday ? 'long' : undefined,
+    timeZone: 'UTC', // exibe a data "crua", sem conversão de fuso
     ...opts,
   });
 }
@@ -26,9 +30,11 @@ export function formatTime(timeStr) {
   return m === '00' ? `${h}h` : `${h}h${m}`;
 }
 
+const TZ = 'America/Sao_Paulo';
+
 export function formatDateTime(dtStr) {
   if (!dtStr) return '—';
-  return new Date(dtStr).toLocaleString('pt-BR');
+  return new Date(dtStr).toLocaleString('pt-BR', { timeZone: TZ });
 }
 
 export function formatPhone(phone) {

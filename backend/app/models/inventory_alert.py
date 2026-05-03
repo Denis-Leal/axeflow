@@ -21,7 +21,7 @@ GiraNotification:
 """
 import uuid
 import enum
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, DateTime, ForeignKey, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -43,13 +43,13 @@ class InventoryAlert(Base):
         nullable=False,
     )
 
-    triggered_at        = Column(DateTime, nullable=False, default=datetime.utcnow)
+    triggered_at        = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # Null = alerta ainda aberto; preenchido = estoque recuperou
-    resolved_at         = Column(DateTime, nullable=True)
+    resolved_at         = Column(DateTime(timezone=True), nullable=True)
 
     # Última vez que uma notificação foi enviada (controle anti-spam)
-    last_notified_at    = Column(DateTime, nullable=True)
+    last_notified_at    = Column(DateTime(timezone=True), nullable=True)
 
     # Relacionamento
     item = relationship("InventoryItem", back_populates="alerts")
@@ -86,10 +86,10 @@ class GiraNotification(Base):
 
     type        = Column(SAEnum(NotificationTypeEnum), nullable=False)
 
-    created_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at  = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # Null = não lida; preenchida = lida pelo usuário
-    read_at     = Column(DateTime, nullable=True)
+    read_at     = Column(DateTime(timezone=True), nullable=True)
 
     # Relacionamentos
     gira    = relationship("Gira")

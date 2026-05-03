@@ -21,7 +21,7 @@ IMPORTANTE — optimistic locking:
 """
 import uuid
 import enum
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 
 from sqlalchemy import (
     Column, String, Integer, DateTime, Text, Boolean,
@@ -111,8 +111,8 @@ class Ajeum(Base):
     observacoes = Column(Text, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     # lazy="dynamic" não usado: preferimos queries explícitas no serviço
@@ -174,8 +174,8 @@ class AjeumItem(Base):
     deleted_at = Column(DateTime, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     ajeum    = relationship("Ajeum",   back_populates="itens")
@@ -270,8 +270,8 @@ class AjeumSelecao(Base):
     confirmado_em = Column(DateTime, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     item      = relationship("AjeumItem",  back_populates="selecoes")

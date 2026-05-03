@@ -10,7 +10,7 @@ IMPORTANTE: vagas_disponiveis conta apenas inscrições de consulentes
 """
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from app.utils.datetime_utils import utcnow, ensure_utc
 from app.core.database import get_db
 from app.models.gira import Gira, StatusGiraEnum
 from app.utils.enuns import StatusInscricaoEnum
@@ -47,7 +47,7 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
     if getattr(gira, 'acesso', 'publica') == 'fechada':
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
-    agora = datetime.utcnow()
+    agora = utcnow()
 
     # Conta apenas inscrições de CONSULENTES (consulente_id IS NOT NULL).
     # Membros confirmados são contados em pool separado e não ocupam vagas do público.
@@ -68,7 +68,7 @@ def get_gira_publica(slug: str, request: Request, db: Session = Depends(get_db))
     lista_aberta = (
         gira.abertura_lista is not None
         and gira.fechamento_lista is not None
-        and gira.abertura_lista <= agora <= gira.fechamento_lista
+        and ensure_utc(gira.abertura_lista) <= agora <= ensure_utc(gira.fechamento_lista)
         and gira.status == StatusGiraEnum.aberta
     )
 

@@ -10,7 +10,7 @@ Status simplificado (sem lista_espera — membros não ficam em fila):
   confirmado → compareceu | faltou | cancelado
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -30,8 +30,8 @@ class InscricaoMembro(Base):
 
     status = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     gira   = relationship("Gira", back_populates="inscricoes_membro", passive_deletes=True)
     membro = relationship("Usuario", back_populates="inscricoes_membro")

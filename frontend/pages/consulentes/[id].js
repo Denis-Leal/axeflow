@@ -363,7 +363,7 @@ export default function PerfilConsulente() {
                 <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', marginBottom: '2px' }}>Última visita</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: retorno.cor }}>
                   {perfil.ultima_visita
-                    ? new Date(perfil.ultima_visita + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+                    ? new Date(perfil.ultima_visita + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'short' })
                     : '—'}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
@@ -379,7 +379,7 @@ export default function PerfilConsulente() {
                 <div style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', marginBottom: '2px' }}>Primeira visita</div>
                 <div style={{ fontSize: '1rem', fontWeight: 700,  color: retorno.cor }}>
                   {perfil.primeira_data
-                    ? new Date(perfil.primeira_data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                    ? new Date(perfil.primeira_data + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })
                     : '—'}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
@@ -499,7 +499,7 @@ export default function PerfilConsulente() {
                           </div>
                           {dataStr && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', whiteSpace: 'nowrap' }}>
-                              {new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {new Date(dataStr + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })}
                             </span>
                           )}
                         </div>

@@ -6,7 +6,7 @@ ALTERAÇÃO: adicionado relacionamento `inscricoes_membro` para o novo
 model InscricaoMembro. O back_populates espelhado em inscricao_membro.py.
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -31,8 +31,8 @@ class Usuario(Base):
     senha_hash  = Column(String(255), nullable=False)
     role        = Column(String(50), default=RoleEnum.membro)
     ativo       = Column(Boolean, default=True)
-    created_at  = Column(DateTime, default=datetime.utcnow)
-    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at  = Column(DateTime(timezone=True), default=utcnow)
+    updated_at  = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     terreiro          = relationship("Terreiro", back_populates="usuarios")
     giras_responsavel = relationship("Gira", back_populates="responsavel_lista")

@@ -28,8 +28,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://axeflow.vercel.app';
 /** Formata "2025-06-14" → "sábado, 14 de junho de 2025" */
 function formatarData(dataStr) {
   if (!dataStr) return '';
-  return new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  return new Date(dataStr + 'T00:00:00Z').toLocaleDateString('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   });
 }
 
@@ -341,7 +341,6 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function GiraPublica({ gira, erro, slug }) {
-  console.log("GiraPublica: ", gira)
   // ── Meta tags OG ─────────────────────────────────────────────────────────
   const dataFormatada = formatarData(gira?.data);
   const horario       = formatarHorario(gira?.horario);
@@ -376,9 +375,8 @@ export default function GiraPublica({ gira, erro, slug }) {
   // ── Lógica de estado da lista ─────────────────────────────────────────────
 
   const agora          = new Date();
-  const listaFutura    = gira.abertura_lista  && agora < new Date(gira.abertura_lista);
-  const listaEncerrada = gira.fechamento_lista && agora > new Date(gira.fechamento_lista);
-
+  const listaFutura    = new Date(gira.abertura_lista) && agora < new Date(gira.abertura_lista);
+  const listaEncerrada = new Date(gira.fechamento_lista) && agora > new Date(gira.fechamento_lista);
   // Percentual de ocupação (considera vagas + lista de espera para a barra visual)
   const ocupadas = gira.limite_consulentes - gira.vagas_disponiveis;
   const pct      = Math.min(100, (ocupadas / gira.limite_consulentes) * 100);
@@ -481,7 +479,7 @@ export default function GiraPublica({ gira, erro, slug }) {
                 <i className="bi bi-hourglass-split" style={{ color: '#f59e0b', fontSize: '1.5rem' }}></i>
                 <div style={{ color: '#fcd34d', fontWeight: 600, marginTop: '0.5rem' }}>Lista ainda não abriu</div>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                  Abre em {new Date(gira.abertura_lista).toLocaleString('pt-BR')}
+                  Abre em {new Date(gira.abertura_lista).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                 </div>
               </div>
 

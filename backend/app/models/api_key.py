@@ -13,7 +13,7 @@ Formato da chave gerada:
   Exemplo: axf_a3f7b2c1d4e5f6789abcdef0123456789abcdef0123456789abcdef01234567
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import (
     Column, String, Boolean, DateTime, BigInteger, Text,
     ForeignKey, Index,
@@ -62,8 +62,8 @@ class ApiKey(Base):
     request_count = Column(BigInteger, nullable=False, default=0)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
 
     # ── Relacionamentos ────────────────────────────────────────────────────────
     terreiro = relationship("Terreiro")
@@ -81,7 +81,7 @@ class ApiKey(Base):
         """Retorna True se a chave já passou da data de expiração."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return utcnow() > self.expires_at
 
     @property
     def valida(self) -> bool:

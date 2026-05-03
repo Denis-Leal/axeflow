@@ -116,7 +116,7 @@ function ModalHistorico({ item, onClose }) {
                   return (
                     <tr key={m.id}>
                       <td style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
-                        {new Date(m.created_at).toLocaleString('pt-BR')}
+                        {new Date(m.created_at).toLocaleString('pt-BR', {timeZone: 'America/Sao_Paulo'})}
                       </td>
                       <td>
                         <span style={{

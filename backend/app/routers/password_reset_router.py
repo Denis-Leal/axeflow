@@ -26,8 +26,8 @@ Rate limiting:
 import hashlib
 import secrets
 import logging
-from datetime import datetime, timedelta
-
+from datetime import timedelta
+from app.utils.datetime_utils import utcnow
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -101,7 +101,7 @@ def _invalidar_tokens_anteriores(db: Session, user_id) -> None:
     Invalida todos os tokens ainda ativos do usuário antes de gerar novo.
     Garante que só o link mais recente funcione.
     """
-    agora = datetime.utcnow()
+    agora = utcnow()
     (
         db.query(PasswordResetToken)
         .filter(
@@ -268,7 +268,7 @@ def enviar_reset(
 
     # Gera token e persiste apenas o hash
     token_raw, token_hash = _gerar_token()
-    expires_at = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRA_HORAS)
+    expires_at = utcnow() + timedelta(hours=TOKEN_EXPIRA_HORAS)
 
     reset_token = PasswordResetToken(
         user_id     = usuario.id,
@@ -349,7 +349,7 @@ def redefinir_senha(
 
     # Atualiza senha e invalida token na mesma operação
     usuario.senha_hash  = hash_password(data.nova_senha)
-    reset_token.used_at = datetime.utcnow()
+    reset_token.used_at = utcnow()
     db.commit()
 
     audit_service.log(

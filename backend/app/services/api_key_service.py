@@ -17,10 +17,11 @@ Geração segura:
   - SHA-256 armazenado (sem possibilidade de reversão)
   - Valor real exibido UMA ÚNICA VEZ ao usuário (nunca mais recuperável)
 """
+from datetime import datetime
 import hashlib
 import secrets
 import logging
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from typing import Optional
 from uuid import UUID
 
@@ -159,7 +160,7 @@ def revogar_api_key(db: Session, key_id: UUID, terreiro_id: UUID) -> ApiKey:
         raise HTTPException(status_code=400, detail="Chave já está revogada")
 
     key.ativa      = False
-    key.revoked_at = datetime.utcnow()
+    key.revoked_at = utcnow()
     db.commit()
     db.refresh(key)
 
@@ -207,7 +208,7 @@ def autenticar_por_api_key(
 
     # Atualiza estatísticas de uso (sem falhar a requisição se der erro)
     try:
-        key.last_used_at  = datetime.utcnow()
+        key.last_used_at  = utcnow()
         key.request_count = (key.request_count or 0) + 1
         db.commit()
     except Exception as e:

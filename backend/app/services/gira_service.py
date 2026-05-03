@@ -16,7 +16,7 @@ from app.utils.slug import generate_gira_slug
 from app.services.push_service import send_push_to_terreiro
 from app.services.inscricao_service import promover_fila_em_lote
 from app.services.inventory_service import finalizar_gira
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 
 from app.models.gira_item_consumption import ConsumptionStatusEnum, GiraItemConsumption
 
@@ -327,7 +327,7 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID, usuario_id: UUID)
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     titulo = gira.titulo
-    gira.deleted_at = datetime.utcnow()
+    gira.deleted_at = utcnow()
     db.commit()
     
     usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, ForeignKey, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -11,8 +11,8 @@ class PushSubscription(Base):
     endpoint   = Column(Text, unique=True, nullable=False, index=True)
     p256dh     = Column(Text, nullable=False)   # chave pública do browser
     auth       = Column(Text, nullable=False)   # segredo de autenticação
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
     user_id = Column(UUID, ForeignKey("usuarios.id"), nullable=False)
     terreiro_id = Column(UUID, ForeignKey("terreiros.id"), nullable=False)

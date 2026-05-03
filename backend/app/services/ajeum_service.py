@@ -29,7 +29,7 @@ MULTI-TENANT — validação em toda operação:
   Falha → 403 (não 404), para não revelar existência de recursos de outros terreiros.
 """
 import logging
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from uuid import UUID
 
 from sqlalchemy import text
@@ -583,7 +583,7 @@ def selecionar_item(
             item_id, user.id,
         )
         selecao_existente.status     = StatusSelecaoEnum.selecionado
-        selecao_existente.updated_at = datetime.utcnow()
+        selecao_existente.updated_at = utcnow()
         # version NÃO é incrementado aqui: re-seleção não é confirmação de admin,
         # não há risco de conflito de duas confirmações simultâneas
         db.commit()
@@ -705,7 +705,7 @@ def cancelar_selecao(
     _validar_transicao(selecao.status, StatusSelecaoEnum.cancelado)
 
     selecao.status     = StatusSelecaoEnum.cancelado
-    selecao.updated_at = datetime.utcnow()
+    selecao.updated_at = utcnow()
     # version não muda: cancelamento pelo membro não é confirmação de admin
 
     db.commit()
@@ -768,7 +768,7 @@ def confirmar_selecao(
     # Valida que o novo status é uma transição permitida
     _validar_transicao(selecao.status, data.novo_status)
 
-    agora = datetime.utcnow()
+    agora = utcnow()
 
     # ── UPDATE com verificação de version ─────────────────────────────────────
     # Usamos SQL direto para ter acesso ao rowcount após o UPDATE.
@@ -864,7 +864,7 @@ def editar_item(
     if data.descricao is not None:
         item.descricao = data.descricao.strip()
 
-    item.updated_at = datetime.utcnow()
+    item.updated_at = utcnow()
     db.commit()
     db.refresh(item)
 
@@ -873,8 +873,7 @@ def editar_item(
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SOFT DELETE DE ITEM
-# ══════════════════════════════════════════════════════════════════════════════
-
+# ══════════════════════════════════
 def deletar_item(
     db: Session,
     item_id: UUID,
@@ -909,8 +908,8 @@ def deletar_item(
             ),
         )
 
-    item.deleted_at = datetime.utcnow()
-    item.updated_at = datetime.utcnow()
+    item.deleted_at = utcnow()
+    item.updated_at = utcnow()
     db.commit()
 
     logger.info(

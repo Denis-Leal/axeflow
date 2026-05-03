@@ -662,7 +662,7 @@ export default function ApiDocs() {
                                 <div>{k.request_count || 0} req</div>
                                 {k.last_used_at && (
                                   <div style={{ fontSize: '0.72rem' }}>
-                                    {new Date(k.last_used_at).toLocaleDateString('pt-BR')}
+                                    {new Date(k.last_used_at).toLocaleDateString('pt-BR', {timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short'})}
                                   </div>
                                 )}
                               </td>

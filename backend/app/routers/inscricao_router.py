@@ -7,7 +7,7 @@ Eventos registrados:
   INSCRICAO_CANCELADA — inscrição cancelada (WARNING)
   INSCRICAO_REATIVADA — inscrição reativada (INFO)
 """
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
@@ -266,14 +266,14 @@ def deletar_consulente(
     ).update(
         {
             InscricaoConsulente.status: "cancelado",
-            InscricaoConsulente.updated_at: datetime.utcnow(),
-            InscricaoConsulente.deleted_at: datetime.utcnow()  # marca inscrições como deletadas
+            InscricaoConsulente.updated_at: utcnow(),
+            InscricaoConsulente.deleted_at: utcnow()  # marca inscrições como deletadas
         },
         synchronize_session=False
     )
 
     # 🔹 Soft delete do consulente
-    consulente.deleted_at = datetime.utcnow()
+    consulente.deleted_at = utcnow()
 
     db.commit()
 

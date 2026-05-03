@@ -10,8 +10,8 @@ Retenção padrão: 90 dias (configurável via env AUDIT_LOG_RETENTION_DAYS).
 O job roda uma vez por dia às 03:00 UTC para evitar carga em horário de pico.
 """
 import logging
-from datetime import datetime, timedelta
-
+from datetime import timedelta
+from app.utils.datetime_utils import utcnow
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import text
@@ -33,7 +33,7 @@ def _purge_audit_logs() -> None:
     Repete em lotes de 5000 até não restar mais nada a remover.
     """
     retention_days = settings.AUDIT_LOG_RETENTION_DAYS
-    cutoff = datetime.utcnow() - timedelta(days=retention_days)
+    cutoff = utcnow() - timedelta(days=retention_days)
     total_removidos = 0
 
     db = SessionLocal()

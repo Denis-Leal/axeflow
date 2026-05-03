@@ -1,6 +1,6 @@
 # app/models/device.py
 
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from app.core.database import Base
 from sqlalchemy.dialects.postgresql import UUID 
 import uuid
@@ -21,5 +21,5 @@ class Device(Base):
     provider = Column(String, nullable=False)  # fcm
 
     active = Column(Boolean, default=True)
-    last_seen = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime(timezone=True), default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)

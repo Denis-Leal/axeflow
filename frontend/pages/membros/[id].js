@@ -254,7 +254,7 @@ export default function PerfilMembro() {
                 </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: retorno.cor }}>
                   {perfil.ultima_visita
-                    ? new Date(perfil.ultima_visita + 'T00:00:00').toLocaleDateString('pt-BR', {
+                    ? new Date(perfil.ultima_visita + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC',
                         day: '2-digit', month: 'short',
                       })
                     : '—'}
@@ -275,7 +275,7 @@ export default function PerfilMembro() {
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--cor-acento)' }}>
                   {perfil.primeira_data
-                    ? new Date(perfil.primeira_data + 'T00:00:00').toLocaleDateString('pt-BR', {
+                    ? new Date(perfil.primeira_data + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC',
                         day: '2-digit', month: 'short', year: 'numeric',
                       })
                     : '—'}
@@ -373,7 +373,7 @@ export default function PerfilMembro() {
                           </div>
                           {dataStr && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', whiteSpace: 'nowrap' }}>
-                              {new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR', {
+                              {new Date(dataStr + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC',
                                 day: '2-digit', month: 'short', year: 'numeric',
                               })}
                             </span>

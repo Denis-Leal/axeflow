@@ -10,7 +10,7 @@ Ciclo de vida do token:
   5. Limpeza periódica remove tokens expirados (pode ser feita pelo cleanup_service)
 """
 import uuid
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -41,7 +41,7 @@ class PasswordResetToken(Base):
     used_at    = Column(DateTime, nullable=True)  # None = ainda não usado
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # ── Relacionamentos ────────────────────────────────────────────────────────
     usuario  = relationship("Usuario")
@@ -57,8 +57,8 @@ class PasswordResetToken(Base):
     @property
     def valido(self) -> bool:
         """Token pode ser usado: não expirou e ainda não foi utilizado."""
-        return self.used_at is None and datetime.utcnow() < self.expires_at
+        return self.used_at is None and utcnow() < self.expires_at
 
     @property
     def expirado(self) -> bool:
-        return datetime.utcnow() >= self.expires_at
+        return utcnow() >= self.expires_at

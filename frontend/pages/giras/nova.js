@@ -9,6 +9,16 @@ import { handleApiError } from '../../services/errorHandler';
 import api from '../../services/api';
 import { Button, FormField, Card, CardHeader, CardBody, StatCard } from '../../components/ui';
 
+
+/**
+ * Converte valor de <input type="datetime-local"> (BRT local) para ISO UTC.
+ * Ex: "2026-05-03T10:50" (BRT) → "2026-05-03T13:50:00Z" (UTC)
+ */
+function localDatetimeToUTC(localStr) {
+  if (!localStr) return null;
+  return new Date(localStr).toISOString();
+}
+
 export default function NovaGira() {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -47,8 +57,8 @@ export default function NovaGira() {
         limite_consulentes: parseInt(form.limite_consulentes),
         horario: form.horario + ':00',
         responsavel_lista_id: form.responsavel_lista_id || null,
-        abertura_lista: form.acesso === 'fechada' ? null : form.abertura_lista || null,
-        fechamento_lista: form.acesso === 'fechada' ? null : form.fechamento_lista || null,
+        abertura_lista: form.acesso === 'fechada' ? null : localDatetimeToUTC(form.abertura_lista),
+        fechamento_lista: form.acesso === 'fechada' ? null : localDatetimeToUTC(form.fechamento_lista),
       };
       const res = await createGira(payload);
       router.push(`/giras/${res.data.id}`);

@@ -26,7 +26,7 @@ UNIQUE(gira_id, medium_id, inventory_item_id):
 """
 import uuid
 import enum
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, CheckConstraint, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -86,8 +86,8 @@ class GiraItemConsumption(Base):
         nullable=True,  # null até ser processado
     )
 
-    created_at          = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at          = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # Relacionamentos
     gira        = relationship("Gira")

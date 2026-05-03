@@ -16,7 +16,7 @@ terreiro_id denormalizado:
 """
 import uuid
 import enum
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -60,11 +60,11 @@ class InventoryItem(Base):
     # NUMERIC(10, 2) → até R$ 99.999.999,99 com 2 casas decimais
     unit_cost           = Column(Numeric(10, 2), nullable=True)
 
-    created_at          = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at          = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # deleted_at: soft delete mantém histórico de movimentações
-    deleted_at          = Column(DateTime, nullable=True)
+    deleted_at          = Column(DateTime(timezone=True), nullable=True)
 
     # Relacionamentos
     owner               = relationship("InventoryOwner", back_populates="items")

@@ -1,7 +1,7 @@
 # app/models/notification_log.py
 
 from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
-from datetime import datetime
+from app.utils.datetime_utils import utcnow
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -18,4 +18,4 @@ class NotificationLog(Base):
     payload_hash = Column(String, nullable=False)
     success = Column(Boolean, default=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
