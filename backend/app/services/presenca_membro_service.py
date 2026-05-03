@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.models.inscricao_membro import InscricaoMembro
-from app.models.inscricao_status import StatusInscricaoEnum
+from app.utils.enuns import StatusInscricaoEnum
 from app.models.gira import Gira
 from app.models.usuario import Usuario
 

@@ -39,6 +39,7 @@ def _count_inscritos(db: Session, gira: Gira) -> int:
         return db.query(InscricaoConsulente).filter(
             InscricaoConsulente.gira_id == gira.id,
             InscricaoConsulente.status != "cancelado",
+            InscricaoConsulente.deleted_at.is_(None)
         ).count()
 
 

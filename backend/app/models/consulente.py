@@ -8,7 +8,7 @@ em inscricao_consulente.py.
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, ForeignKey, String, Boolean, DateTime, Text, Index
+from sqlalchemy import Column, ForeignKey, String, Boolean, DateTime, Text, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -32,7 +32,13 @@ class Consulente(Base):
     terreiro        = relationship("Terreiro", back_populates="consulente")
     # Relacionamento com o novo model separado de inscrição de consulentes
     inscricoes      = relationship("InscricaoConsulente", back_populates="consulente")
-    
+    deleted_at      = Column(DateTime, nullable=True)
     __table_args__ = (
-        Index("ix_consulentes_telefone", "telefone"),
-    )
+    Index(
+        "ux_consulente_telefone_ativo",
+        "telefone",
+        "terreiro_id",
+        unique=True,
+        postgresql_where=text("deleted_at IS NULL")
+    ),
+)

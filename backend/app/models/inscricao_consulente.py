@@ -37,6 +37,7 @@ class InscricaoConsulente(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True)
     source          = Column(String(255), nullable=True)  # Ex: "link_publico", "cadastro_manual"
 
     gira       = relationship("Gira", back_populates="inscricoes_consulente", passive_deletes=True)

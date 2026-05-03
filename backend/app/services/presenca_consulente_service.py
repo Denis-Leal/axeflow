@@ -84,6 +84,7 @@ def get_score_consulente(db: Session, consulente_id: UUID, terreiro_id: UUID) ->
         .filter(
             InscricaoConsulente.consulente_id == consulente_id,
             InscricaoConsulente.gira_id.in_(gira_ids),
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .all()
     )
@@ -117,7 +118,8 @@ def get_scores_para_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> dict:
 
     # Inscritos na gira atual — usando nova tabela
     inscritos = db.query(InscricaoConsulente).filter(
-        InscricaoConsulente.gira_id == gira_id
+        InscricaoConsulente.gira_id == gira_id,
+        InscricaoConsulente.deleted_at.is_(None)
     ).all()
     consulente_ids = [i.consulente_id for i in inscritos]
 
@@ -131,6 +133,7 @@ def get_scores_para_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> dict:
             InscricaoConsulente.consulente_id.in_(consulente_ids),
             InscricaoConsulente.gira_id.in_(gira_ids_passadas),
             InscricaoConsulente.status != StatusInscricaoEnum.cancelado,
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .all()
     )
@@ -174,7 +177,7 @@ def get_ranking_consulentes(db: Session, terreiro_id: UUID) -> list:
     # Busca inscrições de consulentes nas giras deste terreiro — nova tabela
     inscricoes = (
         db.query(InscricaoConsulente)
-        .filter(InscricaoConsulente.gira_id.in_(gira_ids))
+        .filter(InscricaoConsulente.gira_id.in_(gira_ids), InscricaoConsulente.deleted_at.is_(None))
         .all()
     )
 

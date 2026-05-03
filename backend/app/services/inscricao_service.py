@@ -54,7 +54,7 @@ def list_inscricoes(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[Inscr
     # AGORA: db.query(InscricaoConsulente)
     inscricoes = (
         db.query(InscricaoConsulente)
-        .filter(InscricaoConsulente.gira_id == gira_id)
+        .filter(InscricaoConsulente.gira_id == gira_id, InscricaoConsulente.consulente_id.isnot(None), InscricaoConsulente.deleted_at.is_(None))
         .order_by(InscricaoConsulente.posicao)
         .all()
     )
@@ -88,6 +88,7 @@ def _promover_lista_espera_novo(
         .filter(
             InscricaoConsulente.gira_id == gira_id,
             InscricaoConsulente.status == StatusNovo.lista_espera,
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .order_by(InscricaoConsulente.posicao)
         .with_for_update()
@@ -126,6 +127,7 @@ def promover_fila_em_lote(
             InscricaoConsulente.gira_id == gira_id,
             InscricaoConsulente.consulente_id.isnot(None),
             InscricaoConsulente.status == StatusNovo.lista_espera,
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .order_by(InscricaoConsulente.posicao)
         .limit(vagas_abertas)
@@ -155,45 +157,12 @@ def find_or_create_consulente(
     created_by: UUID | None = None,
     primeira_visita: bool | None = None
 ):
-    
     nome_normalizado = nome.strip()
-    
+
     if not nome_normalizado:
         raise HTTPException(status_code=400, detail="Nome é obrigatório")
-    
+
     telefone_normalizado = None
-    
-    # Se for cadastro_manual
-    # Telefone é opcional
-    if source == "cadastro_manual":
-        if telefone:
-            if not validate_phone(telefone):
-                raise HTTPException(status_code=400, detail="Telefone inválido")
-            telefone = normalize_phone(telefone)
-        # burca por telefone
-        if telefone:
-            consulente_existente = db.query(Consulente).filter(
-                Consulente.telefone == telefone
-            ).first()
-        else:
-            consulente_existente = db.query(Consulente).filter(
-                Consulente.terreiro_id == terreiro_id,
-                func.lower(Consulente.nome) == nome_normalizado.lower()
-            ).first()
-            
-        if consulente_existente:
-            consulente = consulente_existente
-        else:
-            consulente = Consulente(
-                nome=nome_normalizado,
-                telefone=telefone,
-                terreiro_id=terreiro_id,
-                created_by=created_by,
-                source="cadastro_manual"
-            )
-            db.add(consulente)
-            db.flush() 
-        
 
     if telefone:
         if not validate_phone(telefone):
@@ -201,34 +170,46 @@ def find_or_create_consulente(
 
         telefone_normalizado = normalize_phone(telefone)
 
-        encontrados = db.query(Consulente).filter(
-            Consulente.telefone == telefone_normalizado
-        ).all()
+        consulente = db.query(Consulente).filter(
+            Consulente.telefone == telefone_normalizado,
+            Consulente.terreiro_id == terreiro_id,
+            Consulente.deleted_at.is_(None)
+        ).order_by(Consulente.created_at.asc()).first()
 
-        if len(encontrados) == 1:
-            return encontrados[0]
+        if consulente:
+            if consulente.deleted_at:
+                # 🔄 REATIVAÇÃO
+                consulente.deleted_at = None
+                consulente.updated_at = datetime.utcnow()
 
-        elif len(encontrados) > 1:
-            # ⚠️ conflito — você PRECISA decidir uma regra
-            # escolha pragmática: pegar o mais antigo
-            return sorted(encontrados, key=lambda c: c.created_at)[0]
+                # opcional: atualizar dados
+                consulente.nome = nome_normalizado
+                consulente.source = source
 
-    # ── fallback: busca por nome (apenas interno deveria usar isso) ──
-    # simples, sem fuzzy por enquanto
-    possiveis = db.query(Consulente).filter(
-        Consulente.nome.ilike(f"%{nome.strip()}%")
-    ).limit(5).all()
+                if primeira_visita is not None:
+                    consulente.primeira_visita = primeira_visita
 
-    # ⚠️ aqui você tem 3 opções:
-    # 1. ignorar e criar novo (mais simples)
-    # 2. retornar lista pro frontend decidir (melhor UX)
-    # 3. heurística automática (arriscado)
+                return consulente
+            else:
+                # 🔒 já existe ativo
+                return consulente
 
-    # vou assumir abordagem simples por agora:
+    # ── fallback por nome (somente se não tiver telefone) ──
+    if not telefone_normalizado:
+        consulente = db.query(Consulente).filter(
+            Consulente.terreiro_id == terreiro_id,
+            func.lower(Consulente.nome) == nome_normalizado.lower(),
+            Consulente.deleted_at.is_(None)
+        ).first()
+
+        if consulente:
+            return consulente
+
+    # ── criação ──
     consulente = Consulente(
-        nome=nome.strip(),
-        terreiro_id=terreiro_id,
+        nome=nome_normalizado,
         telefone=telefone_normalizado,
+        terreiro_id=terreiro_id,
         primeira_visita=primeira_visita if primeira_visita is not None else True,
         source=source,
         created_by=created_by,
@@ -282,6 +263,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     inscricao_existente = db.query(InscricaoConsulente).filter(
         InscricaoConsulente.gira_id == gira.id,
         InscricaoConsulente.consulente_id == consulente.id,
+        InscricaoConsulente.deleted_at.is_(None)
     ).first()
 
     if inscricao_existente:
@@ -324,6 +306,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
                 StatusNovo.confirmado,
                 StatusNovo.lista_espera,
             ]),
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .with_for_update()
         .all()
@@ -422,6 +405,7 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     inscricao_existente = db.query(InscricaoConsulente).filter(
         InscricaoConsulente.gira_id == gira.id,
         InscricaoConsulente.consulente_id == consulente.id,
+        InscricaoConsulente.deleted_at.is_(None)
     ).first()
 
     if inscricao_existente:
@@ -445,6 +429,7 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
                 StatusNovo.confirmado,
                 StatusNovo.lista_espera,
             ]),
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .with_for_update()
         .all()
@@ -514,7 +499,7 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
     # 1. Busca inscrição (sem lock ainda)
     inscricao = (
         db.query(InscricaoConsulente)
-        .filter(InscricaoConsulente.id == inscricao_id)
+        .filter(InscricaoConsulente.id == inscricao_id, InscricaoConsulente.deleted_at.is_(None))
         .first()
     )
     if not inscricao:
@@ -544,6 +529,7 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
             InscricaoConsulente.gira_id == gira.id,
             InscricaoConsulente.consulente_id.isnot(None),
             InscricaoConsulente.status == StatusNovo.confirmado,
+            InscricaoConsulente.deleted_at.is_(None)
         )
         .count()
     )
@@ -607,7 +593,8 @@ def update_presenca(
     """
     # Busca na nova tabela (fonte de verdade)
     inscricao = db.query(InscricaoConsulente).filter(
-        InscricaoConsulente.id == inscricao_id
+        InscricaoConsulente.id == inscricao_id,
+        InscricaoConsulente.deleted_at.is_(None)
     ).first()
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
@@ -647,7 +634,8 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
     
     # Busca na nova tabela
     inscricao = db.query(InscricaoConsulente).filter(
-        InscricaoConsulente.id == inscricao_id
+        InscricaoConsulente.id == inscricao_id,
+        InscricaoConsulente.deleted_at.is_(None)
     ).first()
     if not inscricao:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")

@@ -81,6 +81,29 @@ function AxeFlowBrand() {
  * @param {number}  posicaoFila - Quantas pessoas já estão na fila de espera
  */
 function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
+  const formatTelefone = (value) => {
+    // Remove tudo que não for número
+    let digits = value.replace(/\D/g, '');
+
+    // Limita a 11 dígitos
+    digits = digits.slice(0, 11);
+
+    // Aplica máscara dinâmica
+    if (digits.length <= 2) {
+      return `(${digits}`;
+    }
+
+    if (digits.length <= 6) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+
+    if (digits.length <= 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+
+    // Celular com 9 dígitos
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
   const [form, setForm] = useState({
     nome:           '',
     telefone:       '',
@@ -202,7 +225,10 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
         <input
           className="form-control-custom"
           value={form.telefone}
-          onChange={e => setForm({ ...form, telefone: e.target.value })}
+          onChange={(e) => {
+            const formatted = formatTelefone(e.target.value);
+            setForm({ ...form, telefone: formatted });
+          }}
           type="tel"
           placeholder="(11) 99999-9999"
           required

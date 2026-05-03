@@ -7,6 +7,8 @@ Eventos registrados:
   INSCRICAO_CANCELADA — inscrição cancelada (WARNING)
   INSCRICAO_REATIVADA — inscrição reativada (INFO)
 """
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -193,7 +195,7 @@ def lista_consulentes(
             InscricaoConsulente,
             InscricaoConsulente.consulente_id == Consulente.id
         )
-        .filter(Consulente.terreiro_id == user.terreiro_id)
+        .filter(Consulente.terreiro_id == user.terreiro_id, Consulente.deleted_at.is_(None))
         .group_by(
             Consulente.id,
             Consulente.nome,
@@ -249,16 +251,30 @@ def deletar_consulente(
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    if user.role not in ["admin", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
     consulente = db.query(Consulente).filter(
         Consulente.id == consulente_id,
         Consulente.terreiro_id == user.terreiro_id,
+        Consulente.deleted_at.is_(None)
     ).first()
+
     if not consulente:
         raise HTTPException(status_code=404, detail="Consulente não encontrado")
-    
-    db.delete(consulente)
+
+    # 🔹 Cancela todas as inscrições
+    db.query(InscricaoConsulente).filter(
+        InscricaoConsulente.consulente_id == consulente_id
+    ).update(
+        {
+            InscricaoConsulente.status: "cancelado",
+            InscricaoConsulente.updated_at: datetime.utcnow(),
+            InscricaoConsulente.deleted_at: datetime.utcnow()  # marca inscrições como deletadas
+        },
+        synchronize_session=False
+    )
+
+    # 🔹 Soft delete do consulente
+    consulente.deleted_at = datetime.utcnow()
+
     db.commit()
 
 @router.get("/consulentes/{consulente_id}/perfil")
