@@ -26,325 +26,11 @@ import {
   COR_SCORE,
 } from '../viewModels/membroViewModel';
 import { handleApiError } from '../services/errorHandler';
-
-// ─── Sub-componentes puros ────────────────────────────────────────────────────
-
-function Avatar({ inicial, size = 36 }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.3)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: 'var(--cor-acento)', fontFamily: 'Cinzel', fontWeight: 700,
-      fontSize: size > 32 ? '0.9rem' : '0.8rem',
-    }}>
-      {inicial}
-    </div>
-  );
-}
-
-function RoleBadge({ label, color }) {
-  return (
-    <span style={{
-      padding: '0.2rem 0.7rem', borderRadius: '20px',
-      fontSize: '0.75rem', fontWeight: 600,
-      background: `${color}22`, color,
-    }}>
-      {label}
-    </span>
-  );
-}
-
-function ScoreBadge({ item }) {
-  const c = item.corStyle;
-  return (
-    <span
-      title={`${item.comparecimentos} presenças · ${item.faltas} faltas`}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: '3px',
-        background: c.bg, border: `1px solid ${c.border}`, color: c.text,
-        borderRadius: '20px', padding: '2px 10px', fontSize: '0.72rem', fontWeight: 600,
-        whiteSpace: 'nowrap', cursor: 'help',
-      }}
-    >
-      {item.emoji} {item.scoreLabel}
-    </span>
-  );
-}
-
-// ─── Card mobile — aba Lista ──────────────────────────────────────────────────
-
-function MembroCard({ membro, isAdmin, onEditar }) {
-  return (
-    <div style={{
-      background: 'var(--cor-card)', border: '1px solid var(--cor-borda)',
-      borderRadius: '10px', padding: '0.75rem', marginBottom: '0.5rem',
-      display: 'flex', alignItems: 'center', gap: '0.75rem',
-    }}>
-      <Avatar inicial={membro.inicial} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <Link href={`/membros/${membro.id}`}
-            style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--cor-texto)', textDecoration: 'none' }}>
-            {membro.nome}
-          </Link>
-          {membro.souEu && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)' }}>(você)</span>
-          )}
-        </div>
-        <div style={{ fontSize: '0.76rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
-          {membro.email}
-        </div>
-        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <RoleBadge label={membro.roleLabel} color={membro.roleColor} />
-          <span style={{
-            fontSize: '0.72rem', padding: '1px 7px', borderRadius: '20px',
-            background: membro.ativo ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.1)',
-            color: membro.ativo ? '#10b981' : '#ef4444',
-            border: `1px solid ${membro.ativo ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}`,
-          }}>
-            {membro.statusLabel}
-          </span>
-        </div>
-      </div>
-      {isAdmin && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <button onClick={() => onEditar(membro)} style={{
-            background: 'transparent', border: '1px solid var(--cor-borda)',
-            color: 'var(--cor-texto-suave)', borderRadius: '6px',
-            padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
-          }}>
-            <i className="bi bi-pencil" />
-          </button>
-          <Link href={`/membros/${membro.id}`} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: '1px solid rgba(212,175,55,0.35)',
-            color: 'var(--cor-acento)', borderRadius: '6px',
-            padding: '0.3rem 0.5rem', textDecoration: 'none', fontSize: '0.8rem',
-          }}>
-            <i className="bi bi-bar-chart-line" />
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Card mobile — aba Desempenho ─────────────────────────────────────────────
-
-function RankingCard({ item }) {
-  const c = item.corStyle;
-  return (
-    <div style={{
-      background: item.alerta ? 'rgba(249,115,22,0.04)' : 'var(--cor-card)',
-      border: `1px solid ${item.alerta ? 'rgba(249,115,22,0.25)' : 'var(--cor-borda)'}`,
-      borderRadius: '10px', padding: '0.75rem', marginBottom: '0.5rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-        <Avatar inicial={item.inicial} size={32} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <Link href={`/membros/${item.id}`}
-              style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--cor-texto)', textDecoration: 'none' }}>
-              {item.nome}
-            </Link>
-            {item.alerta && (
-              <span style={{
-                fontSize: '0.68rem', color: '#f97316',
-                background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)',
-                borderRadius: '4px', padding: '1px 5px',
-              }}>
-                ⚠ {item.faltas}x faltou
-              </span>
-            )}
-          </div>
-          <span style={{ fontSize: '0.7rem', color: item.roleColor }}>{item.roleLabel}</span>
-        </div>
-        <ScoreBadge item={item} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.76rem', flexWrap: 'wrap' }}>
-        <span style={{ color: '#10b981' }}>✓ {item.comparecimentos}</span>
-        <span style={{
-          color: item.faltas >= 3 ? '#ef4444' : 'var(--cor-texto-suave)',
-          fontWeight: item.faltas >= 3 ? 700 : 400,
-        }}>✗ {item.faltas}</span>
-        <span style={{ color: 'var(--cor-texto-suave)' }}>{item.finalizadas} giras</span>
-        {item.finalizadas > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 80 }}>
-            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px' }}>
-              <div style={{ width: `${item.taxa}%`, height: '100%', background: c.text, borderRadius: '2px' }} />
-            </div>
-            <span style={{ color: 'var(--cor-texto-suave)', minWidth: 30 }}>{item.taxa}%</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tabela desktop — aba Lista ───────────────────────────────────────────────
-
-function MembrosTable({ membros, isAdmin, onEditar }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table className="table-custom">
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Email</th>
-            <th>Telefone</th>
-            <th>Perfil</th>
-            <th>Status</th>
-            {isAdmin && <th>Ações</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {membros.map(m => (
-            <tr key={m.id}>
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <Avatar inicial={m.inicial} />
-                  <div>
-                    <Link href={`/membros/${m.id}`}
-                      style={{ color: 'var(--cor-texto)', textDecoration: 'none', fontWeight: 600 }}>
-                      {m.nome}
-                    </Link>
-                    {m.souEu && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)', marginLeft: '0.4rem' }}>
-                        (você)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td style={{ color: 'var(--cor-texto-suave)' }}>{m.email}</td>
-              <td style={{ color: 'var(--cor-texto-suave)' }}>{m.telefone}</td>
-              <td><RoleBadge label={m.roleLabel} color={m.roleColor} /></td>
-              <td>
-                <span className={`badge-status ${m.ativo ? 'badge-confirmado' : 'badge-cancelado'}`}>
-                  {m.statusLabel}
-                </span>
-              </td>
-              {isAdmin && (
-                <td>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button onClick={() => onEditar(m)} className="btn-outline-gold"
-                      style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
-                      <i className="bi bi-pencil" />
-                    </button>
-                    <Link href={`/membros/${m.id}`} style={{
-                      display: 'inline-flex', alignItems: 'center',
-                      background: 'transparent', border: '1px solid rgba(212,175,55,0.35)',
-                      color: 'var(--cor-acento)', borderRadius: '8px',
-                      padding: '0.2rem 0.6rem', textDecoration: 'none', fontSize: '0.8rem',
-                    }}>
-                      <i className="bi bi-bar-chart-line" />
-                    </Link>
-                  </div>
-                </td>
-              )}
-            </tr>
-          ))}
-          {membros.length === 0 && (
-            <tr><td colSpan="6">
-              <div className="empty-state">
-                <i className="bi bi-person-badge d-block" />
-                <p>Nenhum membro cadastrado</p>
-              </div>
-            </td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Tabela desktop — aba Desempenho ──────────────────────────────────────────
-
-function RankingTable({ itens }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table className="table-custom">
-        <thead>
-          <tr>
-            <th>Membro</th>
-            <th style={{ textAlign: 'center' }}>Score</th>
-            <th style={{ textAlign: 'center' }}>Presenças</th>
-            <th style={{ textAlign: 'center' }}>Faltas</th>
-            <th style={{ textAlign: 'center' }}>Giras</th>
-            <th>Taxa</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {itens.map(m => (
-            <tr key={m.id} style={{ background: m.alerta ? 'rgba(249,115,22,0.04)' : 'transparent' }}>
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <Avatar inicial={m.inicial} size={32} />
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <Link href={`/membros/${m.id}`}
-                        style={{ color: 'var(--cor-texto)', textDecoration: 'none', fontWeight: 600, fontSize: '0.88rem' }}>
-                        {m.nome}
-                      </Link>
-                      {m.alerta && (
-                        <span style={{
-                          fontSize: '0.68rem', color: '#f97316',
-                          background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)',
-                          borderRadius: '4px', padding: '1px 5px',
-                        }}>
-                          ⚠ {m.faltas}x faltou
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '0.7rem', color: m.roleColor }}>{m.roleLabel}</span>
-                  </div>
-                </div>
-              </td>
-              <td style={{ textAlign: 'center' }}><ScoreBadge item={m} /></td>
-              <td style={{ textAlign: 'center', color: '#10b981', fontWeight: 600 }}>{m.comparecimentos}</td>
-              <td style={{
-                textAlign: 'center',
-                color: m.faltas >= 3 ? '#ef4444' : 'var(--cor-texto-suave)',
-                fontWeight: m.faltas >= 3 ? 700 : 400,
-              }}>{m.faltas}</td>
-              <td style={{ textAlign: 'center', color: 'var(--cor-texto-suave)' }}>{m.totalInscricoes}</td>
-              <td style={{ minWidth: 120 }}>
-                {m.finalizadas > 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div className="vagas-bar" style={{ flex: 1 }}>
-                      <div className="vagas-fill" style={{ width: `${m.taxa}%`, background: m.corStyle.text }} />
-                    </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)', minWidth: 35 }}>
-                      {m.taxa}%
-                    </span>
-                  </div>
-                ) : (
-                  <span style={{ color: 'var(--cor-texto-suave)', fontSize: '0.78rem' }}>—</span>
-                )}
-              </td>
-              <td>
-                <Link href={`/membros/${m.id}`} className="btn-outline-gold"
-                  style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem', textDecoration: 'none' }}>
-                  <i className="bi bi-person-lines-fill" />
-                </Link>
-              </td>
-            </tr>
-          ))}
-          {itens.length === 0 && (
-            <tr><td colSpan="7">
-              <div className="empty-state">
-                <i className="bi bi-bar-chart-line d-block" />
-                <p>Nenhum dado de presença ainda</p>
-              </div>
-            </td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+import MembroListCard from '../components/membro/MembroListCard';
+import MembroListTable from '../components/membro/MembroListTable';
+import RankingCard from '../components/membro/RankingCard';
+import RankingTable from '../components/membro/RankingTable';
+import { Spinner, Card, CardHeader, CardBody, Button, StatCard } from '../components/ui';
 
 // ─── Legenda de score ─────────────────────────────────────────────────────────
 
@@ -385,16 +71,13 @@ function Modal({ titulo, onClose, children }) {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
-      <div className="card-custom" style={{ width: '100%', maxWidth: '460px', margin: '1rem' }}>
-        <div className="card-header d-flex justify-content-between align-items-center">
+      <Card style={{ width: '100%', maxWidth: '460px', margin: '1rem' }}>
+        <CardHeader style={{ justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)' }}>✦ {titulo}</span>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'var(--cor-texto-suave)',
-            cursor: 'pointer', fontSize: '1.2rem',
-          }}>×</button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
+          <Button variant="ghost" size="sm" onClick={onClose} style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}>×</Button>
+        </CardHeader>
+        <CardBody>{children}</CardBody>
+      </Card>
     </div>
   );
 }
@@ -501,11 +184,7 @@ export default function Membros() {
 
   // ─── Loading inicial ──────────────────────────────────────────────────────
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold" />
-    </div>
-  );
+  if (loading) return <Spinner center />;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -523,9 +202,9 @@ export default function Membros() {
               <small style={{ color: 'var(--cor-texto-suave)' }}>Usuários do seu terreiro</small>
             </div>
             {isAdmin && aba === 'lista' && (
-              <button className="btn-gold" onClick={() => setShowModal(true)}>
+              <Button variant="primary" size="sm" onClick={() => setShowModal(true)}>
                 <i className="bi bi-person-plus me-1" /> Convidar Membro
-              </button>
+              </Button>
             )}
           </div>
 
@@ -566,15 +245,15 @@ export default function Membros() {
 
             {/* ── ABA: LISTA ── */}
             {aba === 'lista' && (
-              <div className="card-custom">
+              <Card>
                 {isMobile ? (
                   membrosVM.length > 0
-                    ? membrosVM.map(m => <MembroCard key={m.id} membro={m} isAdmin={isAdmin} onEditar={abrirEditar} />)
+                    ? membrosVM.map(m => <MembroListCard key={m.id} membro={m} isAdmin={isAdmin} onEditar={abrirEditar} />)
                     : <div className="empty-state"><i className="bi bi-person-badge d-block" /><p>Nenhum membro cadastrado</p></div>
                 ) : (
-                  <MembrosTable membros={membrosVM} isAdmin={isAdmin} onEditar={abrirEditar} />
+                  <MembroListTable membros={membrosVM} isAdmin={isAdmin} onEditar={abrirEditar} />
                 )}
-              </div>
+              </Card>
             )}
 
             {/* ── ABA: DESEMPENHO ── */}
@@ -582,7 +261,7 @@ export default function Membros() {
               <div>
                 {loadingRanking && (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-                    <div className="spinner-gold" />
+                    <Spinner />
                   </div>
                 )}
 
@@ -599,11 +278,7 @@ export default function Membros() {
                         { label: '⚠ Alertas',        value: rankingStats.alertas,      cor: '#f97316',           sub: '3+ faltas, <50%' },
                         { label: '🆕 Sem histórico', value: rankingStats.semHistorico, cor: '#94a3b8',           sub: '< 2 giras' },
                       ].map(card => (
-                        <div key={card.label} className="stat-card">
-                          <div style={{ fontSize: '0.72rem', color: card.cor, marginBottom: '2px' }}>{card.label}</div>
-                          <div className="stat-value" style={{ color: card.cor, fontSize: '1.6rem' }}>{card.value}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>{card.sub}</div>
-                        </div>
+                        <StatCard key={card.label} label={card.label} value={card.value} sub={card.sub} color={card.cor} />
                       ))}
                     </div>
 
@@ -638,7 +313,7 @@ export default function Membros() {
                     )}
 
                     {/* Mobile: cards | Desktop: tabela */}
-                    <div className="card-custom">
+                    <Card>
                       {isMobile ? (
                         rankingFiltrado.length > 0
                           ? rankingFiltrado.map(m => <RankingCard key={m.id} item={m} />)
@@ -647,7 +322,7 @@ export default function Membros() {
                         <RankingTable itens={rankingFiltrado} />
                       )}
                       <ScoreLegenda />
-                    </div>
+                    </Card>
                   </>
                 )}
               </div>
@@ -693,13 +368,9 @@ export default function Membros() {
               <input type="password" className="form-control-custom" value={form.senha}
                 onChange={e => setForm({ ...form, senha: e.target.value })} required minLength={6} />
             </div>
-            <div className="d-flex gap-2">
-              <button type="button" className="btn-outline-gold"
-                onClick={() => setShowModal(false)} style={{ flex: 1 }}>Cancelar</button>
-              <button type="submit" className="btn-gold" disabled={saving} style={{ flex: 1 }}>
-                {saving && <span className="spinner-border spinner-border-sm me-1" />}
-                Convidar
-              </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button type="button" variant="outline" fullWidth onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" fullWidth disabled={saving} loading={saving}>Convidar</Button>
             </div>
           </form>
         </Modal>
@@ -772,13 +443,9 @@ export default function Membros() {
                 </small>
               )}
             </div>
-            <div className="d-flex gap-2">
-              <button type="button" className="btn-outline-gold"
-                onClick={() => setShowEditModal(false)} style={{ flex: 1 }}>Cancelar</button>
-              <button type="submit" className="btn-gold" disabled={saving} style={{ flex: 1 }}>
-                {saving && <span className="spinner-border spinner-border-sm me-1" />}
-                Salvar
-              </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button type="button" variant="outline" fullWidth onClick={() => setShowEditModal(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" fullWidth disabled={saving} loading={saving}>Salvar</Button>
             </div>
           </form>
         </Modal>

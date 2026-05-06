@@ -57,6 +57,11 @@ export function  Button({
       color:       'var(--cor-texto-suave)',
       borderColor: 'transparent',
     },
+    edit: {
+      background:  'transparent',
+      color:       'var(--cor-texto-suave)',
+      borderColor: 'var(--cor-borda)',
+    },
     danger: {
       background:  'rgba(239,68,68,0.12)',
       color:       '#ef4444',

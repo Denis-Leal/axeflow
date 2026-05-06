@@ -13,6 +13,7 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import api from '../../services/api';
+import { Spinner, Card, CardHeader, CardBody, Button } from '../../components/ui';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
 const COR = {
@@ -79,8 +80,8 @@ function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
   if (!podeEditar && !notas) return null;
 
   return (
-    <div className="card-custom mb-4">
-      <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <Card style={{ marginBottom: '1rem' }}>
+      <CardHeader>
         <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
           📝 Notas do Terreiro
         </span>
@@ -91,22 +92,19 @@ function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
           <span style={{ fontSize: '0.78rem', color: '#ef4444', marginLeft: '0.5rem' }}>Erro ao salvar</span>
         )}
         {podeEditar && !editando && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleEditar}
-            style={{
-              marginLeft: 'auto', background: 'none',
-              border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)',
-              borderRadius: '6px', padding: '0.2rem 0.6rem',
-              cursor: 'pointer', fontSize: '0.78rem',
-            }}
+            style={{ marginLeft: 'auto', border: '1px solid var(--cor-borda)' }}
           >
             <i className="bi bi-pencil me-1"></i>
             {notas ? 'Editar' : 'Adicionar nota'}
-          </button>
+          </Button>
         )}
-      </div>
+      </CardHeader>
 
-      <div style={{ padding: '1rem 1.25rem' }}>
+      <CardBody>
         {editando ? (
           <>
             <textarea
@@ -124,15 +122,12 @@ function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
                 {rascunho.length}/1000
               </span>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button onClick={handleCancelar} className="btn-outline-gold"
-                  style={{ fontSize: '0.82rem', padding: '0.3rem 0.8rem' }}>
+                <Button variant="outline" size="sm" onClick={handleCancelar}>
                   Cancelar
-                </button>
-                <button onClick={handleSalvar} className="btn-gold" disabled={salvando}
-                  style={{ fontSize: '0.82rem', padding: '0.3rem 0.8rem' }}>
-                  {salvando && <span className="spinner-border spinner-border-sm me-1"></span>}
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleSalvar} disabled={salvando} loading={salvando}>
                   Salvar
-                </button>
+                </Button>
               </div>
             </div>
           </>
@@ -148,8 +143,8 @@ function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
             Nenhuma nota registrada ainda.
           </p>
         )}
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -225,11 +220,7 @@ export default function PerfilConsulente() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold"></div>
-    </div>
-  );
+  if (loading) return <Spinner center />;
 
   if (erro || !perfil) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -415,8 +406,8 @@ export default function PerfilConsulente() {
             />
 
             {/* ── Histórico de giras ── */}
-            <div className="card-custom">
-              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Card>
+              <CardHeader>
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
                   ✦ Histórico de Giras
                 </span>
@@ -440,9 +431,9 @@ export default function PerfilConsulente() {
                 <span style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)', marginLeft: 'auto' }}>
                   {perfil.historico.length} registro{perfil.historico.length !== 1 ? 's' : ''}
                 </span>
-              </div>
+              </CardHeader>
 
-              <div style={{ padding: '1.25rem' }}>
+              <CardBody>
                 {perfil.historico.length === 0 && (
                   <div className="empty-state"><p>Nenhuma gira registrada ainda</p></div>
                 )}
@@ -529,8 +520,8 @@ export default function PerfilConsulente() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </CardBody>
+            </Card>
 
           </div>
         </div>

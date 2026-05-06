@@ -18,7 +18,8 @@ import {
   Button, Card, CardHeader, CardBody,
   StatCard, EmptyState, Spinner,
 } from '../components/ui';
-import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { buildItensEstoqueViewModel } from '../viewModels/estoqueViewModel';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ function ModalHistorico({ item, onClose }) {
 export default function InventarioDashboard() {
   const router        = useRouter();
   const { giraAtual } = useGiraAtual();
-  const isDesktop     = useMediaQuery('(min-width: 768px)');
+  const isMobile      = useIsMobile();
 
   const [itens, setItens]                   = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -180,6 +181,8 @@ export default function InventarioDashboard() {
     i.name.toLowerCase().includes(busca.toLowerCase()) ||
     (i.category || '').toLowerCase().includes(busca.toLowerCase())
   );
+
+  const itensVM = buildItensEstoqueViewModel(itensFiltrados);
 
   const totalAlertas = itens.filter(i => i.low_stock).length;
   const totalZerados = itens.filter(i => i.current_stock === 0).length;
@@ -331,7 +334,7 @@ export default function InventarioDashboard() {
               )}
 
               {!loading && itensFiltrados.length > 0 && (
-                isDesktop
+                !isMobile
                   ? <InventarioTable itens={itensFiltrados} onVerHistorico={setItemHistorico} />
                   : (
                     <CardBody>

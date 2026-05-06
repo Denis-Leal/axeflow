@@ -6,7 +6,6 @@ import Sidebar from '../../../components/Sidebar';
 import BottomNav from '../../../components/BottomNav';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { useGiraPublica, useGiras } from '../../../hooks/useGiras';
-import { useIsMobile } from '../../../hooks/useMediaQuery';
 import { inscreverInterno } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import { formatDate, formatPhone, formatTime, formatDateTime } from '../../../utils/format';
@@ -333,7 +332,6 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
 
 export default function Inscricao() {
     const router = useRouter();
-    const isMobile = useIsMobile();
     const { gira, loading, error } = useGiraPublica(router.query.id);
 
     const dataFormatada = formatDate(gira?.data);

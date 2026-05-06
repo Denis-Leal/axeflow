@@ -17,6 +17,7 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import api from '../../services/api';
+import { Spinner, Card, CardHeader, CardBody } from '../../components/ui';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
 const COR = {
@@ -76,12 +77,7 @@ export default function PerfilMembro() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold"></div>
-    </div>
-  );
+  if (loading) return <Spinner center />;
 
   // ── Erro / não encontrado ─────────────────────────────────────────────────
   if (erro || !perfil) return (
@@ -298,17 +294,17 @@ export default function PerfilMembro() {
             </div>
 
             {/* ── Histórico de giras ── */}
-            <div className="card-custom">
-              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Card>
+              <CardHeader style={{ justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
                   ✦ Histórico de Giras
                 </span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)' }}>
                   {perfil.historico.length} registro{perfil.historico.length !== 1 ? 's' : ''}
                 </span>
-              </div>
+              </CardHeader>
 
-              <div style={{ padding: '1.25rem' }}>
+              <CardBody>
                 {perfil.historico.length === 0 && (
                   <div className="empty-state">
                     <p>Nenhuma gira registrada ainda</p>
@@ -398,8 +394,8 @@ export default function PerfilMembro() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </CardBody>
+            </Card>
 
           </div>
         </div>

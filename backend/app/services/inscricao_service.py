@@ -474,7 +474,7 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     payload = {
             "title": "👤 Nova Inscrição",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"{usuario.nome} inscreveu o {consulente.nome} na gira {gira.titulo} (vaga {confirmados + 1}/{gira.limite_consulentes})",
+            "body": f"{usuario.nome} inscreveu {consulente.nome} na gira {gira.titulo} (vaga {confirmados + 1}/{gira.limite_consulentes})",
             "url": f"/giras/{gira.id}",
         }
 
@@ -679,7 +679,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
             "posicao":  promovido_inscricao.posicao,
         }
 
-    corpo_push = f"{nome_usuario} cancelou a inscrição do {nome} na {gira.titulo}"
+    corpo_push = f"{nome_usuario} cancelou a inscrição de {nome} na {gira.titulo}"
     if resultado["promovido"]:
         corpo_push += f" → {resultado['promovido']['nome']} promovido(a) da fila!"
     payload = {

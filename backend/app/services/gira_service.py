@@ -191,7 +191,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         payload = {
             "title": "🔄 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O {nome_usuario} alterou o acesso da gira {gira.titulo} para: {acesso_label}",
+            "body": f"{nome_usuario} alterou o acesso da gira {gira.titulo} para: {acesso_label}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -204,7 +204,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         payload = {
             "title": "✏️ Gira Editada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O {nome_usuario} alterou o título da gira de: {dados.get('titulo')} para: {gira.titulo}",
+            "body": f"{nome_usuario} alterou o título da gira de: {dados.get('titulo')} para: {gira.titulo}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -217,7 +217,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         payload = {
             "title": "🔄 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O {nome_usuario} alterou o tipo da gira {gira.titulo} de: {dados.get('tipo')} para: {gira.tipo}",
+            "body": f"{nome_usuario} alterou o tipo da gira {gira.titulo} de: {dados.get('tipo')} para: {gira.tipo}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -228,9 +228,9 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
 
     if "status" in campos_alterados:
         msgs = {
-            "aberta":    ("📋 Gira Aberta",    f"O {nome_usuario} marcou a gira {gira.titulo} como aberta!"),
-            "fechada":   ("🔒 Gira Encerrada", f"O {nome_usuario} marcou a gira {gira.titulo} como encerrada."),
-            "concluida": ("✅ Gira Concluída",  f"O {nome_usuario} marcou a gira {gira.titulo} como concluída."),
+            "aberta":    ("📋 Gira Aberta",    f"{nome_usuario} marcou a gira {gira.titulo} como aberta!"),
+            "fechada":   ("🔒 Gira Encerrada", f"{nome_usuario} marcou a gira {gira.titulo} como encerrada."),
+            "concluida": ("✅ Gira Concluída",  f"{nome_usuario} marcou a gira {gira.titulo} como concluída."),
         }        
             
         if (novo_status := campos_alterados["status"]) in msgs:
@@ -238,7 +238,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
             
             if novo_status == StatusGiraEnum.concluida:
                 titulo_push = "🎉 Gira Concluída"
-                corpo_push = f"O {nome_usuario} concluiu a gira {gira.titulo}! Parabéns a todos os participantes!"
+                corpo_push = f"{nome_usuario} concluiu a gira {gira.titulo}! Parabéns a todos os participantes!"
                 finalizar_gira(db, gira.id, usuario)  # Processa estoque e marca como finalizada (idempotente)
                 
             if novo_status == StatusGiraEnum.aberta or novo_status == StatusGiraEnum.fechada:
@@ -268,7 +268,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         payload = {
             "title": "📅 Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O {nome_usuario} alterou a data/horário da gira {gira.titulo} para: {data_fmt} às {horario_fmt}",
+            "body": f"{nome_usuario} alterou a data/horário da gira {gira.titulo} para: {data_fmt} às {horario_fmt}",
             "url": f"/giras/{gira.id}",
         }
         send_push_to_terreiro(
@@ -284,7 +284,7 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
         payload = {
             "title": "⏰ Gira Atualizada",
             "terreiro_id": str(gira.terreiro_id),
-            "body": f"O {nome_usuario} atualizou as datas da lista de espera da gira {gira.titulo}: abertura: {abertura_fmt}, fechamento: {fechamento_fmt}",
+            "body": f"{nome_usuario} atualizou as datas da lista de espera da gira {gira.titulo}: abertura: {abertura_fmt}, fechamento: {fechamento_fmt}",
             "url": f"/giras/{gira.id}",
         }
         
