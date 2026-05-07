@@ -104,6 +104,19 @@ export default function InscricaoTable({
                       </>
                     )}
 
+                    {i.whatsappHref && (
+                      <a
+                        href={i.whatsappHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="WhatsApp"
+                        aria-label={`Enviar WhatsApp para ${i.nome}`}
+                        style={btnWhatsapp}
+                      >
+                        <i className="bi bi-whatsapp" />
+                      </a>
+                    )}
+
                     {/* cancelar / reativar */}
                     {i.cancelado ? (
                       <button
@@ -189,6 +202,12 @@ const baseBtn = {
   fontSize: '0.8rem',
   cursor: 'pointer',
   background: 'transparent',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '30px',
+  lineHeight: 1,
+  textDecoration: 'none',
 };
 
 const btnSuccess = {
@@ -217,6 +236,13 @@ const btnNeutral = {
   color: '#9ca3af',
   border: '1px solid rgba(156,163,175,0.25)',
   background: 'rgba(156,163,175,0.06)',
+};
+
+const btnWhatsapp = {
+  ...baseBtn,
+  color: '#22c55e',
+  border: '1px solid rgba(34,197,94,0.3)',
+  background: 'rgba(34,197,94,0.08)',
 };
 
 const emptyState = {

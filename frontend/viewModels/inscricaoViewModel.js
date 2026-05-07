@@ -1,3 +1,5 @@
+import { whatsappLink } from '../utils/format';
+
 /**
  * viewModels/inscricaoViewModel.js — AxeFlow
  *
@@ -11,11 +13,26 @@
 // INSCRIÇÕES → VIEW MODEL
 // ─────────────────────────────────────────────────────────────
 
-export function buildInscricoesComScoreViewModel(inscricoes = []) {
+function hasPhone(phone) {
+  return String(phone || '').replace(/\D/g, '').length > 0;
+}
+
+function buildWhatsappMessage(inscricao, giraTitulo) {
+  const nome = inscricao.nome || 'Consulente';
+
+  if (inscricao.naFila || inscricao.status === 'lista_espera') {
+    return `Ola ${nome}! Sua inscricao na gira "${giraTitulo}" foi recebida. No momento voce esta na lista de espera. Avisaremos quando uma vaga for liberada.`;
+  }
+
+  return `Ola ${nome}! Sua inscricao na gira "${giraTitulo}" foi confirmada.`;
+}
+
+export function buildInscricoesComScoreViewModel(inscricoes = [], giraTitulo = null) {
   return inscricoes.map((i, index) => {
     const comparecimentos = i.comparecimentos || 0;
     const faltas = i.faltas || 0;
     const finalizadas = comparecimentos + faltas;
+    const canSendWhatsapp = Boolean(giraTitulo) && !i.cancelado && hasPhone(i.telefone);
 
     const scorePct =
       finalizadas > 0
@@ -42,6 +59,9 @@ export function buildInscricoesComScoreViewModel(inscricoes = []) {
 
       finalizadas,
       temAlerta: faltas >= 3,
+      whatsappHref: canSendWhatsapp
+        ? whatsappLink(i.telefone, buildWhatsappMessage(i, giraTitulo))
+        : null,
     };
   });
 }

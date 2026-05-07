@@ -176,8 +176,10 @@ export default function GiraDetalhe() {
 
   // ViewModels — só derivam quando dados chegam
   const inscricoesVM = useMemo(
-    () => (vm?.inscricoes?.length ? buildInscricoesComScoreViewModel(vm?.inscricoes) : []),
-    [vm?.inscricoes]
+    () => (vm?.inscricoes?.length
+      ? buildInscricoesComScoreViewModel(vm.inscricoes, vm.isPublica ? vm.titulo : null)
+      : []),
+    [vm?.inscricoes, vm?.isPublica, vm?.titulo]
   );
   console.log("inscricoesVM-index: ", inscricoesVM)
   const membrosVM = useMemo(

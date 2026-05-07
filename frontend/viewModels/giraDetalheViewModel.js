@@ -78,9 +78,15 @@ function buildMembroItemViewModel(membro) {
   };
 }
 
-function buildListaItemViewModel(item, giraTitulo) {
-  const mensagem = `Ola ${item.nome}! Uma vaga foi liberada na gira "${giraTitulo}". Voce estava na fila de espera e agora esta confirmado(a)!`;
+function buildListaWhatsappMessage(item, giraTitulo) {
+  if (item.naFila || item.status === 'lista_espera') {
+    return `Ola ${item.nome}! Sua inscricao na gira "${giraTitulo}" foi recebida. No momento voce esta na lista de espera. Avisaremos quando uma vaga for liberada.`;
+  }
 
+  return `Ola ${item.nome}! Sua inscricao na gira "${giraTitulo}" foi confirmada.`;
+}
+
+function buildListaItemViewModel(item, giraTitulo, canUseWhatsapp) {
   return {
     id: item.id,
     nome: item.nome,
@@ -106,8 +112,8 @@ function buildListaItemViewModel(item, giraTitulo) {
       : 'Sem historico anterior',
     compareceuStatus: 'compareceu',
     faltouStatus: 'faltou',
-    whatsappHref: item.naFila && selectHasPhone(item.telefone)
-      ? whatsappLink(item.telefone, mensagem)
+    whatsappHref: canUseWhatsapp && !item.cancelado && selectHasPhone(item.telefone)
+      ? whatsappLink(item.telefone, buildListaWhatsappMessage(item, giraTitulo))
       : null,
   };
 }
@@ -209,7 +215,7 @@ export function buildGiraDetalheViewModel({
 
   const giraVm = buildGiraItem(gira);
   const inscricoesVm = buildInscricoesViewModel(inscricoes);
-  const listaBase = inscricoesVm.map((item) => buildListaItemViewModel(item, giraVm.titulo));
+  const listaBase = inscricoesVm.map((item) => buildListaItemViewModel(item, giraVm.titulo, giraVm.acesso === 'publica'));
   const metricas = buildInscricoesMetricas(inscricoesVm);
   const membrosVm = membrosPresenca.map(buildMembroItemViewModel);
   const metricasMembros = buildMembrosMetricas(membrosVm);

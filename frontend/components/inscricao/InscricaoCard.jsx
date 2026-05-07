@@ -134,6 +134,19 @@ export default function InscricaoCard({
             </>
           )}
 
+          {i.whatsappHref && (
+            <a
+              href={i.whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="WhatsApp"
+              aria-label={`Enviar WhatsApp para ${i.nome}`}
+              style={buttonStyle('#22c55e')}
+            >
+              <i className="bi bi-whatsapp" />
+            </a>
+          )}
+
           {i.cancelado ? (
             <button
               onClick={() => onReativar(i.id, i.nome)}
@@ -164,5 +177,11 @@ function buttonStyle(color) {
     padding: '4px 8px',
     fontSize: '0.8rem',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '32px',
+    lineHeight: 1,
+    textDecoration: 'none',
   };
 }
