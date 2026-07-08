@@ -214,6 +214,44 @@ def find_or_create_consulente(
         source=source,
         created_by=created_by,
     )
+    
+    possible_duplicate = (
+        db.query(Consulente)
+        .filter(
+            Consulente.terreiro_id == terreiro_id,
+            Consulente.deleted_at.is_(None),
+        )
+        .filter(
+            func.similarity(
+                func.lower(Consulente.nome),
+                nome_normalizado.lower()
+            ) > 0.80
+        )
+        .order_by(
+            func.similarity(
+                func.lower(Consulente.nome),
+                nome_normalizado.lower()
+            ).desc()
+        )
+        .first()
+    )
+
+    if possible_duplicate:
+        send_push_to_terreiro(
+            db=db,
+            terreiro_id=terreiro_id,
+            payload={
+                "title": "⚠️ Possível Consulente Duplicado",
+                "terreiro_id": str(terreiro_id),
+                "body": (
+                    f"Novo cadastro: '{nome_normalizado}' "
+                    f"Telefone: '{telefone_normalizado or 'N/A'}' "
+                    f"Nome existente: '{possible_duplicate.nome}' "
+                    f"Telefone existente: '{possible_duplicate.telefone}'"
+                ),
+                "url": f"/consulentes/{possible_duplicate.id}",
+            },
+        )
 
     db.add(consulente)
     db.flush()
