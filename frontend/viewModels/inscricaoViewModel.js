@@ -34,17 +34,17 @@ function buildWhatsappMessage(inscricao, giraTitulo) {
           • Evitar usar o celular durante a gira;
           • Firmar os pensamentos para o que deseja receber.
 
-          🚫 Filmar e/ou tirar fotos.
+          ❌ Filmar e/ou tirar fotos.
 
-          📍 Endereço:
+          📌 Endereço:
           R. Áries, 74 - Cidade Satélite Santa Bárbara (próximo ao Terminal São Mateus).
 
-          📍 Localização:
+          📌 Localização:
           https://maps.app.goo.gl/K1aasgPEi5W3U3Fh7?g_st=ic
 
           No mais, sua presença é muito importante para nós! Axé!
 
-          Tenda Ogum Xoroquê! 🔱⚔️`;
+          Tenda Ogum Xoroquê! ⭐`;
 }
 
 export function buildInscricoesComScoreViewModel(inscricoes = [], giraTitulo = null) {
