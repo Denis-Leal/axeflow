@@ -24,7 +24,27 @@ function buildWhatsappMessage(inscricao, giraTitulo) {
     return `Ola ${nome}! Sua inscricao na gira "${giraTitulo}" foi recebida. No momento voce esta na lista de espera. Avisaremos quando uma vaga for liberada.`;
   }
 
-  return `Ola ${nome}! Sua inscricao na gira "${giraTitulo}" foi confirmada.`;
+  return `Olá ${nome}! Sua inscrição na gira "${giraTitulo}" foi confirmada.
+
+          Caso não possa comparecer, favor nos informar o quanto antes, para que possamos disponibilizar sua vaga a outro consulente.
+
+          E, para facilitar a comunicação, deixaremos listadas algumas instruções da casa:
+
+          • Vir com vestimenta adequada;
+          • Evitar usar o celular durante a gira;
+          • Firmar os pensamentos para o que deseja receber.
+
+          🚫 Filmar e/ou tirar fotos.
+
+          📍 Endereço:
+          R. Áries, 74 - Cidade Satélite Santa Bárbara (próximo ao Terminal São Mateus).
+
+          📍 Localização:
+          https://maps.app.goo.gl/K1aasgPEi5W3U3Fh7?g_st=ic
+
+          No mais, sua presença é muito importante para nós! Axé!
+
+          Tenda Ogum Xoroquê! 🔱⚔️`;
 }
 
 export function buildInscricoesComScoreViewModel(inscricoes = [], giraTitulo = null) {
