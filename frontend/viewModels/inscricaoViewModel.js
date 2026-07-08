@@ -34,17 +34,17 @@ function buildWhatsappMessage(inscricao, giraTitulo) {
           • Evitar usar o celular durante a gira;
           • Firmar os pensamentos para o que deseja receber.
 
-          \u{1F6AB} Filmar e/ou tirar fotos.
+          🚫 Filmar e/ou tirar fotos.
 
-          \u{1F4CD} Endereço:
+          📍 Endereço:
           R. Áries, 74 - Cidade Satélite Santa Bárbara (próximo ao Terminal São Mateus).
 
-          \u{1F4CD} Localização:
+          📍 Localização:
           https://maps.app.goo.gl/K1aasgPEi5W3U3Fh7?g_st=ic
 
           No mais, sua presença é muito importante para nós! Axé!
 
-          Tenda Ogum Xoroquê! \u{1F531}\u2694\uFE0F`;
+          Tenda Ogum Xoroquê! 🔱⚔️`;
 }
 
 export function buildInscricoesComScoreViewModel(inscricoes = [], giraTitulo = null) {
