@@ -200,7 +200,7 @@ def lista_consulentes(
             Consulente.id,
             Consulente.nome,
             Consulente.telefone,
-        )
+        ).order_by(Consulente.nome.asc())
         .all()
     )
 
