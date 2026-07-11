@@ -18,4 +18,4 @@ jobs:
       - name: Ping Render
         run: |
           curl --fail --silent --show-error \
-            https://axeflow-backend.onrender.com/health
+            https://axeflow-backend.onrender.com/ping
