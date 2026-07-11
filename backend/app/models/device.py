@@ -5,21 +5,22 @@ from app.core.database import Base
 from sqlalchemy.dialects.postgresql import UUID 
 import uuid
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
-
+from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
 
 class Device(Base):
     __tablename__ = "devices"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
-    terreiro_id = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
+    user_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    terreiro_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
 
-    token = Column(Text, nullable=False, unique=True)
+    token : Mapped[str] = mapped_column(Text, nullable=False, unique=True)
 
-    platform = Column(String, nullable=False)  # web, android, ios
-    provider = Column(String, nullable=False)  # fcm
+    platform : Mapped[str] = mapped_column(String, nullable=False)  # web, android, ios
+    provider : Mapped[str] = mapped_column(String, nullable=False)  # fcm
 
-    active = Column(Boolean, default=True)
-    last_seen = Column(DateTime(timezone=True), default=utcnow)
-    created_at = Column(DateTime(timezone=True), default=utcnow)
+    active : Mapped[bool] = mapped_column(Boolean, default=True)
+    last_seen : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

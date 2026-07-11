@@ -146,4 +146,8 @@ export const editarConsumo         = (giraId, cid, data)   => api.patch(`/giras/
 
 // Finalização
 export const finalizarGira         = (giraId)              => api.post(`/giras/${giraId}/finalizar`);
+
+// ── Exportação ─────────────────────────────────────────
+export const exportGira = (giraId, formato = "xlsx") => api.get(`/giras/${giraId}/export`, { params: { formato }, responseType: "blob",});
+
 // (Outros endpoints podem ser adicionados aqui conforme necessário)

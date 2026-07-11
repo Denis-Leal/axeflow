@@ -7,7 +7,7 @@ e InscricaoConsulente para giras públicas, em vez de InscricaoGira para ambas.
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from app.models.gira import Gira, StatusGiraEnum
+from app.models.gira import Gira, StatusGiraEnum, AcessoGiraEnum
 from app.models.usuario import Usuario
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_membro import InscricaoMembro
@@ -17,9 +17,9 @@ from app.services.push_service import send_push_to_terreiro
 from app.services.inscricao_service import promover_fila_em_lote
 from app.services.inventory_service import finalizar_gira
 from app.utils.datetime_utils import utcnow
-
+from typing import Optional
 from app.models.gira_item_consumption import ConsumptionStatusEnum, GiraItemConsumption
-
+from typing import List
 
 def _count_inscritos(db: Session, gira: Gira) -> int:
     """
@@ -30,7 +30,7 @@ def _count_inscritos(db: Session, gira: Gira) -> int:
 
     Pools completamente separados — um não interfere no outro.
     """
-    if gira.acesso == "fechada":
+    if gira.acesso == AcessoGiraEnum.fechada:
         return db.query(InscricaoMembro).filter(
             InscricaoMembro.gira_id == gira.id,
             InscricaoMembro.status != "cancelado",
@@ -53,7 +53,7 @@ def _enrich(gira: Gira, db: Session, total_inscritos: int = 0) -> GiraResponse:
     return r
 
 
-def list_giras(db: Session, terreiro_id: UUID):
+def list_giras(db: Session, terreiro_id: UUID) -> List[GiraResponse]:
     """Lista giras ativas (não deletadas) do terreiro, ordenadas por data desc."""
     giras = (
         db.query(Gira)
@@ -94,6 +94,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     horario_fmt  = gira.horario.strftime("%H:%M")
     acesso_label = "pública" if is_publica else "fechada (membros)"
     usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
+    nome_usuario = None
     if user:
         usuario = db.query(Usuario).filter(Usuario.id == user.id).first()
     if usuario:
@@ -112,7 +113,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
 
     return _enrich(gira, db, 0)
 
-def get_gira_consumo(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
+def get_gira_consumo(db: Session, gira_id: UUID, terreiro_id: UUID) -> list[GiraResponse]:
     """Busca gira por ID, incluindo dados para tela de consumo operacional."""
     gira = db.query(GiraItemConsumption).filter(
         GiraItemConsumption.gira_id == gira_id,
@@ -134,7 +135,7 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     return _enrich(gira, db, _count_inscritos(db, gira))
 
 
-def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID, usuario_id: UUID = None) -> GiraUpdateResponse:
+def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID, usuario_id: Optional[UUID] = None) -> GiraUpdateResponse:
     """
     Atualiza campos da gira.
     Promoção em lote ao aumentar vagas — delegada ao inscricao_service com FOR UPDATE.

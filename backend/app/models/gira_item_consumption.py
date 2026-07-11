@@ -29,10 +29,10 @@ import enum
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, CheckConstraint, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy import Enum as SAEnum
 from app.core.database import Base
-
+from datetime import datetime
 
 class ConsumptionSourceEnum(str, enum.Enum):
     MEDIUM   = "MEDIUM"   # débito do estoque do médium
@@ -48,46 +48,46 @@ class ConsumptionStatusEnum(str, enum.Enum):
 class GiraItemConsumption(Base):
     __tablename__ = "gira_item_consumptions"
 
-    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id                  : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Isolamento multi-tenant
-    terreiro_id         = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
+    terreiro_id         : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
 
     # Gira em que o consumo ocorreu
-    gira_id             = Column(UUID(as_uuid=True), ForeignKey("giras.id"), nullable=False)
+    gira_id             : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("giras.id"), nullable=False)
 
     # Médium que consumiu o item
-    medium_id           = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    medium_id           : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
 
     # Item consumido
-    inventory_item_id   = Column(
+    inventory_item_id   : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("inventory_items.id"),
         nullable=False,
     )
 
     # De qual estoque será debitado no fechamento
-    source              = Column(SAEnum(ConsumptionSourceEnum), nullable=False)
+    source              : Mapped[ConsumptionSourceEnum] = mapped_column(SAEnum(ConsumptionSourceEnum), nullable=False)
 
     # Quantidade consumida (sempre positiva)
-    quantity            = Column(Integer, nullable=False)
+    quantity            : Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Estado do consumo no fluxo
-    status              = Column(
+    status              : Mapped[ConsumptionStatusEnum] = mapped_column(
         SAEnum(ConsumptionStatusEnum),
         nullable=False,
         default=ConsumptionStatusEnum.PENDENTE,
     )
 
     # Referência à movimentação gerada no fechamento (rastreabilidade bidirecional)
-    movement_id         = Column(
+    movement_id         : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("inventory_movements.id"),
         nullable=True,  # null até ser processado
     )
 
-    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at          = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # Relacionamentos
     gira        = relationship("Gira")
