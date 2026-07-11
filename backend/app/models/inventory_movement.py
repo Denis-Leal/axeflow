@@ -28,7 +28,8 @@ import enum
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
 from sqlalchemy import Enum as SAEnum, String
 from app.core.database import Base
 
@@ -42,40 +43,40 @@ class MovementTypeEnum(str, enum.Enum):
 class InventoryMovement(Base):
     __tablename__ = "inventory_movements"
 
-    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id                  : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Item que foi movimentado
-    inventory_item_id   = Column(
+    inventory_item_id   : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("inventory_items.id"),
         nullable=False,
     )
 
     # Tipo de movimentação
-    type                = Column(SAEnum(MovementTypeEnum), nullable=False)
+    type                : Mapped[MovementTypeEnum] = mapped_column(SAEnum(MovementTypeEnum), nullable=False)
 
     # Quantidade: SEMPRE positiva (sinal implícito no type)
     # CHECK constraint no banco para garantir invariante
-    quantity            = Column(Integer, nullable=False)
+    quantity            : Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Contexto: gira que gerou o consumo (null = movimentação manual)
-    gira_id             = Column(
+    gira_id             : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("giras.id"),
         nullable=True,
     )
 
     # Quem registrou a movimentação (auditoria)
-    created_by          = Column(
+    created_by          : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id"),
         nullable=False,
     )
 
     # Nota opcional para ajustes manuais (ex: "contagem física: 5 unidades")
-    notes               = Column(String(500), nullable=True)
+    notes               : Mapped[str] = mapped_column(String(500), nullable=True)
 
-    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     # Relacionamentos
     item        = relationship("InventoryItem", back_populates="movements")

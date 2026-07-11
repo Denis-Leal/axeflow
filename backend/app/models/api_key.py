@@ -19,21 +19,21 @@ from sqlalchemy import (
     ForeignKey, Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.core.database import Base
-
+from datetime import datetime
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
     # ── Identidade ─────────────────────────────────────────────────────────────
-    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    terreiro_id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    terreiro_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("terreiros.id", ondelete="CASCADE"),
         nullable=False,
     )
-    user_id = Column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id", ondelete="CASCADE"),
         nullable=False,
@@ -41,29 +41,29 @@ class ApiKey(Base):
 
     # ── Chave (nunca armazenar o valor real) ───────────────────────────────────
     # prefix: 'axf_XXXX' — permite identificar a chave sem expô-la
-    prefix   = Column(String(10), nullable=False)
+    prefix  : Mapped[str] = mapped_column(String(10), nullable=False)
     # key_hash: SHA-256 hexdigest da chave completa
-    key_hash = Column(String(64), nullable=False, unique=True)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
 
     # ── Metadados ──────────────────────────────────────────────────────────────
-    nome      = Column(String(100), nullable=False)
-    descricao = Column(Text, nullable=True)
+    nome      : Mapped[str] = mapped_column(String(100), nullable=False)
+    descricao : Mapped[str] = mapped_column(Text, nullable=True)
 
     # ── Permissões ─────────────────────────────────────────────────────────────
     # Lista de scopes: ["giras:read", "inscricoes:write", ...]
-    scopes = Column(JSONB, nullable=False, default=list)
+    scopes : Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
     # ── Controle de acesso ─────────────────────────────────────────────────────
-    ativa      = Column(Boolean, nullable=False, default=True)
-    expires_at = Column(DateTime, nullable=True)   # None = não expira
+    ativa      : Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    expires_at : Mapped[datetime] = mapped_column(DateTime, nullable=True)   # None = não expira
 
     # ── Auditoria de uso ───────────────────────────────────────────────────────
-    last_used_at  = Column(DateTime, nullable=True)
-    request_count = Column(BigInteger, nullable=False, default=0)
+    last_used_at  : Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    request_count : Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # ── Relacionamentos ────────────────────────────────────────────────────────
     terreiro = relationship("Terreiro")

@@ -20,7 +20,7 @@ import {
   buildMembrosPresencaViewModel,
   buildGiraDetalheStats,
 } from '../../../viewModels/inscricaoViewModel';
-
+import GiraActions from '../../../components/gira/GiraActions';
 // ─── Helpers locais ──────────────────────────────────────────────────────────
 
 // Composicoes locais de Badge permanecem aqui porque representam semantica
@@ -229,10 +229,10 @@ export default function GiraDetalhe() {
           <div className="page-content">
                 {/* Header da gira */}
                 <GiraInfoHeader gira={gira} />
-
-              {/* Stats */}
+                {/* Stats */}
                 <StatsBar stats={stats} />
 
+                <GiraActions giraId={gira.id} giraNome={gira.titulo} />
                 {/* Abas */}
                 <div style={{
                   display: 'flex',

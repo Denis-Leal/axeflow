@@ -18,7 +18,7 @@ import uuid
 import enum
 from sqlalchemy import Column, String, Enum, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.core.database import Base
 
 
@@ -30,13 +30,13 @@ class OwnerTypeEnum(str, enum.Enum):
 class InventoryOwner(Base):
     __tablename__ = "inventory_owners"
 
-    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id           : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Tipo do dono: MEDIUM ou TERREIRO
-    type         = Column(Enum(OwnerTypeEnum), nullable=False)
+    type         : Mapped[OwnerTypeEnum] = mapped_column(Enum(OwnerTypeEnum), nullable=False)
 
     # Para MEDIUM: id do Usuario; para TERREIRO: id do Terreiro
-    reference_id = Column(UUID(as_uuid=True), nullable=True)
+    reference_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # Relacionamentos reversos (usados em queries analíticas)
     items = relationship("InventoryItem", back_populates="owner")

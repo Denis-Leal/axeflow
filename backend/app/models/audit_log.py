@@ -14,39 +14,40 @@ from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, DateTime, Integer, Text, Index
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
-
+from datetime import datetime
+from sqlalchemy.orm import Mapped, mapped_column
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # ── Quem ──────────────────────────────────────────────────────────────────
     # NULL em eventos não autenticados (ex: login falhou, inscrição pública)
-    user_id    = Column(UUID(as_uuid=True), nullable=True, index=True)
-    ip         = Column(String(45), nullable=True)         # IPv4 ou IPv6
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    ip: Mapped[str] = mapped_column(String(45), nullable=True)         # IPv4 ou IPv6
 
     # ── O quê ─────────────────────────────────────────────────────────────────
     # Categoria ampla (ex: "auth", "gira", "inscricao")
-    context    = Column(String(100), nullable=False, index=True)
+    context    : Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     # Evento específico (ex: "LOGIN_OK", "GIRA_CREATED", "INSCRICAO_CANCELADA")
-    action     = Column(String(100), nullable=True,  index=True)
+    action     : Mapped[str] = mapped_column(String(100), nullable=True,  index=True)
     # Severidade: INFO | WARNING | ERROR
-    level      = Column(String(10),  nullable=False, default="INFO")
+    level      : Mapped[str] = mapped_column(String(10),  nullable=False, default="INFO")
 
     # ── Detalhes HTTP ─────────────────────────────────────────────────────────
-    status     = Column(Integer, nullable=True)   # HTTP status code
-    code       = Column(String(50), nullable=True) # código interno (ex: ERR_NETWORK)
-    method     = Column(String(10), nullable=True)
-    url        = Column(Text, nullable=True)
-    message    = Column(Text, nullable=True)
-    user_agent = Column(Text, nullable=True)
+    status     : Mapped[int] = mapped_column(Integer, nullable=True)   # HTTP status code
+    code       : Mapped[str] = mapped_column(String(50), nullable=True) # código interno (ex: ERR_NETWORK)
+    method     : Mapped[str] = mapped_column(String(10), nullable=True)
+    url        : Mapped[str] = mapped_column(Text, nullable=True)
+    message    : Mapped[str] = mapped_column(Text, nullable=True)
+    user_agent : Mapped[str] = mapped_column(Text, nullable=True)
 
     # ── Rastreabilidade ───────────────────────────────────────────────────────
     # UUID gerado por requisição — correlaciona logs de uma mesma chamada
-    trace_id   = Column(String(36), nullable=True, index=True)
+    trace_id   : Mapped[str] = mapped_column(String(36), nullable=True, index=True)
 
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
     __table_args__ = (
         # Query mais comum: filtrar por contexto + período para dashboards

@@ -19,7 +19,8 @@ import enum
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
 from sqlalchemy import Enum as SAEnum
 from app.core.database import Base
 
@@ -42,29 +43,29 @@ class ItemCategoryEnum(str, enum.Enum):
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
-    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id                  : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Isolamento multi-tenant (denormalizado para queries diretas sem JOIN)
-    terreiro_id         = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
+    terreiro_id         : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
 
     # Proprietário: médium ou terreiro
-    owner_id            = Column(UUID(as_uuid=True), ForeignKey("inventory_owners.id"), nullable=False)
+    owner_id            : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("inventory_owners.id"), nullable=False)
 
-    name                = Column(String(255), nullable=False)
-    category            = Column(SAEnum(ItemCategoryEnum), nullable=False)
+    name                : Mapped[str] = mapped_column(String(255), nullable=False)
+    category            : Mapped[ItemCategoryEnum] = mapped_column(SAEnum(ItemCategoryEnum), nullable=False)
 
     # Threshold para alerta de estoque baixo (0 = sem alerta)
-    minimum_threshold   = Column(Integer, nullable=False, default=0)
+    minimum_threshold   : Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Custo unitário: preparado para futuro cálculo de custo por gira
     # NUMERIC(10, 2) → até R$ 99.999.999,99 com 2 casas decimais
-    unit_cost           = Column(Numeric(10, 2), nullable=True)
+    unit_cost           : Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
 
-    created_at          = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at          = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # deleted_at: soft delete mantém histórico de movimentações
-    deleted_at          = Column(DateTime(timezone=True), nullable=True)
+    deleted_at          : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relacionamentos
     owner               = relationship("InventoryOwner", back_populates="items")

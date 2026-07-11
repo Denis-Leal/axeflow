@@ -13,7 +13,7 @@ from pydantic import BaseModel, model_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime, date, time
-
+from app.models.gira import StatusGiraEnum
 
 class GiraCreate(BaseModel):
     titulo: str
@@ -63,7 +63,7 @@ class GiraResponse(BaseModel):
     limite_membros: Optional[int] = None
     abertura_lista: Optional[datetime] = None
     fechamento_lista: Optional[datetime] = None
-    status: str
+    status: StatusGiraEnum
     slug_publico: Optional[str] = None
     terreiro_id: UUID
     responsavel_lista_id: Optional[UUID] = None

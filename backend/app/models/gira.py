@@ -14,9 +14,11 @@ import uuid
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Date, Time, ForeignKey, Enum, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime, date, time
 from app.core.database import Base
 import enum
+from typing import Optional
 
 
 class StatusGiraEnum(str, enum.Enum):
@@ -33,27 +35,27 @@ class AcessoGiraEnum(str, enum.Enum):
 class Gira(Base):
     __tablename__ = "giras"
 
-    id                   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    terreiro_id          = Column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
-    titulo               = Column(String(255), nullable=False)
-    tipo                 = Column(String(100))
-    data                 = Column(Date, nullable=False)
-    horario              = Column(Time, nullable=False)
-    limite_consulentes   = Column(Integer, nullable=True)
-    limite_membros       = Column(Integer, nullable=True)
-    abertura_lista       = Column(DateTime(timezone=True), nullable=True)
-    fechamento_lista     = Column(DateTime(timezone=True), nullable=True)
-    responsavel_lista_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
-    status               = Column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
-    acesso               = Column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
-    slug_publico         = Column(String(255), unique=True, nullable=True)
-    created_at           = Column(DateTime(timezone=True), default=utcnow)
-    updated_at           = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-    deleted_at           = Column(DateTime(timezone=True), nullable=True)
+    id                   : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    terreiro_id          : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False)
+    titulo               : Mapped[str] = mapped_column(String(255), nullable=False)
+    tipo                 : Mapped[str] = mapped_column(String(100))
+    data                 : Mapped[date] = mapped_column(Date, nullable=False)
+    horario              : Mapped[time] = mapped_column(Time, nullable=False)
+    limite_consulentes   : Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    limite_membros       : Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    abertura_lista       : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    fechamento_lista     : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    responsavel_lista_id : Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
+    status               : Mapped[StatusGiraEnum] = mapped_column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
+    acesso               : Mapped[AcessoGiraEnum] = mapped_column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
+    slug_publico         : Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    created_at           : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at           : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    deleted_at           : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Flag de idempotência: True após finalizar_gira() processar o estoque.
     # SELECT FOR UPDATE nesta linha previne dupla finalização concorrente.
-    estoque_processado   = Column(Boolean, nullable=False, default=False)
+    estoque_processado   : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     terreiro          = relationship("Terreiro", back_populates="giras")
     responsavel_lista = relationship("Usuario", back_populates="giras_responsavel")

@@ -13,7 +13,8 @@ import uuid
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, String, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
 from app.core.database import Base
 
 
@@ -21,27 +22,27 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     # ── Identidade ─────────────────────────────────────────────────────────────
-    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id     = Column(
+    id          : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id     : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id", ondelete="CASCADE"),
         nullable=False,
     )
-    terreiro_id = Column(
+    terreiro_id : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("terreiros.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     # ── Token (apenas o hash é persistido) ────────────────────────────────────
-    token_hash = Column(String(64), nullable=False, unique=True)
+    token_hash : Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
 
     # ── Controle de validade ───────────────────────────────────────────────────
-    expires_at = Column(DateTime, nullable=False)
-    used_at    = Column(DateTime, nullable=True)  # None = ainda não usado
+    expires_at : Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at    : Mapped[datetime] = mapped_column(DateTime, nullable=True)  # None = ainda não usado
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # ── Relacionamentos ────────────────────────────────────────────────────────
     usuario  = relationship("Usuario")

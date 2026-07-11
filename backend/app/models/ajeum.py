@@ -28,9 +28,10 @@ from sqlalchemy import (
     ForeignKey, CheckConstraint, UniqueConstraint, Index, event,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.core.database import Base
+from datetime import datetime
 
 
 # ── Enum de status da seleção ──────────────────────────────────────────────────
@@ -84,35 +85,31 @@ class Ajeum(Base):
     __tablename__ = "ajeum"
 
     # ── Identidade ─────────────────────────────────────────────────────────────
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # ── Multi-tenant ───────────────────────────────────────────────────────────
     # Presente diretamente para isolamento sem JOIN obrigatório.
     # Preenchido pelo serviço a partir do usuário autenticado — nunca do payload.
-    terreiro_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("terreiros.id"),
-        nullable=False,
-    )
+    terreiro_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("terreiros.id"), nullable=False,)
 
     # ── Referências ────────────────────────────────────────────────────────────
-    gira_id = Column(
+    gira_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("giras.id"),
         nullable=False,
     )
-    criado_por = Column(
+    criado_por: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id"),
         nullable=False,
     )
 
     # ── Dados ──────────────────────────────────────────────────────────────────
-    observacoes = Column(Text, nullable=True)
+    observacoes: Mapped[str] = mapped_column(Text, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     # lazy="dynamic" não usado: preferimos queries explícitas no serviço
@@ -149,33 +146,33 @@ class AjeumItem(Base):
     __tablename__ = "ajeum_item"
 
     # ── Identidade ─────────────────────────────────────────────────────────────
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # ── Multi-tenant ───────────────────────────────────────────────────────────
-    terreiro_id = Column(
+    terreiro_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("terreiros.id"),
         nullable=False,
     )
 
     # ── Referência ao Ajeum pai ────────────────────────────────────────────────
-    ajeum_id = Column(
+    ajeum_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ajeum.id"),
         nullable=False,
     )
 
     # ── Dados ──────────────────────────────────────────────────────────────────
-    descricao = Column(String(255), nullable=False)
-    limite    = Column(Integer,     nullable=False)
+    descricao: Mapped[str] = mapped_column(String(255), nullable=False)
+    limite    : Mapped[int] = mapped_column(Integer,     nullable=False)
 
     # ── Soft delete ────────────────────────────────────────────────────────────
     # NULL = ativo  |  preenchido = deletado
-    deleted_at = Column(DateTime, nullable=True)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     ajeum    = relationship("Ajeum",   back_populates="itens")
@@ -227,29 +224,29 @@ class AjeumSelecao(Base):
     __tablename__ = "ajeum_selecao"
 
     # ── Identidade ─────────────────────────────────────────────────────────────
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # ── Multi-tenant ───────────────────────────────────────────────────────────
-    terreiro_id = Column(
+    terreiro_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("terreiros.id"),
         nullable=False,
     )
 
     # ── Referências ────────────────────────────────────────────────────────────
-    item_id = Column(
+    item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ajeum_item.id"),  # sem CASCADE
         nullable=False,
     )
-    membro_id = Column(
+    membro_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id"),
         nullable=False,
     )
 
     # ── Estado ─────────────────────────────────────────────────────────────────
-    status = Column(
+    status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
         default=StatusSelecaoEnum.selecionado,
@@ -258,20 +255,20 @@ class AjeumSelecao(Base):
     # ── Optimistic locking ─────────────────────────────────────────────────────
     # Começa em 1. Incrementado a cada UPDATE de status.
     # O serviço usa: UPDATE ... WHERE id = :id AND version = :version_lida
-    version = Column(Integer, nullable=False, default=1)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     # ── Rastreabilidade da confirmação ─────────────────────────────────────────
     # Preenchidos apenas quando status → confirmado ou nao_entregue
-    confirmado_por = Column(
+    confirmado_por: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("usuarios.id"),
         nullable=True,
     )
-    confirmado_em = Column(DateTime, nullable=True)
+    confirmado_em: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # ── Relationships ──────────────────────────────────────────────────────────
     item      = relationship("AjeumItem",  back_populates="selecoes")

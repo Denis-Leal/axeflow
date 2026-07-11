@@ -13,9 +13,10 @@ Ciclo de status:
 """
 import uuid
 from app.utils.datetime_utils import utcnow
-from sqlalchemy import Column, Integer, DateTime, ForeignKey, Enum, String, Text, UniqueConstraint, Index
+from sqlalchemy import Integer, DateTime, ForeignKey, Enum, String, Text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
 from app.core.database import Base
 from app.utils.enuns import StatusInscricaoEnum
 
@@ -23,22 +24,22 @@ from app.utils.enuns import StatusInscricaoEnum
 class InscricaoConsulente(Base):
     __tablename__ = "inscricoes_consulente"
 
-    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    gira_id       = Column(UUID(as_uuid=True), ForeignKey("giras.id", ondelete="CASCADE"), nullable=False)
-    consulente_id = Column(UUID(as_uuid=True), ForeignKey("consulentes.id"), nullable=False)
-    usuario_id    = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
+    id            : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    gira_id       : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("giras.id", ondelete="CASCADE"), nullable=False)
+    consulente_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("consulentes.id"), nullable=False)
+    usuario_id    : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
 
     # posicao: usado para exibição e auditoria.
     # Fonte autoritativa para ordenação em concorrência: created_at.
-    posicao     = Column(Integer, nullable=False)
+    posicao     : Mapped[int] = mapped_column(Integer, nullable=False)
 
-    status      = Column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado, nullable=False)
-    observacoes = Column(Text, nullable=True)  # anotação do consulente ao se inscrever
+    status      : Mapped[StatusInscricaoEnum] = mapped_column(Enum(StatusInscricaoEnum), default=StatusInscricaoEnum.confirmado, nullable=False)
+    observacoes : Mapped[str] = mapped_column(Text, nullable=True)  # anotação do consulente ao se inscrever
 
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
-    source          = Column(String(255), nullable=True)  # Ex: "link_publico", "cadastro_manual"
+    created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    deleted_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    source          : Mapped[str] = mapped_column(String(255), nullable=True)  # Ex: "link_publico", "cadastro_manual"
 
     gira       = relationship("Gira", back_populates="inscricoes_consulente", passive_deletes=True)
     consulente = relationship("Consulente", back_populates="inscricoes")

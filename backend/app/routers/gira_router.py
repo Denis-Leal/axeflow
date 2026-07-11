@@ -7,7 +7,8 @@ Eventos registrados:
   GIRA_UPDATED  — gira editada (INFO)
   GIRA_DELETED  — gira removida (WARNING)
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List
@@ -17,6 +18,7 @@ from app.core.security import get_current_user, require_role
 from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse, GiraUpdateResponse
 from app.services import gira_service
 from app.services import audit_service
+from app.services import export_service
 from app.models.usuario import Usuario
 
 router = APIRouter(prefix="/giras", tags=["giras"])
@@ -38,7 +40,7 @@ def get_gira(
 ):
     return gira_service.get_gira(db, gira_id, user.terreiro_id)
 
-@router.get("/{gira_id}/consumo", response_model=GiraResponse)
+@router.get("/{gira_id}/consumo", response_model=List[GiraResponse])
 def get_gira_consumo(
     gira_id: UUID,
     user: Usuario = Depends(get_current_user),
@@ -109,3 +111,25 @@ def delete_gira(
         message = f"Gira removida (soft delete): {gira_id}",
     )
     return result
+
+@router.get("/{gira_id}/export")
+def export_gira(
+    gira_id: UUID,
+    formato: str = Query("xlsx", pattern="^(xlsx|csv|pdf|docx)$"),
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    arquivo = export_service.export(
+        db=db,
+        gira_id=gira_id,
+        terreiro_id=user.terreiro_id,
+        formato=formato,
+    )
+
+    return StreamingResponse(
+        arquivo.stream,
+        media_type=arquivo.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{arquivo.filename}"'
+        },
+    )

@@ -43,6 +43,7 @@ class InscricaoResponse(BaseModel):
     observacoes: Optional[str] = None
     usuario_id: Optional[UUID] = None
     source: str
+    primeira_visita: Optional[bool] = None
 
     class Config:
         from_attributes = True

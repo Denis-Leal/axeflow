@@ -24,7 +24,8 @@ import enum
 from app.utils.datetime_utils import utcnow
 from sqlalchemy import Column, DateTime, ForeignKey, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
 from sqlalchemy import Enum as SAEnum, String
 from app.core.database import Base
 
@@ -34,22 +35,22 @@ from app.core.database import Base
 class InventoryAlert(Base):
     __tablename__ = "inventory_alerts"
 
-    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id                  : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Item que disparou o alerta
-    inventory_item_id   = Column(
+    inventory_item_id   : Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("inventory_items.id"),
         nullable=False,
     )
 
-    triggered_at        = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    triggered_at        : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # Null = alerta ainda aberto; preenchido = estoque recuperou
-    resolved_at         = Column(DateTime(timezone=True), nullable=True)
+    resolved_at         : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Última vez que uma notificação foi enviada (controle anti-spam)
-    last_notified_at    = Column(DateTime(timezone=True), nullable=True)
+    last_notified_at    : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relacionamento
     item = relationship("InventoryItem", back_populates="alerts")
@@ -76,20 +77,20 @@ class NotificationTypeEnum(str, enum.Enum):
 class GiraNotification(Base):
     __tablename__ = "gira_notifications"
 
-    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id          : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Gira que originou a notificação
-    gira_id     = Column(UUID(as_uuid=True), ForeignKey("giras.id"), nullable=False)
+    gira_id     : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("giras.id"), nullable=False)
 
     # Usuário que deve receber a notificação
-    user_id     = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    user_id     : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
 
-    type        = Column(SAEnum(NotificationTypeEnum), nullable=False)
+    type        : Mapped[NotificationTypeEnum] = mapped_column(SAEnum(NotificationTypeEnum), nullable=False)
 
-    created_at  = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    created_at  : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     # Null = não lida; preenchida = lida pelo usuário
-    read_at     = Column(DateTime(timezone=True), nullable=True)
+    read_at     : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relacionamentos
     gira    = relationship("Gira")
