@@ -15,7 +15,7 @@ import csv
 from io import BytesIO, StringIO
 
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -257,6 +257,13 @@ def export_pdf(db: Session, gira_id: UUID, terreiro_id: UUID) -> BytesIO:
 
     normal_style = styles["Normal"]
     normal_style.fontSize = 10
+    
+    cell_style = ParagraphStyle(
+        "Cell",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,
+    )
 
 
     elementos = []
@@ -316,12 +323,15 @@ def export_pdf(db: Session, gira_id: UUID, terreiro_id: UUID) -> BytesIO:
 
     tabela = [
         [
-            "Pos.",
-            "Nome",
-            "Telefone",
-            "1ª Visita",
-            "Status",
-            "Observações",
+            Paragraph("<b>Pos.</b>", cell_style),
+            Paragraph("<b>Nome</b>", cell_style),
+            Paragraph("<b>Telefone</b>", cell_style),
+            Paragraph("<b>1ª Visita</b>", cell_style),
+            Paragraph("<b>Status</b>", cell_style),
+            Paragraph("<b>Observações</b>", cell_style),
+            Paragraph("<b>Consulta</b>", cell_style),
+            Paragraph("<b>Passe</b>", cell_style),
+            Paragraph("<b>Entidade</b>", cell_style),
         ]
     ]
 
@@ -329,28 +339,24 @@ def export_pdf(db: Session, gira_id: UUID, terreiro_id: UUID) -> BytesIO:
     for item in dados["inscricoes"]:
         tabela.append(
             [
-                str(item["posicao"]),
-                item["nome"],
-                item["telefone"],
-                item["primeira_visita"],
-                item["status"],
-                item["observacoes"],
-            ]
+            Paragraph(str(item["posicao"]), cell_style),
+            Paragraph(item["nome"], cell_style),
+            Paragraph(item["telefone"], cell_style),
+            Paragraph(item["primeira_visita"], cell_style),
+            Paragraph(item["status"], cell_style),
+            Paragraph(item["observacoes"] or "", cell_style),
+            Paragraph("", cell_style),
+            Paragraph("", cell_style),
+            Paragraph("", cell_style),
+        ]
         )
 
 
     table = Table(
-        tabela,
-        repeatRows=1,
-        colWidths=[
-            1*cm,
-            4*cm,
-            3*cm,
-            2*cm,
-            2.5*cm,
-            4.5*cm,
-        ],
-    )
+    tabela,
+    repeatRows=1,
+    hAlign="LEFT",
+)
 
 
     table.setStyle(
