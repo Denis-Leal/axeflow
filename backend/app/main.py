@@ -11,7 +11,7 @@ iniciado na subida do processo e encerrado graciosamente no shutdown.
 """
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -102,6 +102,10 @@ app.include_router(api_key_router.router)
 app.include_router(password_reset_router.router)
 app.include_router(ajeum_router.router)
 app.include_router(inventory_router.router)
+
+@app.api_route("/ping", methods=["GET", "HEAD"], include_in_schema=False)
+def ping():
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
