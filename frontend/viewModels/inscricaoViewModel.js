@@ -49,16 +49,17 @@ function buildWhatsappMessage(inscricao, giraTitulo) {
 
 export function buildInscricoesComScoreViewModel(inscricoes = [], giraTitulo = null) {
   return inscricoes.map((i, index) => {
-    const comparecimentos = i.comparecimentos || 0;
-    const faltas = i.faltas || 0;
-    const finalizadas = comparecimentos + faltas;
+    console.log("Inscrições view model:", i)
+    const comparecimentos = i.score.comparecimentos || 0;
+    const faltas = i.score.faltas || 0;
+    const finalizadas = i.score.finalizadas;
     const canSendWhatsapp = Boolean(giraTitulo) && !i.cancelado && hasPhone(i.telefone);
 
     const scorePct =
       finalizadas > 0
         ? Math.round((comparecimentos / finalizadas) * 100)
         : null;
-
+    console.log("ViewModel score:", scorePct)
     const scoreEmoji =
       scorePct == null
         ? '🆕'
