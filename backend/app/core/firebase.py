@@ -1,22 +1,27 @@
 # app/core/firebase.py
-import os
+
 import json
+
 import firebase_admin
 from firebase_admin import credentials
 
+from app.core.config import settings
+
+
 def init_firebase():
-    if not firebase_admin._apps:
-        cred_json = os.getenv("FIREBASE_CREDENTIALS")
+    if firebase_admin._apps:
+        return
 
-        if not cred_json:
-            raise ValueError("FIREBASE_CREDENTIALS environment variable is not set")
-        
-        cred_dict = json.loads(cred_json)
+    if not settings.FIREBASE_CREDENTIALS:
+        raise ValueError("FIREBASE_CREDENTIALS não está configurada.")
 
-        cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
-        
-        print(cred_dict["private_key"][:100])
-        
-        cred = credentials.Certificate(cred_dict)
+    try:
+        cred_dict = json.loads(settings.FIREBASE_CREDENTIALS)
+    except json.JSONDecodeError as exc:
+        raise ValueError("FIREBASE_CREDENTIALS contém um JSON inválido.") from exc
 
-        firebase_admin.initialize_app(cred)
+    cred_dict["private_key"] = cred_dict["private_key"].replace("\\n","\n",)
+
+    cred = credentials.Certificate(cred_dict)
+
+    firebase_admin.initialize_app(cred)
