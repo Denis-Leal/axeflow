@@ -2,27 +2,26 @@
 presenca_membro_service.py — AxeFlow
 Score de presença de MEMBROS do terreiro.
 
-Lógica análoga ao presenca_service.py (consulentes), mas usando
+Lógica análoga ao presenca_consulente_service.py, mas usando
 InscricaoMembro como fonte de dados.
 
-Membros não têm fila de espera nem score público — o cálculo é
-para uso interno do terreiro (painel administrativo).
-
-Diferença em relação a consulentes:
+Diferenças em relação a consulentes:
   - Não existe status 'lista_espera' para membros
-  - Cancelamento conta diferente: membro que cancela estava confirmado
-    mas avisou — consideramos igual ao consulente (não penaliza)
-  - O campo `total_inscricoes` conta apenas confirmado/compareceu/faltou
-    (excluindo cancelado)
+  - Cancelamento não penaliza — membro avisou que não poderia ir
+  - `total_inscricoes` conta apenas confirmado/compareceu/faltou
 """
-from sqlalchemy.orm import Session
+from datetime import date
 from uuid import UUID
 
-from app.models.inscricao_membro import InscricaoMembro
-from app.utils.enuns import StatusInscricaoEnum
-from app.models.gira import Gira
-from app.models.usuario import Usuario
+from sqlalchemy.orm import Session
 
+from app.models.gira import Gira
+from app.models.inscricao_membro import InscricaoMembro
+from app.models.usuario import Usuario
+from app.utils.enuns import StatusInscricaoEnum
+
+
+# ── Classificação ──────────────────────────────────────────────────────────────
 
 def calcular_score_membro(total: int, comparecimentos: int, faltas: int) -> dict:
     """
@@ -31,24 +30,25 @@ def calcular_score_membro(total: int, comparecimentos: int, faltas: int) -> dict
     Regras idênticas ao score de consulentes:
     - Mínimo 2 inscrições finalizadas para ter score numérico
     - Score = comparecimentos / (comparecimentos + faltas) * 100
-    - Confiável  >= 80%
-    - Regular    50-79%
-    - Risco      20-49%
+    - Confiável    >= 80%
+    - Regular      50–79%
+    - Risco        20–49%
     - Problemático < 20% com 3+ faltas
+
+    Sempre retorna `total_inscricoes` para consistência entre os callers.
     """
-    # Apenas giras com resultado definitivo (compareceu ou faltou)
     finalizadas = comparecimentos + faltas
 
     if finalizadas < 2:
         return {
-            "score":           None,
-            "label":           "Novo",
-            "cor":             "cinza",
-            "emoji":           "🆕",
-            "alerta":          False,
+            "score": None,
+            "label": "Novo",
+            "cor": "cinza",
+            "emoji": "🆕",
+            "alerta": False,
             "comparecimentos": comparecimentos,
-            "faltas":          faltas,
-            "finalizadas":     finalizadas,
+            "faltas": faltas,
+            "finalizadas": finalizadas,
             "total_inscricoes": total,
         }
 
@@ -63,40 +63,40 @@ def calcular_score_membro(total: int, comparecimentos: int, faltas: int) -> dict
     else:
         label, cor, emoji = "Problemático", "vermelho", "🚫"
 
-    # Alerta: 3+ faltas E taxa abaixo de 50% — ocupa vaga sem comparecer
+    # Alerta: membro ocupa vaga sem comparecer consistentemente
     alerta = faltas >= 3 and taxa < 50
 
     return {
-        "score":            taxa,
-        "label":            label,
-        "cor":              cor,
-        "emoji":            emoji,
-        "alerta":           alerta,
-        "comparecimentos":  comparecimentos,
-        "faltas":           faltas,
-        "finalizadas":      finalizadas,
+        "score": taxa,
+        "label": label,
+        "cor": cor,
+        "emoji": emoji,
+        "alerta": alerta,
+        "comparecimentos": comparecimentos,
+        "faltas": faltas,
+        "finalizadas": finalizadas,
         "total_inscricoes": total,
     }
 
+
+# ── Ranking de membros do terreiro ────────────────────────────────────────────
 
 def get_ranking_membros(db: Session, terreiro_id: UUID) -> list:
     """
     Retorna ranking de presença de todos os membros ativos do terreiro.
 
-    Inclui membros que nunca se inscreveram (score zerado) para
-    que o admin veja todos os membros numa única tela.
+    Inclui membros sem inscrições (score zerado) para que o admin
+    veja todos numa única tela.
 
-    Ordena: alertas primeiro, depois por score asc (piores no topo).
+    Ordena: alertas primeiro, depois por score ascendente (piores no topo).
     """
-    # IDs de todas as giras não-deletadas do terreiro
-    gira_ids = [
-        g.id for g in db.query(Gira.id).filter(
-            Gira.terreiro_id == terreiro_id,
-            Gira.deleted_at.is_(None),
-        ).all()
-    ]
+    # Subquery com giras ativas do terreiro — resolvida no banco
+    giras_sq = db.query(Gira.id).filter(
+        Gira.terreiro_id == terreiro_id,
+        Gira.deleted_at.is_(None),
+    ).scalar_subquery()
 
-    # Busca todos os membros ativos do terreiro
+    # Todos os membros ativos — inicializados com score zerado
     membros = db.query(Usuario).filter(
         Usuario.terreiro_id == terreiro_id,
         Usuario.ativo == True,
@@ -105,49 +105,49 @@ def get_ranking_membros(db: Session, terreiro_id: UUID) -> list:
     if not membros:
         return []
 
-    # Inicializa dados para todos os membros (inclusive os sem inscrições)
-    dados: dict[str, dict] = {}
-    for m in membros:
-        dados[str(m.id)] = {
-            "id":             str(m.id),
-            "nome":           m.nome,
-            "email":          m.email,
-            "telefone":       m.telefone,
-            "role":           m.role,
-            "total":          0,
+    # Inicializa dados para todos os membros, inclusive os sem inscrições
+    dados: dict[str, dict] = {
+        str(m.id): {
+            "id": str(m.id),
+            "nome": m.nome,
+            "email": m.email,
+            "telefone": m.telefone,
+            "role": m.role,
+            "total": 0,
             "comparecimentos": 0,
-            "faltas":         0,
+            "faltas": 0,
         }
+        for m in membros
+    }
 
-    # Agrega inscrições de membros nas giras do terreiro
-    if gira_ids:
-        inscricoes = (
-            db.query(InscricaoMembro)
-            .filter(InscricaoMembro.gira_id.in_(gira_ids))
-            .all()
-        )
+    # Inscrições nas giras do terreiro — subquery evita carregar IDs na memória
+    inscricoes = (
+        db.query(InscricaoMembro)
+        .filter(InscricaoMembro.gira_id.in_(giras_sq))
+        .all()
+    )
 
-        for i in inscricoes:
-            mid = str(i.membro_id)
-            if mid not in dados:
-                # Membro inativo ou removido — ignora
-                continue
+    for i in inscricoes:
+        mid = str(i.membro_id)
+        if mid not in dados:
+            # Membro inativo ou removido — ignora
+            continue
 
-            # Cancelamentos não contam no total (avisou)
-            if i.status != StatusInscricaoEnum.cancelado:
-                dados[mid]["total"] += 1
+        # Cancelamentos não contam no total (avisou)
+        if i.status != StatusInscricaoEnum.cancelado:
+            dados[mid]["total"] += 1
 
-            if i.status == StatusInscricaoEnum.compareceu:
-                dados[mid]["comparecimentos"] += 1
-            elif i.status == StatusInscricaoEnum.faltou:
-                dados[mid]["faltas"] += 1
+        if i.status == StatusInscricaoEnum.compareceu:
+            dados[mid]["comparecimentos"] += 1
+        elif i.status == StatusInscricaoEnum.faltou:
+            dados[mid]["faltas"] += 1
 
     result = []
     for d in dados.values():
         score = calcular_score_membro(d["total"], d["comparecimentos"], d["faltas"])
         result.append({**d, **score})
 
-    # Ordena: alertas primeiro, depois por score asc
+    # Alertas no topo; dentro de cada grupo, os piores scores primeiro
     result.sort(key=lambda x: (
         not x.get("alerta", False),
         x.get("score") if x.get("score") is not None else 999,
@@ -156,12 +156,14 @@ def get_ranking_membros(db: Session, terreiro_id: UUID) -> list:
     return result
 
 
-def get_perfil_membro(db: Session, membro_id: UUID, terreiro_id: UUID) -> dict:
+# ── Perfil individual de membro ───────────────────────────────────────────────
+
+def get_perfil_membro(db: Session, membro_id: UUID, terreiro_id: UUID) -> dict | None:
     """
     Perfil completo de um membro: score + histórico de giras.
 
-    Valida que o membro pertence ao terreiro antes de retornar.
-    Raises 404 implícito (retorna None) se não encontrar.
+    Valida que o membro pertence ao terreiro.
+    Retorna None se não encontrado.
     """
     membro = db.query(Usuario).filter(
         Usuario.id == membro_id,
@@ -172,7 +174,7 @@ def get_perfil_membro(db: Session, membro_id: UUID, terreiro_id: UUID) -> dict:
     if not membro:
         return None
 
-    # Giras do terreiro para filtrar inscrições
+    # Carrega giras ativas do terreiro para montar o histórico
     giras_map = {
         str(g.id): g
         for g in db.query(Gira).filter(
@@ -181,7 +183,7 @@ def get_perfil_membro(db: Session, membro_id: UUID, terreiro_id: UUID) -> dict:
         ).all()
     }
 
-    # Histórico de inscrições do membro neste terreiro
+    # Histórico de inscrições do membro neste terreiro, mais recente primeiro
     inscricoes = (
         db.query(InscricaoMembro)
         .filter(
@@ -192,70 +194,77 @@ def get_perfil_membro(db: Session, membro_id: UUID, terreiro_id: UUID) -> dict:
         .all()
     )
 
-    # Monta histórico para exibição na tela de perfil
+    # Agrega métricas e monta histórico em um único loop
+    total = comparecimentos = faltas = cancelamentos = 0
+    datas_presenca = []
     historico = []
+
     for i in inscricoes:
         gira = giras_map.get(str(i.gira_id))
         if not gira:
             continue
+
         historico.append({
             "inscricao_id": str(i.id),
-            "gira_id":      str(gira.id),
-            "gira_titulo":  gira.titulo,
-            "gira_tipo":    gira.tipo,
-            "gira_data":    gira.data.isoformat(),
-            "posicao":      i.posicao,
-            "status":       i.status,
-            "inscrito_em":  i.created_at.isoformat(),
+            "gira_id": str(gira.id),
+            "gira_titulo": gira.titulo,
+            "gira_tipo": gira.tipo,
+            "gira_data": gira.data.isoformat(),
+            "posicao": i.posicao,
+            "status": i.status,
+            "inscrito_em": i.created_at.isoformat(),
         })
 
-    # Agrega métricas
-    nao_cancelados  = [i for i in inscricoes if i.status != StatusInscricaoEnum.cancelado]
-    comparecimentos = [i for i in inscricoes if i.status == StatusInscricaoEnum.compareceu]
-    faltas          = [i for i in inscricoes if i.status == StatusInscricaoEnum.faltou]
-    cancelamentos   = [i for i in inscricoes if i.status == StatusInscricaoEnum.cancelado]
+        if i.status == StatusInscricaoEnum.cancelado:
+            cancelamentos += 1
+            continue
 
-    # Datas de comparecimento para calcular status de retorno
-    datas_presenca = sorted([
-        giras_map[str(i.gira_id)].data
-        for i in comparecimentos
-        if str(i.gira_id) in giras_map
-    ])
+        total += 1
+        if i.status == StatusInscricaoEnum.compareceu:
+            comparecimentos += 1
+            datas_presenca.append(gira.data)
+        elif i.status == StatusInscricaoEnum.faltou:
+            faltas += 1
 
-    from datetime import date
-    score = calcular_score_membro(
-        len(nao_cancelados),
-        len(comparecimentos),
-        len(faltas),
-    )
+    datas_presenca.sort()
+
+    # Status de engajamento baseado na última visita
+    if not datas_presenca:
+        status_retorno = "nunca_compareceu"
+        dias_ausente = None
+        ultima_visita = None
+        primeira_data = None
+    else:
+        dias_ausente = (date.today() - datas_presenca[-1]).days
+        ultima_visita = datas_presenca[-1].isoformat()
+        primeira_data = datas_presenca[0].isoformat()
+
+        if dias_ausente <= 60:
+            status_retorno = "ativo"
+        elif dias_ausente <= 180:
+            status_retorno = "morno"
+        else:
+            status_retorno = "inativo"
+
+    score = calcular_score_membro(total, comparecimentos, faltas)
 
     return {
-        "id":             str(membro.id),
-        "nome":           membro.nome,
-        "email":          membro.email,
-        "telefone":       membro.telefone,
-        "role":           membro.role,
-        "cadastrado_em":  membro.created_at.isoformat(),
-        "score":          score,
-        "comparecimentos": len(comparecimentos),
-        "faltas":          len(faltas),
-        # Status de engajamento baseado na última visita
-        "status_retorno": (
-            "nunca_compareceu" if not datas_presenca
-            else "ativo"       if (date.today() - datas_presenca[-1]).days <= 60
-            else "morno"       if (date.today() - datas_presenca[-1]).days <= 180
-            else "inativo"
-        ),
-        "ultima_visita":  datas_presenca[-1].isoformat() if datas_presenca else None,
-        "primeira_data":  datas_presenca[0].isoformat()  if datas_presenca else None,
-        "dias_ausente": (
-            (date.today() - datas_presenca[-1]).days if datas_presenca else None
-        ),
+        "id": str(membro.id),
+        "nome": membro.nome,
+        "email": membro.email,
+        "telefone": membro.telefone,
+        "role": membro.role,
+        "cadastrado_em": membro.created_at.isoformat(),
+        "score": score,
+        "status_retorno": status_retorno,
+        "ultima_visita": ultima_visita,
+        "primeira_data": primeira_data,
+        "dias_ausente": dias_ausente,
         "stats": {
-            "total_inscricoes": len(nao_cancelados),
-            "comparecimentos":  len(comparecimentos),
-            "faltas":           len(faltas),
-            "cancelamentos":    len(cancelamentos),
+            "total_inscricoes": total,
+            "comparecimentos": comparecimentos,
+            "faltas": faltas,
+            "cancelamentos": cancelamentos,
         },
         "historico": historico,
     }

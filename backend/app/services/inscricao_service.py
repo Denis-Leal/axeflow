@@ -31,7 +31,6 @@ from app.models.gira import Gira, StatusGiraEnum
 from app.models.consulente import Consulente
 from app.utils.enuns import StatusInscricaoEnum
 from app.models.inscricao_consulente import InscricaoConsulente
-from app.utils.enuns import StatusInscricaoEnum as StatusNovo
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, InscricaoResponse, PresencaUpdate
 from app.utils.validators import normalize_phone, validate_phone
 from app.services.push_service import send_push_to_terreiro
@@ -88,7 +87,7 @@ def _promover_lista_espera_novo(
         db.query(InscricaoConsulente)
         .filter(
             InscricaoConsulente.gira_id == gira_id,
-            InscricaoConsulente.status == StatusNovo.lista_espera,
+            InscricaoConsulente.status == StatusInscricaoEnum.lista_espera,
             InscricaoConsulente.deleted_at.is_(None)
         )
         .order_by(InscricaoConsulente.posicao)
@@ -100,7 +99,7 @@ def _promover_lista_espera_novo(
         return None
 
     # Promove na nova tabela
-    proximo.status = StatusNovo.confirmado
+    proximo.status = StatusInscricaoEnum.confirmado
 
     db.flush()
     return proximo
@@ -127,7 +126,7 @@ def promover_fila_em_lote(
         .filter(
             InscricaoConsulente.gira_id == gira_id,
             InscricaoConsulente.consulente_id.isnot(None),
-            InscricaoConsulente.status == StatusNovo.lista_espera,
+            InscricaoConsulente.status == StatusInscricaoEnum.lista_espera,
             InscricaoConsulente.deleted_at.is_(None)
         )
         .order_by(InscricaoConsulente.posicao)
@@ -138,7 +137,7 @@ def promover_fila_em_lote(
 
     promovidos = []
     for inscricao in proximos:
-        inscricao.status = StatusNovo.confirmado
+        inscricao.status = StatusInscricaoEnum.confirmado
         db.flush()
         if inscricao.consulente:
             promovidos.append({
@@ -281,7 +280,6 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     agora = utcnow()
-    print("Validar janela de inscrição: agora =", agora, "abertura =", ensure_utc(gira.abertura_lista), "fechamento =", ensure_utc(gira.fechamento_lista))
     if agora < ensure_utc(gira.abertura_lista):
         raise HTTPException(status_code=400, detail="Lista ainda não foi aberta")
     if agora > ensure_utc(gira.fechamento_lista):
@@ -307,7 +305,7 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     ).first()
 
     if inscricao_existente:
-        if inscricao_existente.status == StatusNovo.cancelado:
+        if inscricao_existente.status == StatusInscricaoEnum.cancelado:
             # Mensagem orientativa — não expõe detalhes internos
             raise HTTPException(
                 status_code=400,
@@ -343,8 +341,8 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         .filter(
             InscricaoConsulente.gira_id == gira.id,
             InscricaoConsulente.status.in_([
-                StatusNovo.confirmado,
-                StatusNovo.lista_espera,
+                StatusInscricaoEnum.confirmado,
+                StatusInscricaoEnum.lista_espera,
             ]),
             InscricaoConsulente.deleted_at.is_(None)
         )
@@ -354,14 +352,14 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
 
     confirmados = sum(
         1 for i in inscricoes_ativas
-        if i.status == StatusNovo.confirmado
+        if i.status == StatusInscricaoEnum.confirmado
     )
     proxima_posicao = len(inscricoes_ativas) + 1
 
     status_inicial = (
-        StatusNovo.lista_espera
+        StatusInscricaoEnum.lista_espera
         if confirmados >= gira.limite_consulentes
-        else StatusNovo.confirmado
+        else StatusInscricaoEnum.confirmado
     )
 
     observacoes_sanitizadas = None
@@ -411,7 +409,6 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
     )
 
 def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest, usuario_id: UUID):
-    print("Validar dados: ", data)
     """
     Inscrição interna feita por um usuário logado (membro do terreiro).
     Funcionalmente similar à inscrição pública, mas sem validação de telefone
@@ -449,7 +446,7 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     ).first()
 
     if inscricao_existente:
-        if inscricao_existente.status == StatusNovo.cancelado:
+        if inscricao_existente.status == StatusInscricaoEnum.cancelado:
             # Mensagem orientativa — não expõe detalhes internos
             raise HTTPException(
                 status_code=400,
@@ -466,8 +463,8 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         .filter(
             InscricaoConsulente.gira_id == gira.id,
             InscricaoConsulente.status.in_([
-                StatusNovo.confirmado,
-                StatusNovo.lista_espera,
+                StatusInscricaoEnum.confirmado,
+                StatusInscricaoEnum.lista_espera,
             ]),
             InscricaoConsulente.deleted_at.is_(None)
         )
@@ -477,14 +474,14 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
 
     confirmados = sum(
         1 for i in inscricoes_ativas
-        if i.status == StatusNovo.confirmado
+        if i.status == StatusInscricaoEnum.confirmado
     )
     proxima_posicao = len(inscricoes_ativas) + 1
 
     status_inicial = (
-        StatusNovo.lista_espera
+        StatusInscricaoEnum.lista_espera
         if confirmados >= gira.limite_consulentes
-        else StatusNovo.confirmado
+        else StatusInscricaoEnum.confirmado
     )
     
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
@@ -535,7 +532,7 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         source=inscricao_nova.source
     )
 
-def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID = None) -> dict:
+def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID) -> dict:
     # 1. Busca inscrição (sem lock ainda)
     inscricao = (
         db.query(InscricaoConsulente)
@@ -568,7 +565,7 @@ def reativar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
         .filter(
             InscricaoConsulente.gira_id == gira.id,
             InscricaoConsulente.consulente_id.isnot(None),
-            InscricaoConsulente.status == StatusNovo.confirmado,
+            InscricaoConsulente.status == StatusInscricaoEnum.confirmado,
             InscricaoConsulente.deleted_at.is_(None)
         )
         .count()
@@ -647,7 +644,7 @@ def update_presenca(
     if not gira:
         raise HTTPException(status_code=403, detail="Acesso negado")
 
-    if data.status not in ("compareceu", "faltou"):
+    if data.status not in (StatusInscricaoEnum.compareceu, StatusInscricaoEnum.faltou):
         raise HTTPException(status_code=400, detail="Status inválido")
 
     # Atualiza a nova tabela
@@ -689,7 +686,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
         raise HTTPException(status_code=403, detail="Acesso negado")
 
     nome = inscricao.consulente.nome if inscricao.consulente else "Consulente"
-    era_confirmado = inscricao.status == StatusNovo.confirmado
+    era_confirmado = inscricao.status == StatusInscricaoEnum.confirmado
 
     # Buscar o usuário logado para fins de auditoria e notificação
     # (pode ser útil para logs ou para incluir o nome do usuário na mensagem de
@@ -701,7 +698,7 @@ def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuar
     else:
         nome_usuario = "Um usuário"
     # Cancela na nova tabela
-    inscricao.status = StatusNovo.cancelado
+    inscricao.status = StatusInscricaoEnum.cancelado
 
     # Promoção da fila — agora usa InscricaoConsulente
     promovido_inscricao = None

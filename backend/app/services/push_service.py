@@ -155,63 +155,6 @@ def get_subscriptions_count(terreiro_id: Optional[UUID] = None) -> int:
 
 
 # ── Envio ──────────────────────────────────────────────────────────────────────
-# region Envio de push notifications para as subscriptions do terreiro (obsoleto)
-# def _send_one(
-#     sub: PushSubscription,
-#     title: str,
-#     body: str,
-#     url: str,
-#     icon: str,
-#     terreiro_id: UUID,
-# ) -> bool:
-#     """
-#     Envia push para uma subscription específica.
-
-#     O payload inclui `terreiro_id` dentro de `data` para que o frontend
-#     possa validar se a notificação pertence ao terreiro do usuário logado.
-#     Isso é a segunda camada de segurança multi-tenant no lado cliente.
-#     """
-#     payload = json.dumps({
-#         "title": title,
-#         "body":  body,
-#         "icon":  icon,
-#         "badge": "/icons/notification-icon.png",
-#         "data": {
-#             # URL da página de destino (ex: /giras/{id})
-#             "url": url,
-#             # terreiro_id permite ao frontend validar o contexto antes de navegar
-#             "terreiro_id": str(terreiro_id),
-#         },
-#     })
-#     subscription_info = {
-#         "endpoint": sub.endpoint,
-#         "keys": {
-#             "p256dh": sub.p256dh,
-#             "auth":   sub.auth,
-#         },
-#     }
-#     try:
-#         webpush(
-#             subscription_info=subscription_info,
-#             data=payload,
-#             vapid_private_key=settings.VAPID_PRIVATE_KEY,
-#             vapid_claims={"sub": settings.VAPID_EMAIL},
-#         )
-#         return True
-#     except WebPushException as ex:
-#         status = ex.response.status_code if ex.response else None
-#         logger.warning("[Push] Falha ao enviar para %s: %s | Status: %s",
-#                        sub.endpoint[:40], ex, status)
-#         # 404/410 = subscription expirada ou cancelada — remove sem validar terreiro
-#         if status in (404, 410):
-#             remove_subscription(sub.endpoint)
-#         return False
-#     except Exception as ex:
-#         logger.error("[Push] Erro inesperado ao enviar: %s", ex)
-#         return False
-# endregion
-
-
 def send_push_to_terreiro(db, terreiro_id, payload):
     return get_push_service().send_to_terreiro(db, terreiro_id, payload)
 

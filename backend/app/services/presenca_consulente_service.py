@@ -3,15 +3,15 @@ presenca_consulente_service.py — AxeFlow
 Score de presença: o core real do sistema.
 Calcula confiabilidade de cada consulente com base no histórico.
 """
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from collections import defaultdict
 from uuid import UUID
-from app.models.consulente import Consulente
 
-# CORREÇÃO: importa o novo model, não o legado
+from sqlalchemy.orm import Session, joinedload
+
+from app.models.consulente import Consulente
+from app.models.gira import Gira
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.utils.enuns import StatusInscricaoEnum
-from app.models.gira import Gira
 
 
 # ── Classificação ──────────────────────────────────────────────────────────────
@@ -21,15 +21,17 @@ def calcular_score(total: int, comparecimentos: int, faltas: int) -> dict:
     Retorna score e classificação de confiabilidade.
 
     Regras:
-    - Mínimo 2 inscrições para ter score (abaixo disso é "Novo")
+    - Mínimo 2 inscrições finalizadas para ter score (abaixo disso é "Novo")
     - Score = comparecimentos / (comparecimentos + faltas) * 100
       (cancelamentos não contam — a pessoa pelo menos avisou)
-    - Confiável  ≥ 80%
-    - Regular    50–79%
-    - Risco      20–49%
+    - Confiável    ≥ 80%
+    - Regular      50–79%
+    - Risco        20–49%
     - Problemático < 20% com 3+ faltas (está ocupando vaga de quem quer ir)
+
+    Sempre retorna `total_inscricoes` para consistência entre os callers.
     """
-    finalizadas = comparecimentos + faltas  # só giras que já aconteceram
+    finalizadas = comparecimentos + faltas  # cancelamentos excluídos
 
     if finalizadas < 2:
         return {
@@ -38,6 +40,7 @@ def calcular_score(total: int, comparecimentos: int, faltas: int) -> dict:
             "cor": "cinza",
             "emoji": "🆕",
             "alerta": False,
+            "total_inscricoes": total,  # presente em todos os casos para consistência
         }
 
     taxa = round((comparecimentos / finalizadas) * 100)
@@ -72,30 +75,33 @@ def get_score_consulente(db: Session, consulente_id: UUID, terreiro_id: UUID) ->
     """
     Score completo de um consulente neste terreiro.
     """
-    # IDs das giras deste terreiro (para filtrar inscrições do consulente)
-    gira_ids = [
-        g.id for g in db.query(Gira.id).filter(Gira.terreiro_id == terreiro_id).all()
-    ]
-    if not gira_ids:
-        return calcular_score(0, 0, 0)
+    # Subquery com IDs das giras do terreiro — resolvida no banco, sem carregar em memória
+    giras_sq = db.query(Gira.id).filter(
+        Gira.terreiro_id == terreiro_id
+    ).scalar_subquery()
 
     inscricoes = (
         db.query(InscricaoConsulente)
         .filter(
             InscricaoConsulente.consulente_id == consulente_id,
-            InscricaoConsulente.gira_id.in_(gira_ids),
+            InscricaoConsulente.gira_id.in_(giras_sq),
             InscricaoConsulente.deleted_at.is_(None)
         )
         .all()
     )
 
-    total           = len([i for i in inscricoes if i.status != StatusInscricaoEnum.cancelado])
-    comparecimentos = len([i for i in inscricoes if i.status == StatusInscricaoEnum.compareceu])
-    faltas          = len([i for i in inscricoes if i.status == StatusInscricaoEnum.faltou])
+    # Agrega em um único loop — cancelamentos não penalizam
+    total = comparecimentos = faltas = 0
+    for i in inscricoes:
+        if i.status == StatusInscricaoEnum.cancelado:
+            continue
+        total += 1
+        if i.status == StatusInscricaoEnum.compareceu:
+            comparecimentos += 1
+        elif i.status == StatusInscricaoEnum.faltou:
+            faltas += 1
 
-    score = calcular_score(total, comparecimentos, faltas)
-    score["total_inscricoes"] = total
-    return score
+    return calcular_score(total, comparecimentos, faltas)
 
 
 # ── Score para lista de gira (batch) ──────────────────────────────────────────
@@ -103,43 +109,41 @@ def get_score_consulente(db: Session, consulente_id: UUID, terreiro_id: UUID) ->
 def get_scores_para_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> dict:
     """
     Retorna dict {consulente_id: score} para todos os inscritos de uma gira.
-    Usado para enriquecer a lista de presença com o histórico de cada um.
-    Exclui a gira atual do cálculo (histórico passado apenas).
-
-    CORREÇÃO: usa InscricaoConsulente (nova tabela) em ambas as queries.
+    Usado para enriquecer a lista de presença com o histórico de cada consulente.
+    Exclui a gira atual do cálculo — considera apenas histórico passado.
     """
-    # Giras passadas do terreiro, excluindo a gira atual
-    gira_ids_passadas = [
-        g.id for g in db.query(Gira.id).filter(
-            Gira.terreiro_id == terreiro_id,
-            Gira.id != gira_id,
+    # Subquery com giras passadas do terreiro, excluindo a atual
+    giras_passadas_sq = db.query(Gira.id).filter(
+        Gira.terreiro_id == terreiro_id,
+        Gira.id != gira_id,
+    ).scalar_subquery()
+
+    # IDs dos consulentes inscritos na gira atual
+    consulente_ids = [
+        row.consulente_id
+        for row in db.query(InscricaoConsulente.consulente_id).filter(
+            InscricaoConsulente.gira_id == gira_id,
+            InscricaoConsulente.deleted_at.is_(None)
         ).all()
     ]
 
-    # Inscritos na gira atual — usando nova tabela
-    inscritos = db.query(InscricaoConsulente).filter(
-        InscricaoConsulente.gira_id == gira_id,
-        InscricaoConsulente.deleted_at.is_(None)
-    ).all()
-    consulente_ids = [i.consulente_id for i in inscritos]
+    if not consulente_ids:
+        return {}
 
-    if not consulente_ids or not gira_ids_passadas:
-        return {str(cid): calcular_score(0, 0, 0) for cid in consulente_ids}
-
-    # Histórico passado de todos eles em batch — usando nova tabela
+    # Busca o histórico passado de todos os inscritos em batch
     historico = (
         db.query(InscricaoConsulente)
         .filter(
             InscricaoConsulente.consulente_id.in_(consulente_ids),
-            InscricaoConsulente.gira_id.in_(gira_ids_passadas),
+            InscricaoConsulente.gira_id.in_(giras_passadas_sq),
             InscricaoConsulente.status != StatusInscricaoEnum.cancelado,
             InscricaoConsulente.deleted_at.is_(None)
         )
         .all()
     )
 
-    # Agrega por consulente
-    dados = {str(cid): {"total": 0, "comparecimentos": 0, "faltas": 0} for cid in consulente_ids}
+    # Agrega por consulente — defaultdict evita inicialização manual
+    dados = defaultdict(lambda: {"total": 0, "comparecimentos": 0, "faltas": 0})
     for h in historico:
         cid = str(h.consulente_id)
         dados[cid]["total"] += 1
@@ -148,9 +152,14 @@ def get_scores_para_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> dict:
         elif h.status == StatusInscricaoEnum.faltou:
             dados[cid]["faltas"] += 1
 
+    # Consulentes sem histórico passado recebem score zerado ("Novo")
     return {
-        cid: calcular_score(d["total"], d["comparecimentos"], d["faltas"])
-        for cid, d in dados.items()
+        str(cid): calcular_score(
+            dados[str(cid)]["total"],
+            dados[str(cid)]["comparecimentos"],
+            dados[str(cid)]["faltas"]
+        )
+        for cid in consulente_ids
     }
 
 
@@ -159,33 +168,31 @@ def get_scores_para_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> dict:
 def get_ranking_consulentes(db: Session, terreiro_id: UUID) -> list:
     """
     Lista todos os consulentes do terreiro com score calculado.
-    Ordena: problemáticos primeiro (precisam de atenção), depois por taxa asc.
-
-    CAMPO: total_inscricoes agora é populado corretamente (inscrições não
-    canceladas), resolvendo o bug da coluna "Giras" aparecer como 0 no frontend.
+    Ordena: alertas primeiro, depois por score ascendente (piores no topo).
     """
-    # IDs de todas as giras não-deletadas do terreiro
-    gira_ids = [
-        g.id for g in db.query(Gira.id).filter(
-            Gira.terreiro_id == terreiro_id,
-            Gira.deleted_at.is_(None),  # ignora giras soft-deletadas
-        ).all()
-    ]
-    if not gira_ids:
-        return []
+    # Subquery com giras ativas (não deletadas) do terreiro
+    giras_sq = db.query(Gira.id).filter(
+        Gira.terreiro_id == terreiro_id,
+        Gira.deleted_at.is_(None),
+    ).scalar_subquery()
 
-    # Busca inscrições de consulentes nas giras deste terreiro — nova tabela
+    # joinedload evita N+1 — carrega consulente junto com cada inscrição
     inscricoes = (
         db.query(InscricaoConsulente)
-        .filter(InscricaoConsulente.gira_id.in_(gira_ids), InscricaoConsulente.deleted_at.is_(None))
+        .options(joinedload(InscricaoConsulente.consulente))
+        .filter(
+            InscricaoConsulente.gira_id.in_(giras_sq),
+            InscricaoConsulente.deleted_at.is_(None)
+        )
         .all()
     )
+
+    if not inscricoes:
+        return []
 
     # Agrega dados por consulente
     dados: dict[str, dict] = {}
     for i in inscricoes:
-        # lazy load do consulente pode causar N+1; aceitável aqui pois
-        # o loop já carregou todas as inscrições do terreiro em memória
         c = i.consulente
         if not c:
             continue
@@ -193,16 +200,16 @@ def get_ranking_consulentes(db: Session, terreiro_id: UUID) -> list:
         cid = str(c.id)
         if cid not in dados:
             dados[cid] = {
-                "id":            cid,
-                "nome":          c.nome,
-                "telefone":      c.telefone,
+                "id": cid,
+                "nome": c.nome,
+                "telefone": c.telefone,
                 "primeira_visita": c.primeira_visita,
-                "total":         0,   # inscrições não canceladas
+                "total": 0,
                 "comparecimentos": 0,
-                "faltas":        0,
+                "faltas": 0,
             }
 
-        # Cancelamentos não contam no total (não penalizam — avisou)
+        # Cancelamentos não penalizam — não contam no total
         if i.status != StatusInscricaoEnum.cancelado:
             dados[cid]["total"] += 1
 
@@ -216,7 +223,7 @@ def get_ranking_consulentes(db: Session, terreiro_id: UUID) -> list:
         score = calcular_score(d["total"], d["comparecimentos"], d["faltas"])
         result.append({**d, **score})
 
-    # Ordena: alertas primeiro, depois por score asc (piores no topo)
+    # Alertas no topo; dentro de cada grupo, os piores scores primeiro
     result.sort(key=lambda x: (
         not x.get("alerta", False),
         x.get("score") if x.get("score") is not None else 999,
