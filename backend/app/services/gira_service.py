@@ -135,14 +135,14 @@ def get_gira(db: Session, gira_id: UUID, terreiro_id: UUID) -> GiraResponse:
     return _enrich(gira, db, _count_inscritos(db, gira))
 
 
-def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID, usuario_id: Optional[UUID] = None) -> GiraUpdateResponse:
+def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, user: Usuario) -> GiraUpdateResponse:
     """
     Atualiza campos da gira.
     Promoção em lote ao aumentar vagas — delegada ao inscricao_service com FOR UPDATE.
     """
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
-        Gira.terreiro_id == terreiro_id,
+        Gira.terreiro_id == user.terreiro_id,
         Gira.deleted_at.is_(None),
     ).first()
     if not gira:
@@ -180,8 +180,8 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, terreiro_id: UUID,
     db.refresh(gira)
     
     usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
-    if usuario_id:
-        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if user.id:
+        usuario = db.query(Usuario).filter(Usuario.id == user.id).first()
     if usuario:
         nome_usuario = usuario.nome
     else:

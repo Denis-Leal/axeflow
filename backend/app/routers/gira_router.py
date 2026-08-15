@@ -78,7 +78,7 @@ def update_gira(
     db: Session = Depends(get_db),
     user: Usuario = Depends(require_role("admin", "operador")),
 ):
-    result = gira_service.update_gira(db, gira_id, data, user.terreiro_id, user.id)
+    result = gira_service.update_gira(db, gira_id, data, user)
 
     audit_service.log(
         db, request,

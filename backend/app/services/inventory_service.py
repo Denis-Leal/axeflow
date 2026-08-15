@@ -617,7 +617,7 @@ def editar_consumo(
 def finalizar_gira(
     db: Session,
     gira_id: UUID,
-    user: Usuario,
+    user: Usuario | None,
 ) -> GiraFinalizarResponse:
     """
     Finaliza a gira: converte consumos em movimentações de estoque.
