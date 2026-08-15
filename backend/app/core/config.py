@@ -15,32 +15,35 @@ O campo ENVIRONMENT controla comportamentos específicos:
   - APP_URL: calculado automaticamente se não for definido explicitamente
   - CORS: main.py lê allowed_origins a partir deste settings
 """
-from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env.local", env_file_encoding="utf-8", extra="ignore",)
     # ── Ambiente de execução ───────────────────────────────────────────────────
     # Defina no Render: ENVIRONMENT=staging ou ENVIRONMENT=production
     ENVIRONMENT: str = "local"  # "local" | "staging" | "production"
 
     # ── Banco ──────────────────────────────────────────────────────────────────
-    DATABASE_URL: str = "postgresql://terreiro:terreiro123@postgres:5432/axeflow"
+    DATABASE_URL: str = Field(init=False)
 
     # ── Auth ───────────────────────────────────────────────────────────────────
-    SECRET_KEY: str = "change-this-secret-key-in-production"
-    ALGORITHM: str = "HS256"
+    SECRET_KEY: str = Field(init=False)
+    ALGORITHM: str = Field(init=False)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     # ── Web Push (VAPID) ───────────────────────────────────────────────────────
-    VAPID_PRIVATE_KEY: str = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgsxwmmzwI9U13ELFPbXSRKq9Kaz4hxIQ9y9scGnAbwgGhRANCAAT1QdBlpJb8VSKNxgLY9qdSA42b9ckyksFXMCFiwnt8MoC20Q0iXzsUgr0HfmVIk5_i7x9Po7Dyn5c5beE4PLnw"
-    VAPID_PUBLIC_KEY: str  = "BPVB0GWklvxVIo3GAtj2p1IDjZv1yTKSwVcwIWLCe3wygLbRDSJfOxSCvQd-ZUiTn-LvH0-jsPKflzlt4Tg8ufA"
-    VAPID_EMAIL: str       = "mailto:admin@axeflow.app"
+    VAPID_PRIVATE_KEY: str = Field(init=False)
+    VAPID_PUBLIC_KEY: str = Field(init=False)
+    VAPID_EMAIL: str = Field(init=False)
 
     # ── Email (Brevo) ──────────────────────────────────────────────────────────
-    BREVO_API_KEY: str = "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"
-    GMAIL_USER: str    = "axeflow777@gmail.com"
-    DEV_EMAIL: str     = "denis.leal07@gmail.com"
+    BREVO_API_KEY: str = Field(init=False)
+    GMAIL_USER: str = Field(init=False)
+    DEV_EMAIL: str = Field(init=False)
 
     # ── App URL ────────────────────────────────────────────────────────────────
     # Defina explicitamente no Render para cada ambiente:
@@ -49,12 +52,13 @@ class Settings(BaseSettings):
     #
     # Se não definido, o valor é calculado pelo property app_url_resolved abaixo.
     APP_URL: str = ""
+    
+    # ── Firebase ────────────────────────────────────────────────────────────
+
+    FIREBASE_CREDENTIALS: str = ""
 
     # ── Retenção de logs de auditoria ──────────────────────────────────────────
     AUDIT_LOG_RETENTION_DAYS: int = 90
-
-    class Config:
-        env_file = ".env"
 
     @property
     def database_url_fixed(self) -> str:
