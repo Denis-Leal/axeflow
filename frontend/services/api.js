@@ -86,11 +86,15 @@ export const reativarInscricao = (inscricaoId)         => api.post(`/inscricao/$
 
 
 // ── Consulentes ───────────────────────────────────────
-export const listConsulentes   = ()           => api.get('/consulentes');
 export const createConsulente  = (data)       => api.post('/consulentes', data);
-export const updateConsulente  = (id, data)   => api.put(`/consulentes/${id}`, data);
-export const deleteConsulente  = (id)         => api.delete(`/consulentes/${id}`);
+
+export const listConsulentes = () => api.get('/consulentes/lista');
+export const searchConsulentes = (q) => api.get('/consulentes/search', { params: { q } }); // Ainda nao está sendo usada
 export const getRankingConsulentes = () => api.get('/consulentes/ranking');
+export const getPerfilConsulente = (id) => api.get(`/consulentes/${id}/perfil`);
+export const updateConsulente = (id, data) => api.put(`/consulentes/${id}`, data);
+export const atualizarNotaConsulente = (id, data) => api.patch(`/consulentes/${id}/notas`, data);
+export const deleteConsulente = (id) => api.delete(`/consulentes/${id}`);
 
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)              => api.get(`/public/gira/${slug}`);

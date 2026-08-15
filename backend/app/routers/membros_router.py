@@ -32,6 +32,7 @@ from app.services.push_service import send_push_to_terreiro
 from app.models.terreiro import Terreiro
 from app.models.gira import Gira as GiraModel
 from app.core.config import settings
+from app.services import membros_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,26 +60,9 @@ class NotasConsulenteUpdate(BaseModel):
 # ── Membros ────────────────────────────────────────────────────────────────────
 
 @router.get("")
-def list_membros(
-    user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
+def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db),):
     """Lista todos os membros ativos do terreiro."""
-    membros = db.query(Usuario).filter(
-        Usuario.terreiro_id == user.terreiro_id,
-        Usuario.ativo == True,
-    ).all()
-    return [
-        {
-            "id":       str(m.id),
-            "nome":     m.nome,
-            "email":    m.email,
-            "telefone": m.telefone,
-            "role":     m.role,
-            "ativo":    m.ativo,
-        }
-        for m in membros
-    ]
+    return membros_service.list_membros(db=db, terreiro_id=user.terreiro_id)
 
 
 @router.post("")
@@ -87,49 +71,16 @@ def create_membro(
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
-    existing = db.query(Usuario).filter(Usuario.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
-
-    novo = Usuario(
-        terreiro_id=user.terreiro_id,
-        nome=data.nome,
-        email=data.email,
-        telefone=data.telefone,
-        senha_hash=hash_password(data.senha),
-        role=data.role,
+    return membros_service.create_membro(
+        db=db, 
+        terreiro_id=user.terreiro_id, 
+        nome=data.nome, 
+        email=data.email, 
+        senha=data.senha, 
+        telefone=data.telefone, 
+        role=data.role, 
+        convidado_por=user.nome
     )
-    db.add(novo)
-    db.commit()
-    db.refresh(novo)
-
-    terreiro = db.query(Terreiro).filter(Terreiro.id == user.terreiro_id).first()
-    terreiro_nome = terreiro.nome if terreiro else "seu terreiro"
-
-    try:
-        enviado = send_convite_membro(
-            nome=data.nome,
-            email=data.email,
-            senha_provisoria=data.senha,
-            terreiro_nome=terreiro_nome,
-            convidado_por=user.nome,
-            app_url=settings.app_url_resolved,
-        )
-        if not enviado:
-            logger.warning(
-                "[Membros] Email de convite não enviado para %s (BREVO_API_KEY configurada?)",
-                data.email,
-            )
-    except Exception as e:
-        logger.error("[Membros] Erro ao enviar email de convite: %s", e)
-
-    return {
-        "id":                    str(novo.id),
-        "nome":                  novo.nome,
-        "email":                 novo.email,
-        "role":                  novo.role,
-        "email_convite_enviado": bool(settings.BREVO_API_KEY),
-    }
 
 
 @router.put("/{membro_id}")
@@ -139,113 +90,15 @@ def update_membro(
     user: Usuario = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
-    """Atualiza dados de um membro (admin only)."""
-    membro = db.query(Usuario).filter(
-        Usuario.id == membro_id,
-        Usuario.terreiro_id == user.terreiro_id,
-    ).first()
-    if not membro:
-        raise HTTPException(status_code=404, detail="Membro não encontrado")
-
-    if str(membro.id) == str(user.id) and data.get("ativo") is False:
-        raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta")
-
-    if "nome"     in data: membro.nome     = data["nome"]
-    if "telefone" in data: membro.telefone = data["telefone"]
-    if "role"     in data and data["role"] in ("admin", "operador", "membro"):
-        membro.role = data["role"]
-    if "ativo"    in data: membro.ativo    = bool(data["ativo"])
-    if "senha"    in data and data["senha"]:
-        membro.senha_hash = hash_password(data["senha"])
-
-    db.commit()
-    db.refresh(membro)
-    return {
-        "id":       str(membro.id),
-        "nome":     membro.nome,
-        "email":    membro.email,
-        "telefone": membro.telefone,
-        "role":     membro.role,
-        "ativo":    membro.ativo,
-    }
-
-
-# ── Consulentes ────────────────────────────────────────────────────────────────
-
-@router.get("/consulentes-lista")
-def list_consulentes(
-    user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Consulentes que já se inscreveram em giras deste terreiro."""
-    from app.models.consulente import Consulente
-    from app.models.inscricao_consulente import InscricaoConsulente
-
-    consulentes = (
-        db.query(Consulente)
-        .join(InscricaoConsulente, InscricaoConsulente.consulente_id == Consulente.id)
-        .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
-        .filter(GiraModel.terreiro_id == user.terreiro_id)
-        .distinct()
-        .all()
+    return membros_service.update_membro(
+        db=db,
+        membro_id=membro_id,
+        terreiro_id=user.terreiro_id,
+        nome= data["nome"],
+        role=data["role"],
+        telefone=data["telefone"],
+        current_user_id=user.id,
     )
-
-    result = []
-    for c in consulentes:
-        inscricoes = (
-            db.query(InscricaoConsulente)
-            .join(GiraModel, GiraModel.id == InscricaoConsulente.gira_id)
-            .filter(
-                InscricaoConsulente.consulente_id == c.id,
-                GiraModel.terreiro_id == user.terreiro_id,
-            )
-            .all()
-        )
-        total      = len([i for i in inscricoes if i.status != "cancelado"])
-        compareceu = len([i for i in inscricoes if i.status == "compareceu"])
-        result.append({
-            "id":               str(c.id),
-            "nome":             c.nome,
-            "telefone":         c.telefone,
-            "primeira_visita":  c.primeira_visita,
-            "total_inscricoes": total,
-            "comparecimentos":  compareceu,
-        })
-
-    return result
-
-
-@router.patch("/consulentes/{consulente_id}/notas")
-def update_notas_consulente(
-    consulente_id: UUID,
-    data: NotasConsulenteUpdate,
-    user: Usuario = Depends(require_role("admin", "operador")),
-    db: Session = Depends(get_db),
-):
-    """Atualiza notas internas do terreiro sobre um consulente (admin/operador)."""
-    from app.models.consulente import Consulente
-    from app.models.inscricao_consulente import InscricaoConsulente
-
-    consulente = (
-        db.query(Consulente).filter(
-            Consulente.id == consulente_id,
-            Consulente.terreiro_id == user.terreiro_id,
-        ).first()
-    )
-    if not consulente:
-        raise HTTPException(status_code=404, detail="Consulente não encontrado")
-
-    notas_sanitizadas = None
-    if data.notas:
-        notas_sanitizadas = data.notas.strip()[:1000] or None
-
-    consulente.notas = notas_sanitizadas
-    db.commit()
-
-    logger.info("[Consulentes] Notas atualizadas para %s por %s", consulente_id, user.id)
-
-    return {"ok": True, "id": str(consulente.id), "notas": consulente.notas}
-
 
 # ── Presença em giras FECHADAS ────────────────────────────────────────────────
 

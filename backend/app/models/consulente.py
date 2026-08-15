@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.core.database import Base
 from datetime import datetime
+from typing import Optional
 
 class Consulente(Base):
     __tablename__ = "consulentes"
@@ -23,7 +24,7 @@ class Consulente(Base):
     # Telefone sempre normalizado para E.164 sem '+': ex. 5511999999999
     telefone        : Mapped[str] = mapped_column(String(20),  nullable=True)
     primeira_visita : Mapped[bool] = mapped_column(Boolean, default=True)
-    notas           : Mapped[str] = mapped_column(Text, nullable=True)
+    notas           : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at      : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at      : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     created_by      : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)  # ID do usuário que criou o registro

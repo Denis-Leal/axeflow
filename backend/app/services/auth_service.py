@@ -16,7 +16,7 @@ from app.models.terreiro import Terreiro
 from app.schemas.auth_schema import LoginRequest, RegisterRequest, TokenResponse, UsuarioResponse
 from app.core.security import hash_password, verify_password, create_access_token
 from app.core.config import settings
-from backend.app.services import audit_service
+from app.services import audit_service
 
 
 def login(db: Session, data: LoginRequest, request: Request) -> TokenResponse:

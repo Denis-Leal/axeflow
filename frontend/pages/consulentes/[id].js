@@ -13,6 +13,7 @@ import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import api from '../../services/api';
+import { atualizarNotaConsulente, getPerfilConsulente } from '../../services/api';
 import { Spinner, Card, CardHeader, CardBody, Button } from '../../components/ui';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
@@ -62,9 +63,7 @@ function NotasTerreiro({ consulenteId, notasIniciais, podeEditar }) {
     setSalvando(true);
     setFeedback('');
     try {
-      const res = await api.patch(`/membros/consulentes/${consulenteId}/notas`, {
-        notas: rascunho.trim() || null,
-      });
+      const res = await atualizarNotaConsulente(consulenteId, {notas: rascunho.trim() || null,});//api.patch(`/membros/consulentes/${consulenteId}/notas`, {notas: rascunho.trim() || null,});
       setNotas(res.data.notas || '');
       setEditando(false);
       setFeedback('ok');
@@ -202,7 +201,7 @@ export default function PerfilConsulente() {
 
     // Carrega perfil e role do usuário em paralelo
     Promise.all([
-      api.get(`/consulentes/${id}/perfil`),
+      getPerfilConsulente(id),
       api.get('/auth/me'),
     ])
       .then(([perfilRes, meRes]) => {

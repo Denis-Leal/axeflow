@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { listConsulentes, updateConsulente, getRankingConsulentes, deleteConsulente } from '../services/api';
 
 export function useConsulentes() {
   const [consulentes, setConsulentes]           = useState([]);
@@ -12,7 +13,7 @@ export function useConsulentes() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get('/consulentes');
+        const res = await listConsulentes();
         setConsulentes(res.data);
       } catch (err) {
         setError(err);
@@ -26,7 +27,7 @@ export function useConsulentes() {
     if (rankingCarregado || loadingRanking) return;
     setLoadingRanking(true);
     try {
-      const res = await api.get('/consulentes/ranking');
+      const res = await getRankingConsulentes();
       setRanking(res.data);
       setRankingCarregado(true);
     } catch (err) {
@@ -37,13 +38,13 @@ export function useConsulentes() {
   }, [rankingCarregado, loadingRanking]);
 
   const editarConsulente = useCallback(async (id, dados) => {
-    const res = await api.put(`/consulentes/${id}`, dados);
+    const res = await updateConsulente(id, dados)
     setConsulentes(prev => prev.map(c => c.id === id ? res.data : c));
     return res.data;
   }, []);
 
   const deletarConsulente = useCallback(async (id) => {
-    await api.delete(`/consulentes/${id}`);
+    await deleteConsulente(id);
     setConsulentes(prev => prev.filter(c => c.id !== id));
   }, []);
 
