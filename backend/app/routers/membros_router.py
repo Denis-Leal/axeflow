@@ -14,48 +14,24 @@ Funções afetadas:
 InscricaoGira (legado) não é mais referenciado nestas funções.
 """
 import logging
-from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from uuid import UUID
-from datetime import date
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role, hash_password
+from app.core.security import get_current_user, require_role
 from app.models.usuario import Usuario
 from app.models.inscricao_membro import InscricaoMembro
 from app.utils.enuns import StatusInscricaoEnum
-from app.services.email_service import send_convite_membro
 from app.services.push_service import send_push_to_terreiro
-from app.models.terreiro import Terreiro
 from app.models.gira import Gira as GiraModel
-from app.core.config import settings
 from app.services import membros_service
+from app.schemas.membros_schema import MembroCreate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/membros", tags=["membros"])
-
-
-# ── Schemas locais ─────────────────────────────────────────────────────────────
-
-class MembroCreate(BaseModel):
-    nome: str
-    email: EmailStr
-    senha: str
-    telefone: Optional[str] = None
-    role: str = "membro"
-
-
-class NotasConsulenteUpdate(BaseModel):
-    notas: Optional[str] = Field(
-        default=None,
-        max_length=1000,
-        description="Observações internas do terreiro sobre o consulente",
-    )
-
 
 # ── Membros ────────────────────────────────────────────────────────────────────
 
@@ -420,10 +396,8 @@ def perfil_membro(
     Valida que o membro pertence ao mesmo terreiro do usuário autenticado.
     Raises 404 se não encontrado ou se pertencer a outro terreiro.
     """
-    from app.services.presenca_membro_service import get_perfil_membro
-    from fastapi import HTTPException
 
-    perfil = get_perfil_membro(db, membro_id, user.terreiro_id)
+    perfil = membros_service.get_perfil_membro(db, membro_id, user.terreiro_id)
     if not perfil:
         raise HTTPException(status_code=404, detail="Membro não encontrado")
 
