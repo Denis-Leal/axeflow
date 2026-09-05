@@ -50,6 +50,21 @@ const CORES_STATUS = {
   selecionado:  { bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.35)',  text: '#f59e0b' },
 };
 
+// ── Lista de unidades de medida ────────────────────────────────────────────────
+const UNIDADES_MEDIDA = [
+  { value: 'kg', label: 'kg' },
+  { value: 'g', label: 'g' },
+  { value: 'mg', label: 'mg' },
+  { value: 'l', label: 'L' },
+  { value: 'ml', label: 'ml' },
+  { value: 'un', label: 'un.' },
+  { value: 'pacote', label: 'pacote(s)' },
+  { value: 'caixa', label: 'caixa(s)' },
+  { value: 'garrafa', label: 'garrafa(s)' },
+  { value: 'lata', label: 'lata(s)' },
+  { value: 'duzia', label: 'dúzia(s)' },
+];
+
 // ── Helpers de estilo ─────────────────────────────────────────────────────────
 
 function estilosBadge(cor) {
@@ -109,63 +124,104 @@ function ToastFeedback({ mensagem, tipo, onClose }) {
  * Enter na descrição de um item avança para a próxima linha.
  */
 function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
-  const [itens,       setItens]       = useState([{ descricao: '', limite: 1 }]);
+  const [itens, setItens] = useState([
+    { descricao: '', quantidade_necessaria: 1, unidade: 'un' }
+  ]);
   const [observacoes, setObservacoes] = useState('');
-  const [salvando,    setSalvando]    = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   const adicionarLinha = () => {
-    setItens(prev => [...prev, { descricao: '', limite: 1 }]);
+    setItens(prev => [
+      ...prev,
+      {
+        descricao: '',
+        quantidade_necessaria: 1,
+        unidade: 'un',
+      }
+    ]);
   };
 
   const removerLinha = (idx) => {
-    if (itens.length === 1) return; // mantém pelo menos 1
+    if (itens.length === 1) return;
     setItens(prev => prev.filter((_, i) => i !== idx));
   };
 
   const atualizarLinha = (idx, campo, valor) => {
-    setItens(prev => prev.map((item, i) =>
-      i === idx ? { ...item, [campo]: valor } : item
-    ));
+    setItens(prev =>
+      prev.map((item, i) =>
+        i === idx
+          ? { ...item, [campo]: valor }
+          : item
+      )
+    );
   };
 
   const handleSalvar = async () => {
-    // Filtra linhas sem descrição (usuário pode ter deixado em branco)
-    const itensFiltrados = itens.filter(i => i.descricao.trim() !== '');
+    const itensFiltrados = itens.filter(
+      i => i.descricao.trim() !== ''
+    );
 
     if (itensFiltrados.length === 0) {
-      exibirToast('Adicione pelo menos um item com descrição.', 'erro');
+      exibirToast(
+        'Adicione pelo menos um item com descrição.',
+        'erro'
+      );
       return;
     }
 
-    // Valida limites antes de enviar — feedback imediato sem round-trip
-    const invalido = itensFiltrados.find(i => !i.limite || parseInt(i.limite, 10) < 1);
+    const invalido = itensFiltrados.find(
+      i =>
+        !i.quantidade_necessaria ||
+        Number(i.quantidade_necessaria) <= 0 ||
+        !i.unidade
+    );
+
     if (invalido) {
-      exibirToast(`"${invalido.descricao}" precisa de limite mínimo 1.`, 'erro');
+      exibirToast(
+        `"${invalido.descricao}" precisa de uma quantidade maior que zero e uma unidade.`,
+        'erro'
+      );
       return;
     }
 
     setSalvando(true);
+
     try {
-      // POST para criar o Ajeum com todos os itens de uma vez (api.post(`/giras/${giraId}/ajeum`)
       await createAjeum(giraId, {
         observacoes: observacoes.trim() || null,
+
         itens: itensFiltrados.map(i => ({
           descricao: i.descricao.trim(),
-          limite:    parseInt(i.limite, 10),
+          quantidade_necessaria: Number(i.quantidade_necessaria),
+          unidade: i.unidade,
         })),
       });
+
       exibirToast('Lista criada com sucesso!');
-      onCriado(); // recarrega o componente pai
+      onCriado();
+
     } catch (err) {
       if (err.response?.status === 409) {
-        // Raro: outro admin criou ao mesmo tempo
-        exibirToast('Esta gira já tem uma lista. Recarregando...', 'erro');
+        exibirToast(
+          'Esta gira já tem uma lista. Recarregando...',
+          'erro'
+        );
         onCriado();
-      } else if (err.response?.status === 400) {
-        exibirToast(err.response.data.detail || 'Dados inválidos.', 'erro');
+
+      } else if (err.response?.status === 400 ||
+                 err.response?.status === 422) {
+        exibirToast(
+          err.response.data.detail || 'Dados inválidos.',
+          'erro'
+        );
+
       } else {
-        exibirToast('Erro ao criar lista. Tente novamente.', 'erro');
+        exibirToast(
+          'Erro ao criar lista. Tente novamente.',
+          'erro'
+        );
       }
+
     } finally {
       setSalvando(false);
     }
@@ -174,71 +230,159 @@ function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
   return (
     <div style={{ padding: '1.25rem' }}>
 
-      {/* Observações (campo opcional) */}
       <div style={{ marginBottom: '1.25rem' }}>
-        <label style={{ fontSize: '0.78rem', color: 'var(--cor-texto-suave)', display: 'block', marginBottom: '0.35rem' }}>
+        <label style={{
+          fontSize: '0.78rem',
+          color: 'var(--cor-texto-suave)',
+          display: 'block',
+          marginBottom: '0.35rem'
+        }}>
           Observações
-          <span style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.72rem' }}>(opcional — visível para todos os membros)</span>
+          <span style={{
+            fontWeight: 400,
+            marginLeft: '0.4rem',
+            fontSize: '0.72rem'
+          }}>
+            (opcional — visível para todos os membros)
+          </span>
         </label>
+
         <input
           className="form-control-custom"
           value={observacoes}
           onChange={e => setObservacoes(e.target.value)}
           placeholder="Ex: Confiram os itens antes da gira"
-          maxLength={500}
+          maxLength={1000}
         />
       </div>
 
-      {/* Cabeçalho das colunas */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 90px 36px',
-        gap: '0.5rem', marginBottom: '0.4rem', padding: '0 0.25rem',
+        display: 'grid',
+        gridTemplateColumns: '1fr 110px 130px 36px',
+        gap: '0.5rem',
+        marginBottom: '0.4rem',
+        padding: '0 0.25rem',
       }}>
-        <span style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Descrição do item
+        <span style={{
+          fontSize: '0.72rem',
+          color: 'var(--cor-texto-suave)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}>
+          Descrição
         </span>
-        <span style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
-          Limite
+
+        <span style={{
+          fontSize: '0.72rem',
+          color: 'var(--cor-texto-suave)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          textAlign: 'center',
+        }}>
+          Quantidade
         </span>
+
+        <span style={{
+          fontSize: '0.72rem',
+          color: 'var(--cor-texto-suave)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}>
+          Unidade
+        </span>
+
         <span />
       </div>
 
-      {/* Linhas de item */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.4rem',
+        marginBottom: '0.75rem'
+      }}>
         {itens.map((item, idx) => (
-          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 36px', gap: '0.5rem', alignItems: 'center' }}>
-
+          <div
+            key={idx}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 110px 130px 36px',
+              gap: '0.5rem',
+              alignItems: 'center'
+            }}
+          >
             <input
-              className="form-control-custom"
+              className="form-control-custom ajeum-desc-input"
               value={item.descricao}
-              onChange={e => atualizarLinha(idx, 'descricao', e.target.value)}
+              onChange={e =>
+                atualizarLinha(
+                  idx,
+                  'descricao',
+                  e.target.value
+                )
+              }
               placeholder={`Item ${idx + 1}... ex: Bacon, Vela branca`}
               maxLength={255}
               style={{ fontSize: '0.88rem' }}
-              // Enter na descrição: adiciona nova linha e move o foco
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
+
                   adicionarLinha();
+
                   setTimeout(() => {
-                    const inputs = document.querySelectorAll('.ajeum-desc-input');
-                    if (inputs[idx + 1]) inputs[idx + 1].focus();
+                    const inputs =
+                      document.querySelectorAll(
+                        '.ajeum-desc-input'
+                      );
+
+                    if (inputs[idx + 1]) {
+                      inputs[idx + 1].focus();
+                    }
                   }, 30);
                 }
               }}
-              // Classe para querySelector do foco automático
-              data-idx={idx}
-              ref={el => { if (el) el.className = 'form-control-custom ajeum-desc-input'; }}
             />
 
             <input
               type="number"
               className="form-control-custom"
-              value={item.limite}
-              onChange={e => atualizarLinha(idx, 'limite', e.target.value)}
-              min={1} max={999}
-              style={{ fontSize: '0.88rem', textAlign: 'center' }}
+              value={item.quantidade_necessaria}
+              onChange={e =>
+                atualizarLinha(
+                  idx,
+                  'quantidade_necessaria',
+                  e.target.value
+                )
+              }
+              min="0.001"
+              step="0.001"
+              style={{
+                fontSize: '0.88rem',
+                textAlign: 'center'
+              }}
             />
+
+            <select
+              className="form-control-custom"
+              value={item.unidade}
+              onChange={e =>
+                atualizarLinha(
+                  idx,
+                  'unidade',
+                  e.target.value
+                )
+              }
+              style={{ fontSize: '0.88rem' }}
+            >
+              {UNIDADES_MEDIDA.map(unidade => (
+                <option
+                  key={unidade.value}
+                  value={unidade.value}
+                >
+                  {unidade.label}
+                </option>
+              ))}
+            </select>
 
             <button
               onClick={() => removerLinha(idx)}
@@ -246,49 +390,80 @@ function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
               title="Remover linha"
               style={{
                 background: 'transparent',
-                border: `1px solid ${itens.length === 1 ? 'rgba(148,163,184,0.2)' : 'rgba(239,68,68,0.3)'}`,
-                color: itens.length === 1 ? '#94a3b8' : '#ef4444',
-                borderRadius: '6px', width: '36px', height: '36px',
-                cursor: itens.length === 1 ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `1px solid ${
+                  itens.length === 1
+                    ? 'rgba(148,163,184,0.2)'
+                    : 'rgba(239,68,68,0.3)'
+                }`,
+                color: itens.length === 1
+                  ? '#94a3b8'
+                  : '#ef4444',
+                borderRadius: '6px',
+                width: '36px',
+                height: '36px',
+                cursor: itens.length === 1
+                  ? 'not-allowed'
+                  : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: '0.85rem',
               }}
             >
-              <i className="bi bi-x"></i>
+              <i className="bi bi-x" />
             </button>
           </div>
         ))}
       </div>
 
-      {/* Botão: adicionar linha */}
       <button
         onClick={adicionarLinha}
         style={{
           background: 'rgba(212,175,55,0.06)',
           border: '1px dashed rgba(212,175,55,0.35)',
-          color: 'var(--cor-acento)', borderRadius: '8px',
-          padding: '0.45rem 1rem', cursor: 'pointer',
-          fontSize: '0.82rem', width: '100%', marginBottom: '1.25rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+          color: 'var(--cor-acento)',
+          borderRadius: '8px',
+          padding: '0.45rem 1rem',
+          cursor: 'pointer',
+          fontSize: '0.82rem',
+          width: '100%',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.4rem',
         }}
       >
-        <i className="bi bi-plus-lg"></i> Adicionar item (ou pressione Enter)
+        <i className="bi bi-plus-lg" />
+        Adicionar item (ou pressione Enter)
       </button>
 
-      {/* Ação: salvar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end'
+      }}>
         <button
           onClick={handleSalvar}
           disabled={salvando}
           className="btn-gold"
-          style={{ padding: '0.6rem 1.75rem' }}
+          style={{
+            padding: '0.6rem 1.75rem'
+          }}
         >
-          {salvando
-            ? <><span className="spinner-border spinner-border-sm me-2"></span>Criando...</>
-            : <><i className="bi bi-check-lg me-2"></i>Criar Lista</>
-          }
+          {salvando ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" />
+              Criando...
+            </>
+          ) : (
+            <>
+              <i className="bi bi-check-lg me-2" />
+              Criar Lista
+            </>
+          )}
         </button>
       </div>
+
     </div>
   );
 }
@@ -304,14 +479,19 @@ function FormAdicionarItem({ ajeum_id, onAdicionado, exibirToast }) {
   const [descricao, setDescricao] = useState('');
   const [limite,    setLimite]    = useState(1);
   const [salvando,  setSalvando]  = useState(false);
+  const [quantidade, setQuantidade] = useState(1);
+  const [unidade, setUnidade] = useState('un');
 
   const handleSalvar = async () => {
     if (!descricao.trim()) {
       exibirToast('Informe a descrição do item.', 'erro');
       return;
     }
-    if (!limite || parseInt(limite, 10) < 1) {
-      exibirToast('O limite deve ser pelo menos 1.', 'erro');
+    if (!quantidade || Number(quantidade) <= 0) {
+      exibirToast(
+        'A quantidade deve ser maior que zero.',
+        'erro'
+      );
       return;
     }
 
@@ -320,7 +500,8 @@ function FormAdicionarItem({ ajeum_id, onAdicionado, exibirToast }) {
       // POST para criar o item avulso no Ajeum existente (api.post(`/ajeum/${ajeum_id}/itens`))
       await CreateAjeumItem(ajeum_id, {
         descricao: descricao.trim(),
-        limite:    parseInt(limite, 10),
+        quantidade_necessaria: Number(quantidade),
+        unidade: unidade,
       });
       setDescricao('');
       setLimite(1);
@@ -364,7 +545,12 @@ function FormAdicionarItem({ ajeum_id, onAdicionado, exibirToast }) {
       <div style={{ fontSize: '0.78rem', color: 'var(--cor-acento)', fontWeight: 600, marginBottom: '0.6rem' }}>
         + Novo item
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: '0.5rem', marginBottom: '0.6rem' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 100px 130px',
+        gap: '0.5rem',
+        marginBottom: '0.6rem'
+      }}>
         <input
           className="form-control-custom"
           value={descricao}
@@ -372,24 +558,38 @@ function FormAdicionarItem({ ajeum_id, onAdicionado, exibirToast }) {
           placeholder="Ex: Vela branca"
           maxLength={255}
           autoFocus
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleSalvar();
-            if (e.key === 'Escape') { setAberto(false); setDescricao(''); setLimite(1); }
-          }}
           style={{ fontSize: '0.88rem' }}
         />
+
         <input
           type="number"
           className="form-control-custom"
-          value={limite}
-          onChange={e => setLimite(e.target.value)}
-          min={1} max={999}
-          style={{ fontSize: '0.88rem', textAlign: 'center' }}
+          value={quantidade}
+          onChange={e => setQuantidade(e.target.value)}
+          min="0.001"
+          step="0.001"
+          style={{
+            fontSize: '0.88rem',
+            textAlign: 'center'
+          }}
         />
+
+        <select
+          className="form-control-custom"
+          value={unidade}
+          onChange={e => setUnidade(e.target.value)}
+          style={{ fontSize: '0.88rem' }}
+        >
+          {UNIDADES_MEDIDA.map(u => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
         <button
-          onClick={() => { setAberto(false); setDescricao(''); setLimite(1); }}
+          onClick={() => { setAberto(false); setDescricao(''); setQuantidade(1); setUnidade('un'); }}
           className="btn-outline-gold"
           style={{ fontSize: '0.82rem', padding: '0.3rem 0.8rem' }}
         >
@@ -418,13 +618,22 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
   const [editando,     setEditando]     = useState(null);
   const [salvandoEdit, setSalvandoEdit] = useState(false);
 
-  const {
-    id, descricao, limite,
-    total_selecionado, vagas_restantes, lotado,
-    meu_status, minha_selecao_id, minha_version,
-  } = item;
+  const [quantidadeSelecionar, setQuantidadeSelecionar] = useState('');
+  const [selecionando, setSelecionando] = useState(false);
 
-  const pct = Math.min(100, (total_selecionado / limite) * 100);
+  const {
+    id,
+    descricao,
+    quantidade_necessaria,
+    unidade,
+    quantidade_selecionada,
+    quantidade_restante,
+    meu_status,
+    minha_selecao_id,
+    minha_version,
+  } = item;
+  const lotado = quantidade_restante <= 0;
+  const pct = Math.min(100, (quantidade_selecionada / quantidade_necessaria) * 100);
 
   // Guard de double-tap para ações do membro
   const handleAcao = async (fn) => {
@@ -434,59 +643,231 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
   };
 
   const salvarEdicao = async () => {
-    if (!editando.descricao.trim()) return;
-    setSalvandoEdit(true);
-    try {
-      // onEditar lança em caso de erro para manter o modo de edição aberto
-      await onEditar(id, {
-        descricao: editando.descricao.trim(),
-        limite:    parseInt(editando.limite, 10),
-      });
-      setEditando(null); // fecha edição apenas em sucesso
-    } finally {
-      setSalvandoEdit(false);
+  if (!editando.descricao.trim()) return;
+
+  if (
+    !editando.quantidade_necessaria ||
+    Number(editando.quantidade_necessaria) <= 0
+  ) {
+    return;
+  }
+
+  setSalvandoEdit(true);
+
+  try {
+    await onEditar(id, {
+      descricao: editando.descricao.trim(),
+      quantidade_necessaria:
+        Number(editando.quantidade_necessaria),
+      unidade: editando.unidade,
+    });
+
+    setEditando(null);
+  } finally {
+    setSalvandoEdit(false);
+  }
+};
+
+  const confirmarSelecao = async () => {
+  const quantidade = Number(quantidadeSelecionar);
+
+    if (!quantidade || quantidade <= 0) {
+      return;
     }
+
+    if (quantidade > quantidade_restante) {
+      return;
+    }
+
+    await handleAcao(() =>
+      onSelecionar(id, quantidade)
+    );
+
+    setQuantidadeSelecionar('');
+    setSelecionando(false);
   };
 
   // ── Botão do membro (selecionar/cancelar/badges) ──────────────────────────
   const renderBotaoMembro = () => {
-    if (giraConcluida || isAdmin) return null; // admin vê confirmação, não seleção
+  if (giraConcluida || isAdmin) return null;
 
-    if (meu_status === 'confirmado')   return <span style={estilosBadge(CORES_STATUS.confirmado)}>✓ Entregue</span>;
-    if (meu_status === 'nao_entregue') return <span style={estilosBadge(CORES_STATUS.nao_entregue)}>✗ Não entregue</span>;
+  if (meu_status === 'confirmado') {
+    return (
+      <span style={estilosBadge(CORES_STATUS.confirmado)}>
+        ✓ Entregue
+      </span>
+    );
+  }
 
-    if (meu_status === 'selecionado') {
-      return (
-        <button
-          onClick={() => handleAcao(() => onCancelar(minha_selecao_id))}
-          disabled={carregando}
-          style={estilosBotao(CORES_STATUS.selecionado, carregando)}
-          title="Clique para desmarcar"
-        >
-          {carregando
-            ? <span className="spinner-border spinner-border-sm" style={{ width: '0.75rem', height: '0.75rem' }} />
-            : '✓ Vou levar — desmarcar?'
-          }
-        </button>
-      );
-    }
+  if (meu_status === 'nao_entregue') {
+    return (
+      <span style={estilosBadge(CORES_STATUS.nao_entregue)}>
+        ✗ Não entregue
+      </span>
+    );
+  }
 
-    if (lotado) return <button disabled style={estilosBotaoDesabilitado}>Já temos o suficiente</button>;
-
+  if (meu_status === 'selecionado') {
     return (
       <button
-        onClick={() => handleAcao(() => onSelecionar(id))}
-        disabled={carregando}
-        style={estilosBotao({ text: '#10b981', border: 'rgba(16,185,129,0.35)', bg: 'rgba(16,185,129,0.12)' }, carregando)}
-      >
-        {carregando
-          ? <span className="spinner-border spinner-border-sm" style={{ width: '0.75rem', height: '0.75rem' }} />
-          : '+ Vou levar'
+        onClick={() =>
+          handleAcao(() =>
+            onCancelar(minha_selecao_id)
+          )
         }
+        disabled={carregando}
+        style={estilosBotao(
+          CORES_STATUS.selecionado,
+          carregando
+        )}
+        title="Clique para desmarcar"
+      >
+        {carregando ? (
+          <span
+            className="spinner-border spinner-border-sm"
+            style={{
+              width: '0.75rem',
+              height: '0.75rem'
+            }}
+          />
+        ) : (
+          `✓ Vou levar ${formatQuantidade(
+            item.minha_quantidade
+          )} ${unidade} — desmarcar?`
+        )}
       </button>
     );
-  };
+  }
 
+  if (lotado) {
+    return (
+      <button
+        disabled
+        style={estilosBotaoDesabilitado}
+      >
+        Já temos o suficiente
+      </button>
+    );
+  }
+
+  if (selecionando) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        flexWrap: 'wrap',
+      }}>
+        <input
+          type="number"
+          min="0.001"
+          max={quantidade_restante}
+          step="0.001"
+          value={quantidadeSelecionar}
+          onChange={e =>
+            setQuantidadeSelecionar(e.target.value)
+          }
+          autoFocus
+          placeholder={String(quantidade_restante)}
+          style={{
+            width: '90px',
+            padding: '0.35rem 0.5rem',
+            border: '1px solid var(--cor-borda)',
+            borderRadius: '7px',
+            background: 'var(--cor-card)',
+            color: 'var(--cor-texto)',
+            fontSize: '0.82rem',
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              confirmarSelecao();
+            }
+
+            if (e.key === 'Escape') {
+              setSelecionando(false);
+              setQuantidadeSelecionar('');
+            }
+          }}
+        />
+
+        <span style={{
+          fontSize: '0.78rem',
+          color: 'var(--cor-texto-suave)',
+        }}>
+          {unidade}
+        </span>
+
+        <button
+          onClick={confirmarSelecao}
+          disabled={
+            carregando ||
+            !quantidadeSelecionar ||
+            Number(quantidadeSelecionar) <= 0 ||
+            Number(quantidadeSelecionar) > quantidade_restante
+          }
+          style={estilosBotao(
+            CORES_STATUS.confirmado,
+            carregando
+          )}
+        >
+          {carregando ? (
+            <span
+              className="spinner-border spinner-border-sm"
+              style={{
+                width: '0.75rem',
+                height: '0.75rem'
+              }}
+            />
+          ) : (
+            <>
+              <i className="bi bi-check-lg" />
+              Confirmar
+            </>
+          )}
+        </button>
+
+        <button
+          onClick={() => {
+            setSelecionando(false);
+            setQuantidadeSelecionar('');
+          }}
+          disabled={carregando}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--cor-borda)',
+            color: 'var(--cor-texto-suave)',
+            borderRadius: '7px',
+            padding: '0.35rem 0.6rem',
+            cursor: 'pointer',
+            fontSize: '0.78rem',
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        setQuantidadeSelecionar('');
+        setSelecionando(true);
+      }}
+      disabled={carregando}
+      style={estilosBotao(
+        {
+          text: '#10b981',
+          border: 'rgba(16,185,129,0.35)',
+          bg: 'rgba(16,185,129,0.12)'
+        },
+        carregando
+      )}
+    >
+      + Vou levar
+    </button>
+  );
+};
   // ── Painel de confirmação admin (pós-gira) ───────────────────────────────
   // Exibe uma linha por membro que selecionou o item.
   // Admin confirma ✓ Entregou ou ✗ Não entregou para cada um individualmente.
@@ -544,23 +925,61 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
         background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.3)',
         borderRadius: '10px', padding: '0.75rem 1rem',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 110px 130px',
+          gap: '0.5rem',
+          marginBottom: '0.5rem'
+        }}>
           <input
             className="form-control-custom"
             value={editando.descricao}
-            onChange={e => setEditando(p => ({ ...p, descricao: e.target.value }))}
-            maxLength={255} autoFocus
-            onKeyDown={e => { if (e.key === 'Enter') salvarEdicao(); if (e.key === 'Escape') setEditando(null); }}
+            onChange={e =>
+              setEditando(p => ({
+                ...p,
+                descricao: e.target.value
+              }))
+            }
+            maxLength={255}
+            autoFocus
             style={{ fontSize: '0.88rem' }}
           />
+
           <input
             type="number"
             className="form-control-custom"
-            value={editando.limite}
-            onChange={e => setEditando(p => ({ ...p, limite: e.target.value }))}
-            min={1} max={999}
-            style={{ fontSize: '0.88rem', textAlign: 'center' }}
+            value={editando.quantidade_necessaria}
+            onChange={e =>
+              setEditando(p => ({
+                ...p,
+                quantidade_necessaria: e.target.value
+              }))
+            }
+            min="0.001"
+            step="0.001"
+            style={{
+              fontSize: '0.88rem',
+              textAlign: 'center'
+            }}
           />
+
+          <select
+            className="form-control-custom"
+            value={editando.unidade}
+            onChange={e =>
+              setEditando(p => ({
+                ...p,
+                unidade: e.target.value
+              }))
+            }
+            style={{ fontSize: '0.88rem' }}
+          >
+            {UNIDADES_MEDIDA.map(u => (
+              <option key={u.value} value={u.value}>
+                {u.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
           <button onClick={() => setEditando(null)} className="btn-outline-gold" style={{ fontSize: '0.78rem', padding: '0.25rem 0.75rem' }}>
@@ -598,12 +1017,19 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
 
         {/* Contador */}
         <span style={{
-          fontSize: '0.78rem',
-          color: lotado ? '#ef4444' : 'var(--cor-texto-suave)',
-          fontWeight: lotado ? 700 : 400, whiteSpace: 'nowrap',
-        }}>
-          {total_selecionado}/{limite}
-        </span>
+            fontSize: '0.78rem',
+            color: lotado
+              ? '#ef4444'
+              : 'var(--cor-texto-suave)',
+            fontWeight: lotado ? 700 : 400,
+            whiteSpace: 'nowrap',
+            }}>
+            {formatQuantidade(quantidade_selecionada)}
+            {' / '}
+            {formatQuantidade(quantidade_necessaria)}
+            {' '}
+            {unidade}
+          </span>
 
         {/* Botão do membro */}
         {renderBotaoMembro()}
@@ -612,7 +1038,7 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
         {isAdmin && !giraConcluida && (
           <div style={{ display: 'flex', gap: '0.3rem', marginLeft: 'auto' }}>
             <button
-              onClick={() => setEditando({ descricao, limite })}
+              onClick={() => setEditando({ descricao, quantidade_necessaria, unidade })}
               title="Editar item"
               style={{
                 background: 'transparent', border: '1px solid var(--cor-borda)',
@@ -624,16 +1050,16 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
             </button>
             <button
               onClick={() => onDeletar(id, descricao)}
-              title={total_selecionado > 0
-                ? `Não é possível remover: ${total_selecionado} seleção(ões) ativa(s)`
+              title={quantidade_selecionada > 0
+                ? `Não é possível remover: ${quantidade_selecionada} seleção(ões) ativa(s)`
                 : 'Remover item'
               }
               style={{
                 background: 'transparent',
-                border: `1px solid ${total_selecionado > 0 ? 'rgba(148,163,184,0.2)' : 'rgba(239,68,68,0.3)'}`,
-                color: total_selecionado > 0 ? '#94a3b8' : '#ef4444',
+                border: `1px solid ${quantidade_selecionada > 0 ? 'rgba(148,163,184,0.2)' : 'rgba(239,68,68,0.3)'}`,
+                color: quantidade_selecionada > 0 ? '#94a3b8' : '#ef4444',
                 borderRadius: '6px', padding: '0.2rem 0.45rem',
-                cursor: total_selecionado > 0 ? 'not-allowed' : 'pointer',
+                cursor: quantidade_selecionada > 0 ? 'not-allowed' : 'pointer',
                 fontSize: '0.8rem',
               }}
             >
@@ -654,9 +1080,16 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
             }}
           />
         </div>
-        {vagas_restantes > 0 && (
-          <div style={{ fontSize: '0.68rem', color: 'var(--cor-texto-suave)', marginTop: '2px' }}>
-            {vagas_restantes} {vagas_restantes == 1 ? 'item' : 'itens'} disponível{vagas_restantes !== 1 ? 's' : ''}
+        {quantidade_restante > 0 && (
+          <div style={{
+            fontSize: '0.68rem',
+            color: 'var(--cor-texto-suave)',
+            marginTop: '2px',
+          }}>
+            Restam{' '}
+            <strong>
+              {formatQuantidade(quantidade_restante)} {unidade}
+            </strong>
           </div>
         )}
       </div>
@@ -701,7 +1134,11 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
                   {sel.nome.charAt(0).toUpperCase()}
                 </span>
                 {sel.nome.split(' ')[0]}
-                {sel.status === 'confirmado'   && ' ✓'}
+                {' '}
+                {formatQuantidade(sel.quantidade)}
+                {' '}
+                {unidade}
+                {sel.status === 'confirmado' && ' ✓'}
                 {sel.status === 'nao_entregue' && ' ✗'}
               </span>
             );
@@ -715,6 +1152,15 @@ function ItemCard({ item, isAdmin, giraConcluida, onSelecionar, onCancelar, onCo
   );
 }
 
+
+function formatQuantidade(valor) {
+  if (valor == null) return '';
+
+  return Number(valor)
+    .toLocaleString('pt-BR', {
+      maximumFractionDigits: 3
+    });
+}
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
@@ -752,23 +1198,41 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleSelecionar = async (itemId) => {
-    try {
-      // POST para criar a seleção do membro (api.post(`/ajeum/itens/${itemId}/selecionar`))
-      await selecionarItemAjeum(itemId);
+  const handleSelecionar = async (itemId, quantidade) => {
+  try {
+    await selecionarItemAjeum(itemId, {quantidade});
+
+    await carregar();
+
+    exibirToast('Item adicionado à sua lista!');
+
+  } catch (err) {
+    if (err.response?.status === 409) {
       await carregar();
-      exibirToast('Item adicionado à sua lista!');
-    } catch (err) {
-      if (err.response?.status === 409) {
-        await carregar(); // recarrega para mostrar estado atual
-        exibirToast('Esta vaga acabou de ser preenchida por outro membro. A lista foi atualizada.', 'erro');
-      } else if (err.response?.status === 400) {
-        exibirToast(err.response.data.detail || 'Não foi possível selecionar.', 'erro');
-      } else {
-        exibirToast('Erro ao selecionar item. Tente novamente.', 'erro');
-      }
+
+      exibirToast(
+        'A quantidade disponível mudou. A lista foi atualizada.',
+        'erro'
+      );
+
+    } else if (
+      err.response?.status === 400 ||
+      err.response?.status === 422
+    ) {
+      exibirToast(
+        err.response.data.detail ||
+        'Não foi possível selecionar.',
+        'erro'
+      );
+
+    } else {
+      exibirToast(
+        'Erro ao selecionar item. Tente novamente.',
+        'erro'
+      );
     }
-  };
+  }
+};
 
   const handleCancelar = async (selecaoId) => {
     try {

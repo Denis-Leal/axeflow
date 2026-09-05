@@ -19,12 +19,13 @@ IMPORTANTE — optimistic locking:
   pelo serviço. O serviço valida que a version atual bate com a version lida
   antes de confirmar. Se não bater: 409. Ver ajeum_service.py.
 """
+from decimal import Decimal
 import uuid
 import enum
 from app.utils.datetime_utils import utcnow
 
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Text, Boolean,
+    Column, Numeric, String, Integer, DateTime, Text, Boolean,
     ForeignKey, CheckConstraint, UniqueConstraint, Index, event,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -164,7 +165,10 @@ class AjeumItem(Base):
 
     # ── Dados ──────────────────────────────────────────────────────────────────
     descricao: Mapped[str] = mapped_column(String(255), nullable=False)
-    limite    : Mapped[int] = mapped_column(Integer,     nullable=False)
+    # limite    : Mapped[int] = mapped_column(Integer,     nullable=False)
+    quantidade_necessaria: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False,)
+
+    unidade: Mapped[str] = mapped_column(String(20), nullable=False, )
 
     # ── Soft delete ────────────────────────────────────────────────────────────
     # NULL = ativo  |  preenchido = deletado
@@ -185,7 +189,7 @@ class AjeumItem(Base):
 
     # ── Constraints e índices ──────────────────────────────────────────────────
     __table_args__ = (
-        CheckConstraint("limite >= 1", name="ck_ajeum_item_limite_positivo"),
+        CheckConstraint("quantidade_necessaria  > 0", name="ck_ajeum_item_limite_positivo"),
         Index("ix_ajeum_item_ajeum",       "ajeum_id"),
         Index("ix_ajeum_item_ajeum_ativo",  "ajeum_id", "deleted_at"),
         Index("ix_ajeum_item_terreiro",     "terreiro_id"),
@@ -266,6 +270,9 @@ class AjeumSelecao(Base):
     )
     confirmado_em: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
+
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    
     # ── Timestamps ─────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

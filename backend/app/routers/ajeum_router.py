@@ -38,6 +38,7 @@ from app.schemas.ajeum_schema import (
     AjeumCreate,
     AjeumItemCreate,
     AjeumItemEdit,
+    AjeumSelecaoCreate,
     ConfirmarSelecaoRequest,
 )
 from app.services import ajeum_service, audit_service
@@ -131,6 +132,7 @@ def get_ajeum(
 )
 def selecionar_item(
     item_id: UUID,
+    data: AjeumSelecaoCreate,
     request: Request,
     db:      Session = Depends(get_db),
     user:    Usuario = Depends(get_current_user),
@@ -147,7 +149,7 @@ def selecionar_item(
       400: gira concluída
       409: limite atingido ("Já temos o suficiente desse item")
     """
-    selecao = ajeum_service.selecionar_item(db, item_id, user)
+    selecao = ajeum_service.selecionar_item(db, item_id, data, user)
 
     audit_service.log(
         db, request,
@@ -290,7 +292,8 @@ def adicionar_item(
         "ok":       True,
         "id":       str(item.id),
         "descricao": item.descricao,
-        "limite":   item.limite,
+        "quantidade":   item.quantidade_necessaria,
+        "unidade":      item.unidade,
     }
 
 
@@ -329,7 +332,8 @@ def editar_item(
         "ok":       True,
         "id":       str(item.id),
         "descricao": item.descricao,
-        "limite":   item.limite,
+        "quantidade":   item.quantidade_necessaria,
+        "unidade":      item.unidade,
     }
 
 

@@ -11,10 +11,11 @@ são feitas no serviço, não aqui. Aqui ficam apenas validações de formato e 
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
-
+from app.utils.enuns import UnidadeMedidaEnum
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -25,7 +26,8 @@ from pydantic import BaseModel, Field, model_validator
 class AjeumItemCreate(BaseModel):
     """Um item na criação do Ajeum."""
     descricao: str = Field(..., min_length=1, max_length=255)
-    limite:    int = Field(..., ge=1, le=999, description="Mínimo 1, máximo 999")
+    quantidade_necessaria: Decimal = Field(..., ge=1, le=999, description="Mínimo 1, máximo 999")
+    unidade: UnidadeMedidaEnum = Field(..., description="Unidade de medida do item.")
 
 
 class AjeumCreate(BaseModel):
@@ -33,16 +35,20 @@ class AjeumCreate(BaseModel):
     observacoes: Optional[str]        = Field(default=None, max_length=1000)
     itens:       list[AjeumItemCreate] = Field(..., min_length=1, max_length=50)
 
+class AjeumSelecaoCreate(BaseModel):
+    """Payload para criar uma seleção de item do Ajeum."""
+    quantidade: Decimal = Field(..., gt=0, description="Quantidade desejada do item. Deve ser maior que zero.")
 
 class AjeumItemEdit(BaseModel):
     """Payload para editar um item existente. Todos os campos são opcionais."""
     descricao: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    limite:    Optional[int] = Field(default=None, ge=1, le=999)
+    quantidade_necessaria:    Optional[Decimal] = Field(default=None, ge=1, le=999)
+    unidade: Optional[UnidadeMedidaEnum] = Field(default=None, description="Unidade de medida do item.")
 
     @model_validator(mode="after")
     def ao_menos_um_campo(self) -> AjeumItemEdit:
-        if self.descricao is None and self.limite is None:
-            raise ValueError("Informe ao menos um campo para editar: descricao ou limite.")
+        if self.descricao is None and self.quantidade_necessaria is None and self.unidade is None:
+            raise ValueError("Informe ao menos um campo para editar: descricao, quantidade_necessaria ou unidade.")
         return self
 
 
@@ -88,7 +94,8 @@ class AjeumSelecaoResponse(BaseModel):
 class AjeumItemResponse(BaseModel):
     id:          UUID
     descricao:   str
-    limite:      int
+    quantidade_necessaria: Decimal
+    unidade:     UnidadeMedidaEnum
     created_at:  datetime
 
     class Config:

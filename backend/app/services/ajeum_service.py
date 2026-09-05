@@ -28,11 +28,12 @@ MULTI-TENANT — validação em toda operação:
   pertence ao terreiro do usuário autenticado ANTES de qualquer modificação.
   Falha → 403 (não 404), para não revelar existência de recursos de outros terreiros.
 """
+from decimal import Decimal
 import logging
 from app.utils.datetime_utils import utcnow
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -49,6 +50,7 @@ from app.models.usuario import Usuario
 from app.schemas.ajeum_schema import (
     AjeumCreate,
     AjeumItemCreate,
+    AjeumSelecaoCreate,
     AjeumItemEdit,
     AjeumResponse,
     AjeumItemResponse,
@@ -64,6 +66,9 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS INTERNOS
 # ══════════════════════════════════════════════════════════════════════════════
+
+def formatar_quantidade(valor: Decimal) -> str:
+    return f"{valor:.3f}".rstrip("0").rstrip(".")
 
 def _get_gira_do_terreiro(db: Session, gira_id: UUID, terreiro_id: UUID) -> Gira:
     """
@@ -149,20 +154,13 @@ def _get_selecao_do_terreiro(
 
     return selecao
 
-
-def _contar_selecoes_ativas(db: Session, item_id: UUID) -> int:
-    """
-    Conta seleções ativas (não canceladas) para um item.
-
-    DEVE ser chamado apenas dentro de uma transação com FOR UPDATE no item
-    para garantir que a contagem é consistente com a decisão de inserir.
-    Fora do lock, a contagem pode estar desatualizada por milissegundos.
-    """
-    return db.query(AjeumSelecao).filter(
+def _quantidade_selecionada(db: Session, item_id: UUID,) -> Decimal:
+    resultado = db.query(func.coalesce(func.sum(AjeumSelecao.quantidade), 0)).filter(
         AjeumSelecao.item_id == item_id,
         AjeumSelecao.status != StatusSelecaoEnum.cancelado,
-    ).count()
+    ).scalar()
 
+    return Decimal(resultado)
 
 def _validar_transicao(
     status_atual: str,
@@ -221,15 +219,16 @@ def adicionar_item(
         terreiro_id = user.terreiro_id,
         ajeum_id    = ajeum_id,
         descricao   = data.descricao.strip(),
-        limite      = data.limite,
+        quantidade_necessaria = data.quantidade_necessaria,
+        unidade     = data.unidade,
     )
     db.add(item)
     db.commit()
     db.refresh(item)
 
     logger.info(
-        "[Ajeum] Item adicionado: ajeum=%s descricao=%s limite=%d por user=%s",
-        ajeum_id, data.descricao, data.limite, user.id,
+        "[Ajeum] Item adicionado: ajeum=%s descricao=%s quantidade_necessaria=%d unidade=%s por user=%s",
+        ajeum_id, data.descricao, data.quantidade_necessaria, data.unidade, user.id,
     )
 
     # ── Push: notifica membros sobre o novo item ──────────────────────────────
@@ -238,7 +237,7 @@ def adicionar_item(
     gira = db.query(Gira).filter(Gira.id == ajeum.gira_id).first()
     pyaload = {
         "title": "🛒 Novo item no Ajeum",
-        "body":  f'"{data.descricao.strip()}" foi adicionado à lista — {data.limite} vaga(s) disponível(is).',
+        "body":  f'"{data.descricao.strip()}" foi adicionado à lista — {formatar_quantidade(data.quantidade_necessaria)} {data.unidade}(s) disponível(is).',
         "url":   f"/giras/{gira.id}" if gira else "/giras",
         "terreiro_id": str(user.terreiro_id),
     }
@@ -306,7 +305,8 @@ def criar_ajeum(
             terreiro_id = user.terreiro_id,
             ajeum_id    = ajeum.id,
             descricao   = item_data.descricao.strip(),
-            limite      = item_data.limite,
+            quantidade_necessaria = item_data.quantidade_necessaria,
+            unidade     = item_data.unidade,
         )
         db.add(item)
 
@@ -378,11 +378,38 @@ def get_ajeum_da_gira(
             SELECT
                 ai.id,
                 ai.descricao,
-                ai.limite,
+                ai.quantidade_necessaria,
+                ai.unidade,
                 ai.created_at,
                 -- Conta seleções ativas (exclui canceladas)
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN s.status != 'cancelado'
+                            THEN s.quantidade
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS quantidade_selecionada,
+
+                COALESCE(
+                    ai.quantidade_necessaria -
+                    SUM(
+                        CASE
+                            WHEN s.status != 'cancelado'
+                            THEN s.quantidade
+                            ELSE 0
+                        END
+                    ),
+                    ai.quantidade_necessaria
+                ) AS quantidade_restante,
+
                 COUNT(
-                    CASE WHEN s.status != 'cancelado' THEN 1 END
+                    CASE
+                        WHEN s.status != 'cancelado'
+                        THEN 1
+                    END
                 ) AS total_selecionado,
                 -- Verifica se o membro atual já selecionou (status não cancelado)
                 MAX(
@@ -413,7 +440,7 @@ def get_ajeum_da_gira(
             WHERE
                 ai.ajeum_id   = :ajeum_id
                 AND ai.deleted_at IS NULL
-            GROUP BY ai.id, ai.descricao, ai.limite, ai.created_at
+            GROUP BY ai.id, ai.descricao, ai.quantidade_necessaria, ai.unidade, ai.created_at
             ORDER BY ai.created_at ASC
         """),
         {
@@ -463,10 +490,11 @@ def get_ajeum_da_gira(
         {
             "id":               str(row.id),
             "descricao":        row.descricao,
-            "limite":           row.limite,
-            "total_selecionado": int(row.total_selecionado),
-            "vagas_restantes":  max(0, row.limite - int(row.total_selecionado)),
-            "lotado":           int(row.total_selecionado) >= row.limite,
+            "quantidade_necessaria":           float(row.quantidade_necessaria),
+            "unidade":           row.unidade,
+            "quantidade_selecionada": float(row.quantidade_selecionada),
+            "quantidade_restante": float(row.quantidade_restante),
+            "lotado":           int(row.quantidade_selecionada) >= row.quantidade_necessaria,
             "meu_status":       row.meu_status,
             "minha_selecao_id": row.minha_selecao_id,
             "minha_version":    row.minha_version,
@@ -492,6 +520,7 @@ def get_ajeum_da_gira(
 def selecionar_item(
     db: Session,
     item_id: UUID,
+    data: AjeumSelecaoCreate,
     user: Usuario,
 ) -> AjeumSelecao:
     """
@@ -561,38 +590,54 @@ def selecionar_item(
         # O lock no item é liberado quando o contexto de db for encerrado
         # Sem push: seleção já existia, não é evento novo para o terreiro
         return selecao_existente
+        
+    # ── Passo 4: Contagem de seleções ativas (dentro do lock) ────────────────
+    # COUNT é consistente porque estamos dentro do FOR UPDATE no item.
+    quantidade_selecionada = _quantidade_selecionada(db, item_id)
+    quantidade_restante = (item.quantidade_necessaria - quantidade_selecionada)
 
-    # ── Passo 4: COUNT dentro do lock ────────────────────────────────────────
-    # Este COUNT é consistente porque o FOR UPDATE no item impede que
-    # qualquer outra transação insira nova seleção concorrentemente
-    total_ativo = _contar_selecoes_ativas(db, item_id)
+    if data.quantidade <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="A quantidade deve ser maior que zero.",
+        )
 
-    if total_ativo >= item.limite:
+    if data.quantidade > quantidade_restante:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Já temos o suficiente desse item. "
-                f"Limite: {item.limite}, selecionados: {total_ativo}."
+                f"Quantidade indisponível. "
+                f"Restam {quantidade_restante} {item.unidade}."
             ),
         )
 
     # ── Passo 5a: Cenário 3 — re-seleção de seleção cancelada ────────────────
     if selecao_existente and selecao_existente.status == StatusSelecaoEnum.cancelado:
         logger.info(
-            "[Ajeum] Re-seleção de item cancelado: item=%s membro=%s",
-            item_id, user.id,
-        )
-        selecao_existente.status     = StatusSelecaoEnum.selecionado
+        "[Ajeum] Nova seleção: item=%s membro=%s (quantidade %s/%s)",
+        item_id,
+        user.id,
+        quantidade_selecionada + data.quantidade,
+        item.quantidade_necessaria,
+    )
+        selecao_existente.status = StatusSelecaoEnum.selecionado
+        selecao_existente.quantidade = data.quantidade
         selecao_existente.updated_at = utcnow()
+        
+        quantidade_total = quantidade_selecionada + data.quantidade
         # version NÃO é incrementado aqui: re-seleção não é confirmação de admin,
         # não há risco de conflito de duas confirmações simultâneas
         db.commit()
         db.refresh(selecao_existente)
 
+
         # Push: membro retomou o compromisso com o item
         payload = {
             "title": "🛒 Ajeum atualizado",
-            "body":  f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
+            "body": (
+                f"{user.nome} vai levar: {item.descricao} "
+                f"({formatar_quantidade(quantidade_total)}/{formatar_quantidade(item.quantidade_necessaria)} {item.unidade} selecionados)."
+            ),
             "url":   f"/giras/{gira.id}",
             "terreiro_id": str(user.terreiro_id),
         }
@@ -607,7 +652,7 @@ def selecionar_item(
     # ── Passo 5b: Cenário 1 — primeira seleção ────────────────────────────────
     logger.info(
         "[Ajeum] Nova seleção: item=%s membro=%s (vaga %d/%d)",
-        item_id, user.id, total_ativo + 1, item.limite,
+        item_id, user.id, quantidade_selecionada, item.quantidade_necessaria,
     )
 
     nova_selecao = AjeumSelecao(
@@ -616,6 +661,7 @@ def selecionar_item(
         membro_id   = user.id,
         status      = StatusSelecaoEnum.selecionado,
         version     = 1,
+        quantidade  = data.quantidade,
     )
     db.add(nova_selecao)
 
@@ -648,9 +694,14 @@ def selecionar_item(
 
     # Push: membro se comprometeu com o item — notifica o terreiro
     # Disparado após commit bem-sucedido (não no IntegrityError path acima)
+    
+    quantidade_total = quantidade_selecionada + data.quantidade
     payload = {
         "title": "🛒 Ajeum atualizado",
-        "body":  f"{user.nome} vai levar: {item.descricao} ({total_ativo + 1}/{item.limite} selecionados).",
+        "body": (
+            f"{user.nome} vai levar: {item.descricao} "
+            f"({formatar_quantidade(quantidade_total)}/{formatar_quantidade(item.quantidade_necessaria)} {item.unidade} selecionados)."
+        ),
         "url":   f"/giras/{gira.id}",
         "terreiro_id": str(user.terreiro_id),
     }
@@ -712,7 +763,7 @@ def cancelar_selecao(
     db.refresh(selecao)
     payload = {
         "title": "🛒 Ajeum atualizado",
-        "body": f"{user.nome} cancelou a seleção do item: {ajeum_item.descricao} ({ajeum_item.limite - _contar_selecoes_ativas(db, ajeum_item.id)}/{ajeum_item.limite} selecionados).",
+        "body": f"{user.nome} cancelou a seleção do item: {ajeum_item.descricao} ({formatar_quantidade(ajeum_item.quantidade_necessaria - _quantidade_selecionada(db, ajeum_item.id))} {ajeum_item.unidade} restantes).",
         "url": f"/giras/{gira.id}",
         "terreiro_id": str(user.terreiro_id),
     }
@@ -848,18 +899,18 @@ def editar_item(
     # FOR UPDATE: garante que nenhuma nova seleção entra durante a validação
     item = _get_item_do_terreiro(db, item_id, user.terreiro_id, for_update=True)
 
-    if data.limite is not None:
-        total_ativo = _contar_selecoes_ativas(db, item_id)
-        if data.limite < total_ativo:
+    if data.quantidade_necessaria is not None:
+        total_ativo = _quantidade_selecionada(db, item_id)
+        if data.quantidade_necessaria < total_ativo:
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"Não é possível reduzir o limite para {data.limite}. "
+                    f"Não é possível reduzir o limite para {data.quantidade_necessaria}. "
                     f"Já há {total_ativo} seleções ativas. "
                     f"Cancele seleções antes de reduzir o limite."
                 ),
             )
-        item.limite = data.limite
+        item.quantidade_necessaria = data.quantidade_necessaria
 
     if data.descricao is not None:
         item.descricao = data.descricao.strip()
@@ -896,7 +947,7 @@ def deletar_item(
     """
     item = _get_item_do_terreiro(db, item_id, user.terreiro_id, for_update=True)
 
-    total_ativo = _contar_selecoes_ativas(db, item_id)
+    total_ativo = _quantidade_selecionada(db, item_id)
 
     if total_ativo > 0:
         raise HTTPException(
