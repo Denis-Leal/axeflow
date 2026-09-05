@@ -84,7 +84,7 @@ def _montar_dados(gira: Gira, inscricoes: List[InscricaoConsulente]) -> dict[str
                 ),
                 "telefone": (
                     inscricao.consulente.telefone
-                    if inscricao.consulente
+                    if inscricao.consulente and inscricao.consulente.telefone
                     else ""
                 ),
                 "primeira_visita": (
