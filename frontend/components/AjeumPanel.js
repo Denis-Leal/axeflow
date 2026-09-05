@@ -859,7 +859,7 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
           <span style={{ fontFamily: 'Cinzel', fontSize: '0.9rem', color: 'var(--cor-acento)' }}>
             ✦ Ajeum — Lista de Itens
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
+          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
             Sem lista criada
           </span>
         </div>
@@ -914,7 +914,7 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
           </span>
         )}
 
-        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
+        <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--cor-texto-suave)' }}>
           {totalItens} item{totalItens !== 1 ? 'ns' : ''}
         </span>
       </div>

@@ -212,14 +212,14 @@ export default function GiraDetalhe() {
 
   return (
     <>
-      <Head><title>Inscrições | AxeFlow</title></Head>
+      <Head><title>Detalhes da Gira | AxeFlow</title></Head>
       <div style={{ display: 'flex' }}>
         <Sidebar />
         <div className="main-content">
           <div className="topbar">
             <div>
-              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Inscrições</h5>
-              <small style={{ color: 'var(--cor-texto-suave)' }}>Lista de inscritos na gira</small>
+              <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Detalhes da Gira</h5>
+              <small style={{ color: 'var(--cor-texto-suave)' }}>Informações, inscrições e presença</small>
             </div>
             <Link href="/giras" style={{ color: 'var(--cor-texto-suave)', textDecoration: 'none' }}>
               ← Voltar
@@ -232,7 +232,17 @@ export default function GiraDetalhe() {
                 {/* Stats */}
                 <StatsBar stats={stats} />
 
-                <GiraActions giraId={gira.id} giraNome={gira.titulo} />
+                {/* Ações da gira */}
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <GiraActions giraId={gira.id} giraNome={gira.titulo} />
+                </div>
+                {/* Painel de Ajeum */}
+                <AjeumPanel
+                  giraId={gira.id}
+                  isAdmin={isAdmin}
+                  giraStatus={gira.status}
+                />
+
                 {/* Abas */}
                 <div style={{
                   display: 'flex',

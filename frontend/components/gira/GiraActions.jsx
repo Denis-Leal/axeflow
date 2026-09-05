@@ -61,7 +61,7 @@ export default function GiraActions({ giraId, giraNome }) {
       style={{
         display: 'flex',
         justifyContent: 'flex-end',
-        marginBottom: '1rem',
+        marginBottom: '1,5rem',
         position: 'relative',
       }}
     >
@@ -75,8 +75,8 @@ export default function GiraActions({ giraId, giraNome }) {
         <i className="bi bi-download me-1" />
 
         {exportando
-          ? "Exportando..."
-          : "Baixar lista consulentes"}
+          ? "Exportando lista..."
+          : "Exportar lista"}
 
         <i className="bi bi-chevron-down ms-2" />
       </Button>
