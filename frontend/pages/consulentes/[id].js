@@ -12,7 +12,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
-import api from '../../services/api';
+import { getMe } from '../../services/api';
 import { atualizarNotaConsulente, getPerfilConsulente } from '../../services/api';
 import { Spinner, Card, CardHeader, CardBody, Button } from '../../components/ui';
 
@@ -202,7 +202,7 @@ export default function PerfilConsulente() {
     // Carrega perfil e role do usuário em paralelo
     Promise.all([
       getPerfilConsulente(id),
-      api.get('/auth/me'),
+      getMe(),
     ])
       .then(([perfilRes, meRes]) => {
         setPerfil(perfilRes.data);

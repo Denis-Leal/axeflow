@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
 import { listConsulentes, updateConsulente, getRankingConsulentes, deleteConsulente } from '../services/api';
 
 export function useConsulentes() {

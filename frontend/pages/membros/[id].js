@@ -16,7 +16,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
-import api from '../../services/api';
+import { getPerfilMembro } from '../../services/api';
 import { Spinner, Card, CardHeader, CardBody } from '../../components/ui';
 
 // ── Paleta de cores por classificação de score ────────────────────────────────
@@ -62,7 +62,7 @@ export default function PerfilMembro() {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
-    api.get(`/membros/${id}/perfil`)
+    getPerfilMembro(id)
       .then(res => setPerfil(res.data))
       .catch(err => {
         if (err.response?.status === 401) {

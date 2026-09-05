@@ -6,7 +6,7 @@ import Sidebar from '../../components/Sidebar';
 import BottomNav from '../../components/BottomNav';
 import { createGira, getMe } from '../../services/api';
 import { handleApiError } from '../../services/errorHandler';
-import api from '../../services/api';
+import { listMembros } from '../../services/api';
 import { Button, FormField, Card, CardHeader, CardBody, StatCard } from '../../components/ui';
 
 
@@ -43,7 +43,7 @@ export default function NovaGira() {
         return;
       }
       setAutorizado(true);
-      api.get('/membros').then(r => {setMembros(r.data);setForm(prev => ({...prev,limite_membros: r.data.length}));}).catch(() => {});
+      listMembros().then(r => {setMembros(r.data);setForm(prev => ({...prev,limite_membros: r.data.length}));}).catch(() => {});
     }).catch(() => { router.push('/login'); });
   }, []);
 

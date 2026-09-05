@@ -57,7 +57,7 @@ export default function Login() {
         console.warn('[Push] Falha ao registrar device:', err);
       }
 
-      router.push('/dashboard');
+      router.push('/dashboard'); // Redireciona para o dashboard após login bem-sucedido
     } catch (err) {
       setError(handleApiError(err, 'Login'));
     } finally {

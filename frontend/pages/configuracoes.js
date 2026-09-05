@@ -28,7 +28,7 @@ export default function Configuracoes() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
+    if (!token) { router.push('/login'); return; } // Redireciona para login se não houver token
     getMe()
       .then(r => setUser(r.data))
       .catch(err => {

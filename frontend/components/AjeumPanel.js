@@ -32,7 +32,16 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import { 
+  listAjeum, 
+  createAjeum, 
+  CreateAjeumItem, 
+  selecionarItemAjeum, 
+  deleteSelecaoAjeum,
+  updateStatusSelecaoAjeum,
+  updateAjeumItem,
+  deleteAjeumItem
+} from '../services/api';
 
 // ── Paleta de cores por estado de seleção ─────────────────────────────────────
 const CORES_STATUS = {
@@ -137,7 +146,8 @@ function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
 
     setSalvando(true);
     try {
-      await api.post(`/giras/${giraId}/ajeum`, {
+      // POST para criar o Ajeum com todos os itens de uma vez (api.post(`/giras/${giraId}/ajeum`)
+      await createAjeum(giraId, {
         observacoes: observacoes.trim() || null,
         itens: itensFiltrados.map(i => ({
           descricao: i.descricao.trim(),
@@ -307,7 +317,8 @@ function FormAdicionarItem({ ajeum_id, onAdicionado, exibirToast }) {
 
     setSalvando(true);
     try {
-      await api.post(`/ajeum/${ajeum_id}/itens`, {
+      // POST para criar o item avulso no Ajeum existente (api.post(`/ajeum/${ajeum_id}/itens`))
+      await CreateAjeumItem(ajeum_id, {
         descricao: descricao.trim(),
         limite:    parseInt(limite, 10),
       });
@@ -723,7 +734,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const carregar = useCallback(async () => {
     try {
-      const res = await api.get(`/giras/${giraId}/ajeum`);
+      // GET do Ajeum da gira (api.get(`/giras/${giraId}/ajeum`)
+      const res = await listAjeum(giraId); // gira sem Ajeum retorna 404
       setDados(res.data);
     } catch (err) {
       if (err.response?.status === 404) {
@@ -742,7 +754,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const handleSelecionar = async (itemId) => {
     try {
-      await api.post(`/ajeum/itens/${itemId}/selecionar`);
+      // POST para criar a seleção do membro (api.post(`/ajeum/itens/${itemId}/selecionar`))
+      await selecionarItemAjeum(itemId);
       await carregar();
       exibirToast('Item adicionado à sua lista!');
     } catch (err) {
@@ -759,7 +772,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const handleCancelar = async (selecaoId) => {
     try {
-      await api.delete(`/ajeum/selecoes/${selecaoId}`);
+      // DELETE para remover a seleção do membro (api.delete(`/ajeum/selecoes/${selecaoId}`))
+      await deleteSelecaoAjeum(selecaoId);
       await carregar();
       exibirToast('Seleção cancelada.');
     } catch (err) {
@@ -773,7 +787,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const handleConfirmar = async (selecaoId, novoStatus, version) => {
     try {
-      await api.patch(`/ajeum/selecoes/${selecaoId}/confirmar`, { novo_status: novoStatus, version });
+      // PATCH para atualizar o status da seleção (confirmado / nao_entregue) (api.patch(`/ajeum/selecoes/${selecaoId}/confirmar`, { novo_status: novoStatus, version });)
+      await updateStatusSelecaoAjeum(selecaoId, novoStatus, version);
       await carregar();
       exibirToast(novoStatus === 'confirmado' ? 'Entrega confirmada!' : 'Não-entrega registrada.');
     } catch (err) {
@@ -790,7 +805,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const handleEditar = async (itemId, dadosEdicao) => {
     try {
-      await api.patch(`/ajeum/itens/${itemId}`, dadosEdicao);
+      // PATCH para atualizar o item do Ajeum (api.patch(`/ajeum/itens/${itemId}`, dadosEdicao);)
+      await updateAjeumItem(itemId, dadosEdicao);
       await carregar();
       exibirToast('Item atualizado.');
     } catch (err) {
@@ -809,7 +825,8 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
 
   const handleDeletar = async (itemId, descricaoItem) => {
     try {
-      await api.delete(`/ajeum/itens/${itemId}`);
+      // DELETE para remover o item do Ajeum (api.delete(`/ajeum/itens/${itemId}`);)
+      await deleteAjeumItem(itemId);
       await carregar();
       exibirToast(`"${descricaoItem}" removido da lista.`);
     } catch (err) {

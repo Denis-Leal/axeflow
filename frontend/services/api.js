@@ -72,6 +72,20 @@ export const getGira     = (id)         => api.get(`/giras/${id}`);
 export const updateGira  = (id, data)   => api.patch(`/giras/${id}`, data);
 export const deleteGira  = (id)         => api.delete(`/giras/${id}`);
 
+// ── Ajeum em Gira ───────────────────────────────────
+export const listAjeum   = (giraId)     => api.get(`/giras/${giraId}/ajeum`); // Lista o Ajeum da gira (ou 404 se não existir)
+export const createAjeum = (giraId, data) => api.post(`/giras/${giraId}/ajeum`, data); // Cria o Ajeum da gira com todos os itens de uma vez
+export const CreateAjeumItem = (ajeumId, data) => api.post(`/ajeum/${ajeumId}/itens`, data); // Cria um item dentro de um Ajeum existente
+export const selecionarItemAjeum = (itemId) => api.post(`/ajeum/itens/${itemId}/selecionar`); // Seleciona um item no Ajeum
+export const updateAjeum = (giraId, ajeumId, data) => api.patch(`/giras/${giraId}/ajeum/${ajeumId}`, data); // Atualiza o Ajeum da gira (observações, etc.)
+export const updateAjeumItem = (itemId, data) => api.patch(`/ajeum/itens/${itemId}`, data); // Atualiza um item específico no Ajeum
+export const updateStatusSelecaoAjeum = (selecaoId, status, version) => api.patch(`/ajeum/selecoes/${selecaoId}/confirmar`, { novo_status: status, version }); // Atualiza o status de uma seleção específica no Ajeum
+export const deleteAjeum = (giraId, ajeumId) => api.delete(`/giras/${giraId}/ajeum/${ajeumId}`); // Deleta o Ajeum da gira (e todos os itens e seleções associados)
+export const deleteAjeumItem = (itemId) => api.delete(`/ajeum/itens/${itemId}`); // Deleta um item específico no Ajeum
+export const deleteSelecaoAjeum = (selecaoId) => api.delete(`/ajeum/selecoes/${selecaoId}`); // Deleta uma seleção específica no Ajeum
+
+
+
 // ── Inscrições ────────────────────────────────────────
 export const listInscricoes    = (giraId)              => api.get(`/giras/${giraId}/inscricoes`);
 export const updatePresenca    = (inscricaoId, status) => api.patch(`/inscricao/${inscricaoId}/presenca`, { status });
@@ -107,6 +121,7 @@ export const listMembros   = ()           => api.get('/membros');
 export const createMembro  = (data)       => api.post('/membros', data);
 export const updateMembro  = (id, data)   => api.put(`/membros/${id}`, data);
 export const deleteMembro  = (id)         => api.delete(`/membros/${id}`);
+export const getPerfilMembro = (id) => api.get(`/membros/${id}/perfil`);
 
 // ── Configurações ─────────────────────────────────────
 export const getConfig     = ()           => api.get('/config');

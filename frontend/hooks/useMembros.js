@@ -11,7 +11,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getMe, listMembros, createMembro, updateMembro } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
-import api from '../services/api';
 
 export function useMembros() {
   const [membros, setMembros]   = useState([]);
