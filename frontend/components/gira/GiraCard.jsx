@@ -80,7 +80,7 @@ export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, o
             textDecoration: 'none',
           }}
         >
-          <i className="bi bi-list-ul" /> Inscrições
+          <i className="bi bi-info-circle" /> Detalhes
         </Link>
         {/* Inscrever */}
         {gira.slugPublico && (

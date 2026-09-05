@@ -103,7 +103,7 @@ function ProximaGiraCard({ gira, minhaPresenca, jaConfirmei, confirmando, onConf
             fontSize: '0.78rem',
           }}
         >
-          <i className="bi bi-list-ul me-1" />Inscrições
+          <i className="bi bi-info-circle me-1" />Detalhes
         </Link>
         {gira.slugPublico && (
           <Link

@@ -60,7 +60,7 @@ export default function GiraTable({ giras, onEntrar, podeGerenciar, podeExcluir,
                   )}
                   <Link
                     href={`/giras/${g.id}`}
-                    title="Ver inscrições"
+                    title="Ver detalhes"
                     style={{
                       padding: '0.2rem 0.5rem', background: 'transparent',
                       border: '1px solid var(--cor-borda)', borderRadius: '6px',
@@ -68,7 +68,7 @@ export default function GiraTable({ giras, onEntrar, podeGerenciar, podeExcluir,
                       display: 'inline-flex', alignItems: 'center',
                     }}
                   >
-                    <i className="bi bi-list-ul" />
+                    <i className="bi bi-info-circle" />
                   </Link>
                   {podeGerenciar && (
                     <Link
