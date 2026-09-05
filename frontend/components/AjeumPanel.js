@@ -1340,8 +1340,9 @@ export default function AjeumPanel({ giraId, isAdmin, giraStatus }) {
           display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
         }}>
           <i className="bi bi-info-circle" style={{ color: 'var(--cor-acento)', flexShrink: 0, marginTop: '1px' }}></i>
-          Monte a lista de itens que os membros precisam levar.
-          Defina o limite de pessoas por item para controlar a quantidade.
+          <span>
+            Nenhuma lista de itens foi criada para esta gira. Você pode criar uma lista para que os membros se organizem e tragam o que for necessário.
+          </span>
         </div>
 
         <FormCriarAjeum
