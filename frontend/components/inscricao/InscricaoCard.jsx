@@ -117,22 +117,34 @@ export default function InscricaoCard({
           }}
         >
           {!i.naFila && !i.cancelado && (
-            <>
-              <button
-                onClick={() => onPresenca(i.id, 'compareceu')}
-                style={buttonStyle('#10b981')}
-              >
-                ✓
-              </button>
+          <>
+            <button
+              onClick={() => onPresenca(i.id, 'compareceu')}
+              title="Marcar como compareceu"
+              style={buttonStyle('#10b981')}
+            >
+              ✓
+            </button>
 
+            <button
+              onClick={() => onPresenca(i.id, 'faltou')}
+              title="Marcar como faltou"
+              style={buttonStyle('#ef4444')}
+            >
+              ✗
+            </button>
+
+            {(i.status === 'compareceu' || i.status === 'faltou') && (
               <button
-                onClick={() => onPresenca(i.id, 'faltou')}
-                style={buttonStyle('#ef4444')}
+                onClick={() => onPresenca(i.id, 'confirmado')}
+                title="Voltar para confirmado"
+                style={buttonStyle('#6b7280')}
               >
-                ✗
+                <i className="bi bi-arrow-counterclockwise" />
               </button>
-            </>
-          )}
+            )}
+          </>
+        )}
 
           {i.whatsappHref && (
             <a

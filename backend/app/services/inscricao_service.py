@@ -623,36 +623,49 @@ def update_presenca(
     data: PresencaUpdate,
     terreiro_id: UUID,
 ) -> dict:
-    """Atualiza status de presença (compareceu / faltou)."""
-    """
-    MUDANÇA: atualiza InscricaoConsulente.
-    Garante consistência durante o período de transição.
-    """
-    # Busca na nova tabela (fonte de verdade)
+    """Atualiza o status de presença de uma inscrição."""
+
     inscricao = db.query(InscricaoConsulente).filter(
         InscricaoConsulente.id == inscricao_id,
         InscricaoConsulente.deleted_at.is_(None)
     ).first()
+
     if not inscricao:
-        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+        raise HTTPException(
+            status_code=404,
+            detail="Inscrição não encontrada",
+        )
 
     gira = db.query(Gira).filter(
         Gira.id == inscricao.gira_id,
         Gira.terreiro_id == terreiro_id,
         Gira.deleted_at.is_(None),
     ).first()
+
     if not gira:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado",
+        )
 
-    if data.status not in (StatusInscricaoEnum.compareceu, StatusInscricaoEnum.faltou):
-        raise HTTPException(status_code=400, detail="Status inválido")
+    if data.status not in (
+        StatusInscricaoEnum.confirmado,
+        StatusInscricaoEnum.compareceu,
+        StatusInscricaoEnum.faltou,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Status inválido",
+        )
 
-    # Atualiza a nova tabela
     inscricao.status = data.status
 
     db.commit()
-    return {"ok": True, "status": inscricao.status}
 
+    return {
+        "ok": True,
+        "status": inscricao.status,
+    }
 
 def cancelar_inscricao(db: Session, inscricao_id: UUID, terreiro_id: UUID, usuario_id: UUID) -> dict:
     """

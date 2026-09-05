@@ -85,24 +85,34 @@ export default function InscricaoTable({
 
                     {/* presença */}
                     {!i.cancelado && !i.naFila && (
-                      <>
-                        <button
-                          onClick={() => onPresenca?.(i.id, 'compareceu')}
-                          title="Compareceu"
-                          style={btnSuccess}
-                        >
-                          ✓
-                        </button>
+                    <>
+                      <button
+                        onClick={() => onPresenca?.(i.id, 'compareceu')}
+                        title="Marcar como compareceu"
+                        style={btnSuccess}
+                      >
+                        ✓
+                      </button>
 
+                      <button
+                        onClick={() => onPresenca?.(i.id, 'faltou')}
+                        title="Marcar como faltou"
+                        style={btnDanger}
+                      >
+                        ✗
+                      </button>
+
+                      {(i.status === 'compareceu' || i.status === 'faltou') && (
                         <button
-                          onClick={() => onPresenca?.(i.id, 'faltou')}
-                          title="Faltou"
-                          style={btnDanger}
+                          onClick={() => onPresenca?.(i.id, 'confirmado')}
+                          title="Voltar para confirmado"
+                          style={btnNeutral}
                         >
-                          ✗
+                          <i className="bi bi-arrow-counterclockwise" />
                         </button>
-                      </>
-                    )}
+                      )}
+                    </>
+                  )}
 
                     {i.whatsappHref && (
                       <a
