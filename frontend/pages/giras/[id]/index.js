@@ -169,7 +169,7 @@ export default function GiraDetalhe() {
 
   const { state, actions, derived } = useGiraDetalhe(router.query.id, router);
   const { marcarPresenca, cancelarInscricao, reativarInscricao, updateMembro } = actions;
-  const { loading, inscricoesLoading, membrosLoading } = state;
+  const { loading, inscricoesLoading, membrosLoading, modal } = state;
   const { vm, isAdmin, lista, metricas, membrosPresenca, membrosUpdating } = derived;
   const gira = vm;
   const [abaAtiva, setAbaAtiva] = useState('consulentes'); // 'consulentes' | 'membros'
@@ -359,6 +359,16 @@ export default function GiraDetalhe() {
           </div>
         </div>
       </div>
+      <ConfirmModal
+        aberto={modal.aberto}
+        titulo={modal.titulo}
+        mensagem={modal.mensagem}
+        apenasOk={modal.apenasOk}
+        tipoBotao={modal.tipoBotao}
+        labelConfirmar={modal.labelConfirmar}
+        onConfirmar={modal.onConfirmar}
+        onCancelar={actions.fecharModal}
+      />
     </>
   );
 }
