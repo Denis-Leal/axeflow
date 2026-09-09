@@ -23,7 +23,7 @@ import { Spinner, StatCard } from '../components/ui';
 import { useGiras } from '../hooks/useGiras';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { buildGirasViewModel } from '../viewModels/giraViewModel';
-import { deleteGira } from '../services/api';
+import { deleteGira, updateGira } from '../services/api';
 import { handleApiError } from '../services/errorHandler';
 import { useGiraAtual } from '../contexts/GiraContext';
 
@@ -63,6 +63,27 @@ export default function Giras() {
           reload();
         } catch (err) {
           setErro(handleApiError(err, 'Excluir Gira'));
+          setTimeout(() => setErro(''), 5000);
+        }
+      },
+    });
+  };
+
+  const handleConcluir = (gira) => {
+    setModal({
+      aberto: true,
+      titulo: 'Concluir gira',
+      mensagem: `Tem certeza que deseja marcar a gira "${gira.titulo}" como concluída? Esta ação também finalizará o processamento do estoque da gira.`,
+      tipoBotao: 'primary',
+      labelConfirmar: 'Concluir gira',
+      onConfirmar: async () => {
+        fecharModal();
+
+        try {
+          await updateGira(gira.id, { status: 'concluida' });
+          reload();
+        } catch (err) {
+          setErro(handleApiError(err, 'Concluir Gira'));
           setTimeout(() => setErro(''), 5000);
         }
       },
@@ -135,6 +156,7 @@ export default function Giras() {
                       podeGerenciar={podeGerenciar}
                       podeExcluir={podeExcluir}
                       onDelete={handleDelete}
+                      onConcluir={handleConcluir}
                     />
                   ))
                 )}
@@ -147,6 +169,7 @@ export default function Giras() {
                   podeGerenciar={podeGerenciar}
                   podeExcluir={podeExcluir}
                   onDelete={handleDelete}
+                  onConcluir={handleConcluir}
                 />
               </div>
             )}

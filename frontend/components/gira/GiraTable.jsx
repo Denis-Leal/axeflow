@@ -84,6 +84,23 @@ export default function GiraTable({ giras, onEntrar, podeGerenciar, podeExcluir,
                       <i className="bi bi-pencil" />
                     </Link>
                   )}
+                  {podeGerenciar && !g.concluida && (
+                  <button
+                    onClick={() => onConcluir?.(g)}
+                    title="Concluir gira"
+                    style={{
+                      background:   'rgba(16,185,129,0.08)',
+                      border:       '1px solid rgba(16,185,129,0.3)',
+                      color:        '#10b981',
+                      borderRadius: '6px',
+                      padding:      '0.2rem 0.5rem',
+                      cursor:       'pointer',
+                      fontSize:     '0.8rem',
+                    }}
+                  >
+                    <i className="bi bi-check-circle" />
+                  </button>
+                )}
                   {g.slugPublico && (
                     <a
                       href={`/public/${g.slugPublico}`} target="_blank" rel="noopener noreferrer"

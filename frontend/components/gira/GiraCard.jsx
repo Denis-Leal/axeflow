@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 import { Badge, ProgressBar, Button } from '../ui';
 import { useRouter } from 'next/router';
 
-export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, onDelete }) {
+export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, onDelete, onConcluir }) {
   const router = useRouter();
   return (
     <div onClick={() => router.push(`/giras/${gira.id}`)} style={{
@@ -187,6 +187,29 @@ export default function GiraCard({ gira, onEntrar, podeGerenciar, podeExcluir, o
           </Link>
         )}
 
+        {/* Concluir */}
+        {podeGerenciar && !gira.concluida && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onConcluir?.(gira);
+            }}
+            title="Concluir gira"
+            style={{
+              padding:      '0.45rem 0.6rem',
+              background:   'rgba(16,185,129,0.08)',
+              border:       '1px solid rgba(16,185,129,0.3)',
+              borderRadius: '8px',
+              color:        '#10b981',
+              cursor:       'pointer',
+              display:      'flex',
+              alignItems:   'center',
+            }}
+          >
+            <i className="bi bi-check-circle" />
+          </button>
+        )}
+        
         {/* Excluir */}
         {podeExcluir && (
           <button
