@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,28 @@ from app.services.api_key_service import SCOPES_DISPONIVEIS, autenticar_por_api_
 from app.schemas.inscricao_schema import InscricaoPublicaRequest
 from app.services import inscricao_service
 from app.services.presenca_consulente_service import get_ranking_consulentes
+from app.schemas.atendimento_schema import (
+    AgendamentoCreate,
+    AgendamentoResponse,
+    AgendamentoStatusUpdate,
+    AgendamentoUpdate,
+    AtendimentoTipoCreate,
+    AtendimentoTipoResponse,
+    AtendimentoTipoUpdate,
+)
+
+from app.schemas.financeiro_schema import (
+    ContaReceberCreate,
+    ContaReceberResponse,
+    FormaPagamentoCreate,
+    FormaPagamentoResponse,
+    FormaPagamentoUpdate,
+    PagamentoCreate,
+    PagamentoResponse,
+    ReciboResponse,
+)
+
+from app.services import atendimento_service, financeiro_service
 
 logger = logging.getLogger(__name__)
 
@@ -354,4 +376,604 @@ def v1_marcar_presenca(
         db, inscricao_id,
         PresencaUpdate(status=status),
         usuario.terreiro_id,
+    )
+    
+    
+@router.get("/v1/atendimentos", response_model=list[AtendimentoTipoResponse])
+def v1_listar_tipos_atendimento(
+    request: Request,
+    ativos: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Lista tipos de atendimento do terreiro.
+
+    Scope necessário: atendimentos:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "atendimentos:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'atendimentos:read'",
+        )
+
+    return atendimento_service.listar_tipos(
+        db,
+        terreiro_id=usuario.terreiro_id,
+        somente_ativos=ativos,
+    )    
+    
+@router.post(
+    "/v1/atendimentos",
+    response_model=AtendimentoTipoResponse,
+    status_code=201,
+)
+def v1_criar_tipo_atendimento(
+    data: AtendimentoTipoCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Cria um tipo de atendimento.
+
+    Scope necessário: atendimentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "atendimentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'atendimentos:write'",
+        )
+
+    return atendimento_service.criar_tipo(db, data, usuario)
+
+@router.patch(
+    "/v1/atendimentos/{tipo_id}",
+    response_model=AtendimentoTipoResponse,
+)
+def v1_atualizar_tipo_atendimento(
+    tipo_id: UUID,
+    data: AtendimentoTipoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Atualiza um tipo de atendimento.
+
+    Scope necessário: atendimentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "atendimentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'atendimentos:write'",
+        )
+
+    return atendimento_service.atualizar_tipo(
+        db,
+        tipo_id,
+        data,
+        usuario,
+    )
+    
+@router.delete("/v1/atendimentos/{tipo_id}")
+def v1_remover_tipo_atendimento(
+    tipo_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Remove/desativa um tipo de atendimento.
+
+    Scope necessário: atendimentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "atendimentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'atendimentos:write'",
+        )
+
+    return atendimento_service.remover_tipo(
+        db,
+        tipo_id,
+        usuario,
+    )
+    
+@router.get("/v1/agendamentos", response_model=list[AgendamentoResponse])
+def v1_listar_agendamentos(
+    request: Request,
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Lista agendamentos do terreiro.
+
+    Scope necessário: agendamentos:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:read'",
+        )
+
+    return atendimento_service.listar_agendamentos(
+        db,
+        terreiro_id=usuario.terreiro_id,
+        status_filter=status_filter,
+    )
+    
+@router.post(
+    "/v1/agendamentos",
+    response_model=AgendamentoResponse,
+    status_code=201,
+)
+def v1_criar_agendamento(
+    data: AgendamentoCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Cria um agendamento.
+
+    Scope necessário: agendamentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:write'",
+        )
+
+    return atendimento_service.criar_agendamento(
+        db,
+        data,
+        usuario,
+    )
+    
+@router.patch(
+    "/v1/agendamentos/{agendamento_id}",
+    response_model=AgendamentoResponse,
+)
+def v1_atualizar_agendamento(
+    agendamento_id: UUID,
+    data: AgendamentoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Atualiza um agendamento.
+
+    Scope necessário: agendamentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:write'",
+        )
+
+    return atendimento_service.atualizar_agendamento(
+        db,
+        agendamento_id,
+        data,
+        usuario,
+    )
+
+@router.patch(
+    "/v1/agendamentos/{agendamento_id}/status",
+    response_model=AgendamentoResponse,
+)
+def v1_alterar_status_agendamento(
+    agendamento_id: UUID,
+    data: AgendamentoStatusUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Altera o status de um agendamento.
+
+    Scope necessário: agendamentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:write'",
+        )
+
+    return atendimento_service.alterar_status_agendamento(
+        db,
+        agendamento_id,
+        data.status,
+        usuario,
+    )
+    
+    
+@router.post(
+    "/v1/agendamentos/{agendamento_id}/cancelar",
+    response_model=AgendamentoResponse,
+)
+def v1_cancelar_agendamento(
+    agendamento_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Cancela um agendamento.
+
+    Scope necessário: agendamentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:write'",
+        )
+
+    return atendimento_service.alterar_status_agendamento(
+        db,
+        agendamento_id,
+        "cancelado",
+        usuario,
+    )
+    
+    
+@router.post(
+    "/v1/agendamentos/{agendamento_id}/concluir",
+    response_model=AgendamentoResponse,
+)
+def v1_concluir_agendamento(
+    agendamento_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Conclui um agendamento.
+
+    Scope necessário: agendamentos:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "agendamentos:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'agendamentos:write'",
+        )
+
+    return atendimento_service.alterar_status_agendamento(
+        db,
+        agendamento_id,
+        "concluido",
+        usuario,
+    )
+    
+    
+@router.get(
+    "/v1/formas-pagamento",
+    response_model=list[FormaPagamentoResponse],
+)
+def v1_listar_formas_pagamento(
+    request: Request,
+    ativas: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Lista formas de pagamento do terreiro.
+
+    Scope necessário: financeiro:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:read'",
+        )
+
+    return financeiro_service.listar_formas_pagamento(
+        db,
+        terreiro_id=usuario.terreiro_id,
+        somente_ativas=ativas,
+    )
+    
+@router.post(
+    "/v1/formas-pagamento",
+    response_model=FormaPagamentoResponse,
+    status_code=201,
+)
+def v1_criar_forma_pagamento(
+    data: FormaPagamentoCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Cria uma forma de pagamento.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.criar_forma_pagamento(
+        db,
+        data,
+        usuario,
+    )
+    
+@router.patch(
+    "/v1/formas-pagamento/{forma_id}",
+    response_model=FormaPagamentoResponse,
+)
+def v1_atualizar_forma_pagamento(
+    forma_id: UUID,
+    data: FormaPagamentoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Atualiza uma forma de pagamento.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.atualizar_forma_pagamento(
+        db,
+        forma_id,
+        data,
+        usuario,
+    )
+    
+@router.delete("/v1/formas-pagamento/{forma_id}")
+def v1_remover_forma_pagamento(
+    forma_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Remove/desativa uma forma de pagamento.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.remover_forma_pagamento(
+        db,
+        forma_id,
+        usuario,
+    )
+    
+@router.get(
+    "/v1/contas-receber",
+    response_model=list[ContaReceberResponse],
+)
+def v1_listar_contas_receber(
+    request: Request,
+    status_filter: Optional[str] = Query(
+        default=None,
+        alias="status",
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Lista contas a receber do terreiro.
+
+    Scope necessário: financeiro:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:read'",
+        )
+
+    return financeiro_service.listar_contas_receber(
+        db,
+        terreiro_id=usuario.terreiro_id,
+        status_filter=status_filter,
+    )
+    
+@router.get(
+    "/v1/contas-receber/{conta_id}",
+    response_model=ContaReceberResponse,
+)
+def v1_obter_conta_receber(
+    conta_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Consulta uma conta a receber.
+
+    Scope necessário: financeiro:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:read'",
+        )
+
+    return financeiro_service.obter_conta_receber(
+        db,
+        conta_id,
+        usuario,
+    )
+    
+@router.post(
+    "/v1/contas-receber",
+    response_model=ContaReceberResponse,
+    status_code=201,
+)
+def v1_criar_conta_receber(
+    data: ContaReceberCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Cria uma conta a receber.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.criar_conta_receber(
+        db,
+        data,
+        usuario,
+    )
+    
+@router.get(
+    "/v1/pagamentos",
+    response_model=list[PagamentoResponse],
+)
+def v1_listar_pagamentos(
+    request: Request,
+    conta_id: Optional[UUID] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Lista pagamentos do terreiro.
+
+    Scope necessário: financeiro:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:read'",
+        )
+
+    return financeiro_service.listar_pagamentos(
+        db,
+        terreiro_id=usuario.terreiro_id,
+        conta_id=conta_id,
+    )
+    
+    
+@router.post(
+    "/v1/contas-receber/{conta_id}/pagamentos",
+    response_model=PagamentoResponse,
+    status_code=201,
+)
+def v1_registrar_pagamento(
+    conta_id: UUID,
+    data: PagamentoCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Registra um pagamento em uma conta a receber.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.registrar_pagamento(
+        db,
+        conta_id,
+        data,
+        usuario,
+    )
+    
+    
+@router.post(
+    "/v1/pagamentos/{pagamento_id}/recibo",
+    response_model=ReciboResponse,
+    status_code=201,
+)
+def v1_gerar_recibo(
+    pagamento_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Gera um recibo para um pagamento.
+
+    Scope necessário: financeiro:write
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:write"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:write'",
+        )
+
+    return financeiro_service.gerar_recibo(
+        db,
+        pagamento_id,
+        usuario,
+    )
+    
+    
+@router.get(
+    "/v1/recibos/{recibo_id}",
+    response_model=ReciboResponse,
+)
+def v1_obter_recibo(
+    recibo_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    [API v1] Consulta um recibo.
+
+    Scope necessário: financeiro:read
+    """
+    usuario, api_key = _get_user_by_api_key(request, db)
+
+    if not verificar_scope(api_key, "financeiro:read"):
+        raise HTTPException(
+            status_code=403,
+            detail="Scope insuficiente: necessário 'financeiro:read'",
+        )
+
+    return financeiro_service.obter_recibo(
+        db,
+        recibo_id,
+        usuario,
     )

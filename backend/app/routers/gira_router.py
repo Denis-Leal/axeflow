@@ -7,7 +7,7 @@ Eventos registrados:
   GIRA_UPDATED  — gira editada (INFO)
   GIRA_DELETED  — gira removida (WARNING)
 """
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -21,23 +21,52 @@ from app.services import audit_service
 from app.services import export_service
 from app.models.usuario import Usuario
 
+from fastapi import HTTPException
+from app.core.security import get_current_user_with_api_key
+from app.services.api_key_service import verificar_scope
+
 router = APIRouter(prefix="/giras", tags=["giras"])
 
 
 @router.get("", response_model=List[GiraResponse])
 def list_giras(
-    user: Usuario = Depends(get_current_user),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+    if api_key is not None:
+        # Verifica se a API Key tem permissão para listar giras
+        if not verificar_scope(api_key, "giras:read"):
+            raise HTTPException(status_code=403, detail="API Key não tem permissão para listar giras")
+    elif user.role not in ("admin", "operador"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Acesso negado. Necessário: admin, operador. "
+                    f"Seu perfil: {user.role}"
+                ),
+            )
     return gira_service.list_giras(db, user.terreiro_id)
 
 
 @router.get("/{gira_id}", response_model=GiraResponse)
 def get_gira(
     gira_id: UUID,
-    user: Usuario = Depends(get_current_user),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+    if api_key is not None:
+        if not verificar_scope(api_key, "giras:read"):
+            raise HTTPException(status_code=403, detail="API Key não tem permissão para ler gira")
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
     return gira_service.get_gira(db, gira_id, user.terreiro_id)
 
 @router.get("/{gira_id}/consumo", response_model=List[GiraResponse])
@@ -54,8 +83,20 @@ def create_gira(
     data: GiraCreate,
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
 ):
+    user, api_key = auth
+    if api_key is not None:
+        if not verificar_scope(api_key, "giras:create"):
+            raise HTTPException(status_code=403, detail="API Key não tem permissão para criar gira")
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
     result = gira_service.create_gira(db, data, user)
 
     audit_service.log(
@@ -76,8 +117,20 @@ def update_gira(
     data: GiraUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
 ):
+    user, api_key = auth
+    if api_key is not None:
+        if not verificar_scope(api_key, "giras:update"):
+            raise HTTPException(status_code=403, detail="API Key não tem permissão para atualizar gira")
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
     result = gira_service.update_gira(db, gira_id, data, user)
 
     audit_service.log(

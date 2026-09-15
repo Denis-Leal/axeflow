@@ -30,6 +30,13 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.shared import Pt
 from dataclasses import dataclass
 
+from app.models.financeiro import (
+    ContaReceber,
+    FormaPagamento,
+    Pagamento,
+    Recibo,
+)
+
 
 COLUMN_WIDTHS = {
     1: 10,
@@ -499,6 +506,476 @@ class ExportFile:
     stream: BytesIO
     filename: str
     media_type: str
+
+def export_recibo_pdf(
+    db: Session,
+    recibo_id: UUID,
+    terreiro_id: UUID,
+) -> ExportFile:
+
+    recibo = (
+        db.query(Recibo)
+        .filter(
+            Recibo.id == recibo_id,
+            Recibo.terreiro_id == terreiro_id,
+        )
+        .first()
+    )
+
+    if not recibo:
+        raise HTTPException(
+            status_code=404,
+            detail="Recibo não encontrado.",
+        )
+
+    pagamento = (
+        db.query(Pagamento)
+        .filter(
+            Pagamento.id == recibo.pagamento_id,
+            Pagamento.terreiro_id == terreiro_id,
+        )
+        .first()
+    )
+
+    if not pagamento:
+        raise HTTPException(
+            status_code=404,
+            detail="Pagamento do recibo não encontrado.",
+        )
+
+    conta = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.id == pagamento.conta_receber_id,
+            ContaReceber.terreiro_id == terreiro_id,
+        )
+        .first()
+    )
+
+    if not conta:
+        raise HTTPException(
+            status_code=404,
+            detail="Conta a receber do recibo não encontrada.",
+        )
+
+    agendamento = conta.agendamento
+
+    if not agendamento:
+        raise HTTPException(
+            status_code=404,
+            detail="Agendamento do recibo não encontrado.",
+        )
+
+    forma_pagamento = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.id == pagamento.forma_pagamento_id,
+            FormaPagamento.terreiro_id == terreiro_id,
+        )
+        .first()
+    )
+
+    if not forma_pagamento:
+        raise HTTPException(
+            status_code=404,
+            detail="Forma de pagamento não encontrada.",
+        )
+
+    consulente = agendamento.consulente
+    atendimento = agendamento.atendimento_tipo
+    terreiro = conta.terreiro
+
+    # --------------------------------------------------------
+    # PDF
+    # --------------------------------------------------------
+
+    output = BytesIO()
+
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    titulo_style = ParagraphStyle(
+        "ReciboTitulo",
+        parent=styles["Title"],
+        alignment=1,
+        fontSize=20,
+        spaceAfter=20,
+    )
+
+    subtitulo_style = ParagraphStyle(
+        "ReciboSubtitulo",
+        parent=styles["Normal"],
+        alignment=1,
+        fontSize=10,
+        textColor=colors.grey,
+        spaceAfter=20,
+    )
+
+    normal_style = ParagraphStyle(
+        "ReciboNormal",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
+    )
+
+    elementos = []
+
+    # --------------------------------------------------------
+    # Cabeçalho
+    # --------------------------------------------------------
+
+    elementos.append(
+        Paragraph(
+            "RECIBO",
+            titulo_style,
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            f"Recibo nº {recibo.numero}",
+            subtitulo_style,
+        )
+    )
+
+    # --------------------------------------------------------
+    # Estabelecimento
+    # --------------------------------------------------------
+
+    nome_terreiro = getattr(
+        terreiro,
+        "nome",
+        "Terreiro",
+    )
+
+    estabelecimento = [
+        [
+            Paragraph("<b>Estabelecimento</b>", normal_style),
+            Paragraph(str(nome_terreiro), normal_style),
+        ],
+    ]
+
+    estabelecimento_table = Table(
+        estabelecimento,
+        colWidths=[
+            4 * cm,
+            12 * cm,
+        ],
+    )
+
+    estabelecimento_table.setStyle(
+        TableStyle(
+            [
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (0, 0),
+                    colors.HexColor("#F5F5F5"),
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey,
+                ),
+                (
+                    "INNERGRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.3,
+                    colors.grey,
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE",
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+            ]
+        )
+    )
+
+    elementos.append(estabelecimento_table)
+
+    elementos.append(
+        Spacer(1, 0.6 * cm)
+    )
+
+    # --------------------------------------------------------
+    # Consulente
+    # --------------------------------------------------------
+
+    nome_consulente = getattr(
+        consulente,
+        "nome",
+        "Não informado",
+    )
+
+    nome_atendimento = getattr(
+        atendimento,
+        "nome",
+        conta.descricao,
+    )
+
+    dados_atendimento = [
+        [
+            Paragraph("<b>Consulente</b>", normal_style),
+            Paragraph(str(nome_consulente), normal_style),
+        ],
+        [
+            Paragraph("<b>Atendimento</b>", normal_style),
+            Paragraph(str(nome_atendimento), normal_style),
+        ],
+        [
+            Paragraph("<b>Data</b>", normal_style),
+            Paragraph(
+                agendamento.inicio.strftime("%d/%m/%Y"),
+                normal_style,
+            ),
+        ],
+        [
+            Paragraph("<b>Horário</b>", normal_style),
+            Paragraph(
+                (
+                    f"{agendamento.inicio.strftime('%H:%M')} "
+                    f"às {agendamento.fim.strftime('%H:%M')}"
+                ),
+                normal_style,
+            ),
+        ],
+    ]
+
+    atendimento_table = Table(
+        dados_atendimento,
+        colWidths=[
+            4 * cm,
+            12 * cm,
+        ],
+    )
+
+    atendimento_table.setStyle(
+        TableStyle(
+            [
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (0, -1),
+                    colors.HexColor("#F5F5F5"),
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey,
+                ),
+                (
+                    "INNERGRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.3,
+                    colors.grey,
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE",
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+            ]
+        )
+    )
+
+    elementos.append(atendimento_table)
+
+    elementos.append(
+        Spacer(1, 0.6 * cm)
+    )
+
+    # --------------------------------------------------------
+    # Pagamento
+    # --------------------------------------------------------
+
+    valor = f"R$ {pagamento.valor:,.2f}"
+    valor = valor.replace(",", "X").replace(".", ",").replace("X", ".")
+
+    dados_pagamento = [
+        [
+            Paragraph("<b>Valor pago</b>", normal_style),
+            Paragraph(valor, normal_style),
+        ],
+        [
+            Paragraph("<b>Forma de pagamento</b>", normal_style),
+            Paragraph(
+                str(forma_pagamento.nome),
+                normal_style,
+            ),
+        ],
+        [
+            Paragraph("<b>Data do pagamento</b>", normal_style),
+            Paragraph(
+                pagamento.data_pagamento.strftime(
+                    "%d/%m/%Y %H:%M"
+                ),
+                normal_style,
+            ),
+        ],
+        [
+            Paragraph("<b>Emitido em</b>", normal_style),
+            Paragraph(
+                recibo.emitido_em.strftime(
+                    "%d/%m/%Y %H:%M"
+                ),
+                normal_style,
+            ),
+        ],
+    ]
+
+    pagamento_table = Table(
+        dados_pagamento,
+        colWidths=[
+            4 * cm,
+            12 * cm,
+        ],
+    )
+
+    pagamento_table.setStyle(
+        TableStyle(
+            [
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (0, -1),
+                    colors.HexColor("#F5F5F5"),
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey,
+                ),
+                (
+                    "INNERGRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.3,
+                    colors.grey,
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE",
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),
+            ]
+        )
+    )
+
+    elementos.append(pagamento_table)
+
+    # --------------------------------------------------------
+    # Observações
+    # --------------------------------------------------------
+
+    if pagamento.observacoes:
+        elementos.append(
+            Spacer(1, 0.6 * cm)
+        )
+
+        elementos.append(
+            Paragraph(
+                "<b>Observações</b>",
+                normal_style,
+            )
+        )
+
+        elementos.append(
+            Spacer(1, 0.2 * cm)
+        )
+
+        elementos.append(
+            Paragraph(
+                str(pagamento.observacoes),
+                normal_style,
+            )
+        )
+
+    # --------------------------------------------------------
+    # Rodapé
+    # --------------------------------------------------------
+
+    elementos.append(
+        Spacer(1, 1.5 * cm)
+    )
+
+    elementos.append(
+        Paragraph(
+            "Documento emitido pelo AxeFlow.",
+            ParagraphStyle(
+                "ReciboRodape",
+                parent=normal_style,
+                alignment=1,
+                fontSize=8,
+                textColor=colors.grey,
+            ),
+        )
+    )
+
+    doc.build(elementos)
+
+    output.seek(0)
+
+    return ExportFile(
+        stream=output,
+        filename=f"recibo-{recibo.numero}.pdf",
+        media_type="application/pdf",
+    )
     
 def export(db: Session, gira_id: UUID, terreiro_id: UUID, formato: str,):
     if formato == "xlsx":

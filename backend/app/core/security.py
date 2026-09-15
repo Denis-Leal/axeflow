@@ -11,6 +11,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.utils.datetime_utils import utcnow
 
+from app.services.api_key_service import autenticar_por_api_key
+
 
 # Contexto responsável por gerar e validar hashes de senha.
 # bcrypt é utilizado para armazenar senhas de forma segura.
@@ -165,17 +167,39 @@ def get_current_user(
     """
     Dependency que autentica o usuário da requisição.
 
-    Fluxo:
-        Header Authorization
-            ↓
-        validação do JWT
-            ↓
-        obtenção do user_id
-            ↓
-        consulta do usuário no banco
-            ↓
-        usuário autenticado
+    Suporta dois tipos de credencial:
+
+        Authorization: Bearer <JWT>
+        Authorization: Bearer axf_<API_KEY>
+
+    JWT:
+        - valida assinatura e expiração;
+        - obtém o user_id;
+        - verifica se o usuário está ativo.
+
+    API Key:
+        - valida o hash da chave;
+        - verifica se está ativa e não expirada;
+        - verifica se o usuário proprietário está ativo.
     """
+
+    token = credentials.credentials
+
+    # API Key do AxeFlow
+    if token.startswith("axf_"):
+        resultado = autenticar_por_api_key(
+            db,
+            token,
+        )
+
+        if resultado is None:
+            raise credentials_exception
+
+        user, _api_key = resultado
+
+        return user
+
+    # JWT tradicional
     user_id = _decode_token(credentials)
 
     return _get_authenticated_user(
@@ -230,3 +254,46 @@ def require_role(*roles: str):
         return user
 
     return checker
+
+def get_current_user_with_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    """
+    Autentica uma requisição através de JWT ou API Key.
+
+    Retorna:
+        (user, api_key)
+
+    Quando a autenticação é JWT:
+        api_key = None
+
+    Quando a autenticação é API Key:
+        api_key = ApiKey autenticada
+    """
+
+    token = credentials.credentials
+
+    # API Key
+    if token.startswith("axf_"):
+        resultado = autenticar_por_api_key(
+            db,
+            token,
+        )
+
+        if resultado is None:
+            raise credentials_exception
+
+        user, api_key = resultado
+
+        return user, api_key
+
+    # JWT
+    user_id = _decode_token(credentials)
+
+    user = _get_authenticated_user(
+        user_id,
+        db,
+    )
+
+    return user, None

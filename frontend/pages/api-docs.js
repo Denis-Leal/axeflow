@@ -23,23 +23,104 @@ const API_BASE = 'https://axeflow-backend.onrender.com';
 
 // ── Scopes disponíveis com metadados visuais ──────────────────────────────────
 const SCOPES_META = {
-  'giras:read':       { cor: '#60a5fa', label: 'Giras — Leitura',         icone: 'bi-eye' },
-  'giras:write':      { cor: '#a78bfa', label: 'Giras — Escrita',         icone: 'bi-pencil' },
-  'inscricoes:read':  { cor: '#34d399', label: 'Inscrições — Leitura',    icone: 'bi-eye' },
-  'inscricoes:write': { cor: '#10b981', label: 'Inscrições — Escrita',    icone: 'bi-pencil' },
-  'presenca:write':   { cor: '#f59e0b', label: 'Presença — Escrita',      icone: 'bi-check2-circle' },
-  'relatorios:read':  { cor: '#d4af37', label: 'Relatórios — Leitura',    icone: 'bi-bar-chart' },
-  'membros:read':     { cor: '#f97316', label: 'Membros — Leitura',       icone: 'bi-people' },
+  'giras:read': {
+    cor: '#60a5fa',
+    label: 'Giras — Leitura',
+    descricao: 'Consultar giras e seus detalhes',
+    icone: 'bi-eye',
+  },
+  'giras:write': {
+    cor: '#a78bfa',
+    label: 'Giras — Escrita',
+    descricao: 'Criar e editar giras',
+    icone: 'bi-pencil',
+  },
+
+  'inscricoes:read': {
+    cor: '#34d399',
+    label: 'Inscrições — Leitura',
+    descricao: 'Consultar inscrições das giras',
+    icone: 'bi-eye',
+  },
+  'inscricoes:write': {
+    cor: '#10b981',
+    label: 'Inscrições — Escrita',
+    descricao: 'Inscrever e cancelar consulentes',
+    icone: 'bi-pencil',
+  },
+
+  'presenca:write': {
+    cor: '#f59e0b',
+    label: 'Presença — Escrita',
+    descricao: 'Marcar presença ou falta',
+    icone: 'bi-check2-circle',
+  },
+
+  'relatorios:read': {
+    cor: '#d4af37',
+    label: 'Relatórios — Leitura',
+    descricao: 'Consultar relatórios e ranking de consulentes',
+    icone: 'bi-bar-chart',
+  },
+
+  'membros:read': {
+    cor: '#f97316',
+    label: 'Membros — Leitura',
+    descricao: 'Consultar membros do terreiro',
+    icone: 'bi-people',
+  },
+
+  'atendimentos:read': {
+    cor: '#22d3ee',
+    label: 'Atendimentos — Leitura',
+    descricao: 'Consultar os tipos de atendimento oferecidos pelo terreiro',
+    icone: 'bi-list-check',
+  },
+  'atendimentos:write': {
+    cor: '#06b6d4',
+    label: 'Atendimentos — Escrita',
+    descricao: 'Criar, editar e remover tipos de atendimento',
+    icone: 'bi-pencil',
+  },
+
+  'agendamentos:read': {
+    cor: '#c084fc',
+    label: 'Agendamentos — Leitura',
+    descricao: 'Consultar agendamentos do terreiro',
+    icone: 'bi-calendar3',
+  },
+  'agendamentos:write': {
+    cor: '#a855f7',
+    label: 'Agendamentos — Escrita',
+    descricao: 'Criar, editar, cancelar e concluir agendamentos',
+    icone: 'bi-calendar-check',
+  },
+
+  'financeiro:read': {
+    cor: '#4ade80',
+    label: 'Financeiro — Leitura',
+    descricao: 'Consultar formas de pagamento, contas a receber, pagamentos e recibos',
+    icone: 'bi-cash-stack',
+  },
+  'financeiro:write': {
+    cor: '#22c55e',
+    label: 'Financeiro — Escrita',
+    descricao: 'Criar, editar e remover formas de pagamento e contas a receber',
+    icone: 'bi-pencil',
+  },
 };
 
 // ── Documentação dos endpoints ────────────────────────────────────────────────
 const ENDPOINTS = [
+  // ─────────────────────────────────────────────────────────────
+  // GIRAS
+  // ─────────────────────────────────────────────────────────────
   {
-    metodo:  'GET',
-    path:    '/v1/giras',
-    scope:   'giras:read',
-    titulo:  'Listar Giras',
-    desc:    'Retorna todas as giras ativas do seu terreiro.',
+    metodo: 'GET',
+    path: '/v1/giras',
+    scope: 'giras:read',
+    titulo: 'Listar Giras',
+    desc: 'Retorna todas as giras ativas do seu terreiro.',
     resposta: `[
   {
     "id": "uuid",
@@ -54,12 +135,16 @@ const ENDPOINTS = [
   }
 ]`,
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // INSCRIÇÕES
+  // ─────────────────────────────────────────────────────────────
   {
-    metodo:  'GET',
-    path:    '/v1/giras/{id}/inscricoes',
-    scope:   'inscricoes:read',
-    titulo:  'Inscrições de uma Gira',
-    desc:    'Retorna a lista de inscrições de consulentes de uma gira específica.',
+    metodo: 'GET',
+    path: '/v1/giras/{id}/inscricoes',
+    scope: 'inscricoes:read',
+    titulo: 'Inscrições de uma Gira',
+    desc: 'Retorna a lista de inscrições de consulentes de uma gira específica.',
     resposta: `[
   {
     "id": "uuid",
@@ -72,11 +157,11 @@ const ENDPOINTS = [
 ]`,
   },
   {
-    metodo:  'POST',
-    path:    '/v1/giras/{slug}/inscrever',
-    scope:   'inscricoes:write',
-    titulo:  'Inscrever Consulente',
-    desc:    'Inscreve um consulente em uma gira pública via slug. Ideal para integrar com WhatsApp.',
+    metodo: 'POST',
+    path: '/v1/giras/{slug}/inscrever',
+    scope: 'inscricoes:write',
+    titulo: 'Inscrever Consulente',
+    desc: 'Inscreve um consulente em uma gira pública via slug. Ideal para integrar com WhatsApp.',
     body: `{
   "nome": "Maria Silva",
   "telefone": "11999999999",
@@ -90,12 +175,16 @@ const ENDPOINTS = [
   "consulente_nome": "Maria Silva"
 }`,
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // RELATÓRIOS
+  // ─────────────────────────────────────────────────────────────
   {
-    metodo:  'GET',
-    path:    '/v1/relatorios/consulentes',
-    scope:   'relatorios:read',
-    titulo:  'Ranking de Consulentes',
-    desc:    'Retorna o ranking de presença de todos os consulentes do terreiro.',
+    metodo: 'GET',
+    path: '/v1/relatorios/consulentes',
+    scope: 'relatorios:read',
+    titulo: 'Ranking de Consulentes',
+    desc: 'Retorna o ranking de presença de todos os consulentes do terreiro.',
     resposta: `[
   {
     "id": "uuid",
@@ -110,17 +199,368 @@ const ENDPOINTS = [
 ]`,
   },
   {
-    metodo:  'PATCH',
-    path:    '/v1/inscricoes/{id}/presenca',
-    scope:   'presenca:write',
-    titulo:  'Marcar Presença',
-    desc:    'Atualiza o status de presença de um consulente após a gira.',
+    metodo: 'PATCH',
+    path: '/v1/inscricoes/{id}/presenca',
+    scope: 'presenca:write',
+    titulo: 'Marcar Presença',
+    desc: 'Atualiza o status de presença de um consulente após a gira.',
     body: `{
   "status": "compareceu"
 }`,
     resposta: `{
   "ok": true,
   "status": "compareceu"
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // ATENDIMENTOS
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'GET',
+    path: '/atendimentos',
+    scope: 'atendimentos:read',
+    titulo: 'Listar Tipos de Atendimento',
+    desc: 'Retorna os tipos de atendimento oferecidos pelo terreiro.',
+    resposta: `[
+  {
+    "id": "uuid",
+    "nome": "Jogo de Búzios",
+    "descricao": "Consulta de orientação espiritual",
+    "valor": 150.00,
+    "tipo_cobranca": "servico",
+    "ativo": true
+  }
+]`,
+  },
+  {
+    metodo: 'POST',
+    path: '/atendimentos',
+    scope: 'atendimentos:write',
+    titulo: 'Criar Tipo de Atendimento',
+    desc: 'Cria um novo tipo de atendimento oferecido pelo terreiro.',
+    body: `{
+  "nome": "Jogo de Búzios",
+  "descricao": "Consulta de orientação espiritual",
+  "valor": 150.00,
+  "tipo_cobranca": "servico"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "nome": "Jogo de Búzios",
+  "descricao": "Consulta de orientação espiritual",
+  "valor": 150.00,
+  "tipo_cobranca": "servico",
+  "ativo": true
+}`,
+  },
+  {
+    metodo: 'PATCH',
+    path: '/atendimentos/{tipo_id}',
+    scope: 'atendimentos:write',
+    titulo: 'Atualizar Tipo de Atendimento',
+    desc: 'Atualiza os dados de um tipo de atendimento existente.',
+    body: `{
+  "nome": "Jogo de Búzios",
+  "valor": 180.00,
+  "ativo": true
+}`,
+    resposta: `{
+  "id": "uuid",
+  "nome": "Jogo de Búzios",
+  "valor": 180.00,
+  "ativo": true
+}`,
+  },
+  {
+    metodo: 'DELETE',
+    path: '/atendimentos/{tipo_id}',
+    scope: 'atendimentos:write',
+    titulo: 'Remover Tipo de Atendimento',
+    desc: 'Remove ou desativa um tipo de atendimento.',
+    resposta: `{
+  "ok": true
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // AGENDAMENTOS
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'GET',
+    path: '/agendamentos',
+    scope: 'agendamentos:read',
+    titulo: 'Listar Agendamentos',
+    desc: 'Retorna os agendamentos do terreiro, podendo filtrar pelo status.',
+    resposta: `[
+  {
+    "id": "uuid",
+    "consulente_id": "uuid",
+    "atendimento_tipo_id": "uuid",
+    "inicio": "2026-09-20T14:00:00",
+    "fim": "2026-09-20T15:00:00",
+    "valor": 150.00,
+    "status": "agendado",
+    "observacoes": "Primeira consulta"
+  }
+]`,
+  },
+  {
+    metodo: 'POST',
+    path: '/agendamentos',
+    scope: 'agendamentos:write',
+    titulo: 'Criar Agendamento',
+    desc: 'Cria um novo agendamento para um consulente.',
+    body: `{
+  "consulente_id": "uuid",
+  "atendimento_tipo_id": "uuid",
+  "inicio": "2026-09-20T14:00:00",
+  "fim": "2026-09-20T15:00:00",
+  "observacoes": "Primeira consulta"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "consulente_id": "uuid",
+  "atendimento_tipo_id": "uuid",
+  "inicio": "2026-09-20T14:00:00",
+  "fim": "2026-09-20T15:00:00",
+  "valor": 150.00,
+  "status": "agendado",
+  "observacoes": "Primeira consulta"
+}`,
+  },
+  {
+    metodo: 'PATCH',
+    path: '/agendamentos/{agendamento_id}',
+    scope: 'agendamentos:write',
+    titulo: 'Atualizar Agendamento',
+    desc: 'Atualiza os dados de um agendamento existente.',
+    body: `{
+  "inicio": "2026-09-20T15:00:00",
+  "fim": "2026-09-20T16:00:00",
+  "observacoes": "Horário atualizado"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "inicio": "2026-09-20T15:00:00",
+  "fim": "2026-09-20T16:00:00",
+  "status": "agendado"
+}`,
+  },
+  {
+    metodo: 'PATCH',
+    path: '/agendamentos/{agendamento_id}/status',
+    scope: 'agendamentos:write',
+    titulo: 'Alterar Status do Agendamento',
+    desc: 'Altera o status de um agendamento.',
+    body: `{
+  "status": "concluido"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "status": "concluido"
+}`,
+  },
+  {
+    metodo: 'POST',
+    path: '/agendamentos/{agendamento_id}/cancelar',
+    scope: 'agendamentos:write',
+    titulo: 'Cancelar Agendamento',
+    desc: 'Cancela um agendamento existente.',
+    resposta: `{
+  "id": "uuid",
+  "status": "cancelado"
+}`,
+  },
+  {
+    metodo: 'POST',
+    path: '/agendamentos/{agendamento_id}/concluir',
+    scope: 'agendamentos:write',
+    titulo: 'Concluir Agendamento',
+    desc: 'Marca um agendamento como concluído.',
+    resposta: `{
+  "id": "uuid",
+  "status": "concluido"
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // FINANCEIRO — FORMAS DE PAGAMENTO
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'GET',
+    path: '/formas-pagamento',
+    scope: 'financeiro:read',
+    titulo: 'Listar Formas de Pagamento',
+    desc: 'Retorna as formas de pagamento cadastradas no terreiro.',
+    resposta: `[
+  {
+    "id": "uuid",
+    "nome": "PIX",
+    "ativo": true
+  },
+  {
+    "id": "uuid",
+    "nome": "Dinheiro",
+    "ativo": true
+  }
+]`,
+  },
+  {
+    metodo: 'POST',
+    path: '/formas-pagamento',
+    scope: 'financeiro:write',
+    titulo: 'Criar Forma de Pagamento',
+    desc: 'Cria uma nova forma de pagamento.',
+    body: `{
+  "nome": "PIX"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "nome": "PIX",
+  "ativo": true
+}`,
+  },
+  {
+    metodo: 'PATCH',
+    path: '/formas-pagamento/{forma_id}',
+    scope: 'financeiro:write',
+    titulo: 'Atualizar Forma de Pagamento',
+    desc: 'Atualiza uma forma de pagamento existente.',
+    body: `{
+  "nome": "PIX",
+  "ativo": true
+}`,
+    resposta: `{
+  "id": "uuid",
+  "nome": "PIX",
+  "ativo": true
+}`,
+  },
+  {
+    metodo: 'DELETE',
+    path: '/formas-pagamento/{forma_id}',
+    scope: 'financeiro:write',
+    titulo: 'Remover Forma de Pagamento',
+    desc: 'Remove ou desativa uma forma de pagamento.',
+    resposta: `{
+  "ok": true
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // FINANCEIRO — CONTAS A RECEBER
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'GET',
+    path: '/contas-receber',
+    scope: 'financeiro:read',
+    titulo: 'Listar Contas a Receber',
+    desc: 'Retorna as contas a receber do terreiro, podendo filtrar pelo status.',
+    resposta: `[
+  {
+    "id": "uuid",
+    "descricao": "Jogo de Búzios — Maria Silva",
+    "valor": 150.00,
+    "status": "pendente",
+    "vencimento": "2026-09-20"
+  }
+]`,
+  },
+  {
+    metodo: 'GET',
+    path: '/contas-receber/{conta_id}',
+    scope: 'financeiro:read',
+    titulo: 'Obter Conta a Receber',
+    desc: 'Retorna os detalhes de uma conta a receber específica.',
+    resposta: `{
+  "id": "uuid",
+  "descricao": "Jogo de Búzios — Maria Silva",
+  "valor": 150.00,
+  "status": "pendente"
+}`,
+  },
+  {
+    metodo: 'POST',
+    path: '/contas-receber',
+    scope: 'financeiro:write',
+    titulo: 'Criar Conta a Receber',
+    desc: 'Cria uma nova conta a receber.',
+    body: `{
+  "descricao": "Jogo de Búzios — Maria Silva",
+  "valor": 150.00,
+  "vencimento": "2026-09-20"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "descricao": "Jogo de Búzios — Maria Silva",
+  "valor": 150.00,
+  "status": "pendente"
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // FINANCEIRO — PAGAMENTOS
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'GET',
+    path: '/pagamentos',
+    scope: 'financeiro:read',
+    titulo: 'Listar Pagamentos',
+    desc: 'Retorna os pagamentos registrados no terreiro.',
+    resposta: `[
+  {
+    "id": "uuid",
+    "conta_id": "uuid",
+    "valor": 150.00,
+    "forma_pagamento_id": "uuid",
+    "data_pagamento": "2026-09-20T15:00:00"
+  }
+]`,
+  },
+  {
+    metodo: 'POST',
+    path: '/contas-receber/{conta_id}/pagamentos',
+    scope: 'financeiro:write',
+    titulo: 'Registrar Pagamento',
+    desc: 'Registra um pagamento vinculado a uma conta a receber.',
+    body: `{
+  "valor": 150.00,
+  "forma_pagamento_id": "uuid"
+}`,
+    resposta: `{
+  "id": "uuid",
+  "conta_id": "uuid",
+  "valor": 150.00,
+  "forma_pagamento_id": "uuid"
+}`,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // FINANCEIRO — RECIBOS
+  // ─────────────────────────────────────────────────────────────
+  {
+    metodo: 'POST',
+    path: '/pagamentos/{pagamento_id}/recibo',
+    scope: 'financeiro:write',
+    titulo: 'Gerar Recibo',
+    desc: 'Gera um recibo para um pagamento registrado.',
+    resposta: `{
+  "id": "uuid",
+  "numero": "REC-2026-000001",
+  "pagamento_id": "uuid"
+}`,
+  },
+  {
+    metodo: 'GET',
+    path: '/recibos/{recibo_id}',
+    scope: 'financeiro:read',
+    titulo: 'Consultar Recibo',
+    desc: 'Retorna os dados de um recibo específico.',
+    resposta: `{
+  "id": "uuid",
+  "numero": "REC-2026-000001",
+  "pagamento_id": "uuid"
 }`,
   },
 ];
@@ -457,23 +897,89 @@ export default function ApiDocs() {
                     </span>
                   </div>
                   <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <p style={{ color: 'var(--cor-texto-suave)', fontSize: '0.88rem', lineHeight: 1.7, margin: 0 }}>
-                      A API do AxeFlow usa <strong style={{ color: 'var(--cor-texto)' }}>API Keys</strong> para
-                      autenticar integrações externas. Inclua a chave em todas as requisições via header HTTP:
+                    <p style={{
+                      color: 'var(--cor-texto-suave)',
+                      fontSize: '0.88rem',
+                      lineHeight: 1.7,
+                      margin: 0,
+                    }}>
+                      As integrações externas do AxeFlow utilizam{' '}
+                      <strong style={{ color: 'var(--cor-texto)' }}>
+                        API Keys
+                      </strong>{' '}
+                      para autenticação. Envie a chave no header{' '}
+                      <code>Authorization</code>{' '}
+                      de cada requisição:
                     </p>
                     <BlocoCodigo codigo={`Authorization: Bearer axf_SUA_CHAVE_AQUI`} />
                     <div style={{
-                      background: 'rgba(212,175,55,0.06)',
-                      border: '1px solid rgba(212,175,55,0.2)',
-                      borderRadius: '8px', padding: '0.75rem 1rem',
-                      display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.6rem',
+                      padding: '0.9rem 1rem',
+                      background: 'rgba(96,165,250,0.06)',
+                      border: '1px solid rgba(96,165,250,0.2)',
+                      borderRadius: '8px',
                     }}>
-                      <i className="bi bi-shield-lock" style={{ color: '#d4af37', flexShrink: 0, marginTop: '1px' }}></i>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)', lineHeight: 1.6 }}>
-                        Cada chave acessa <strong style={{ color: 'var(--cor-texto)' }}>somente os dados do seu terreiro</strong>.
-                        Jamais compartilhe sua chave publicamente. Em caso de vazamento, revogue imediatamente
-                        na aba <em>Minhas Chaves</em>.
+                      <strong style={{
+                        color: 'var(--cor-texto)',
+                        fontSize: '0.82rem',
+                      }}>
+                        Controle de acesso
+                      </strong>
+
+                      <span style={{
+                        color: 'var(--cor-texto-suave)',
+                        fontSize: '0.8rem',
+                        lineHeight: 1.6,
+                      }}>
+                        Cada API Key possui permissões específicas chamadas{' '}
+                        <strong style={{ color: 'var(--cor-texto)' }}>
+                          scopes
+                        </strong>.
+                        A chave só pode executar operações autorizadas pelos scopes
+                        atribuídos a ela.
                       </span>
+
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem',
+                      }}>
+                        {Object.entries(SCOPES_META).map(([scope, meta]) => (
+                          <div
+                            key={scope}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              fontSize: '0.78rem',
+                            }}
+                          >
+                            <i
+                              className={`bi ${meta.icone}`}
+                              style={{
+                                color: meta.cor,
+                                width: '18px',
+                                textAlign: 'center',
+                              }}
+                            />
+
+                            <span style={{
+                              color: 'var(--cor-texto)',
+                              fontWeight: 600,
+                            }}>
+                              {meta.label}
+                            </span>
+
+                            <span style={{
+                              color: 'var(--cor-texto-suave)',
+                            }}>
+                              — {meta.descricao}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <BlocoCodigo
                       codigo={`# URL base da API\n${API_BASE}`}
@@ -642,18 +1148,48 @@ export default function ApiDocs() {
                                 </code>
                               </td>
                               <td>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px',
+                                }}>
                                   {(k.scopes || []).map(s => {
                                     const m = SCOPES_META[s];
+
                                     return (
-                                      <span key={s} style={{
-                                        fontSize: '0.65rem', color: m?.cor || '#94a3b8',
-                                        background: `${m?.cor || '#94a3b8'}12`,
-                                        border: `1px solid ${m?.cor || '#94a3b8'}25`,
-                                        borderRadius: '4px', padding: '0 5px',
-                                      }}>
-                                        {s}
-                                      </span>
+                                      <div
+                                        key={s}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.4rem',
+                                        }}
+                                      >
+                                        <i
+                                          className={`bi ${m?.icone || 'bi-lock'}`}
+                                          style={{
+                                            color: m?.cor || '#94a3b8',
+                                            fontSize: '0.75rem',
+                                          }}
+                                        />
+
+                                        <div>
+                                          <div style={{
+                                            fontSize: '0.72rem',
+                                            color: m?.cor || '#94a3b8',
+                                            fontWeight: 600,
+                                          }}>
+                                            {m?.label || s}
+                                          </div>
+
+                                          <code style={{
+                                            fontSize: '0.62rem',
+                                            color: 'var(--cor-texto-suave)',
+                                          }}>
+                                            {s}
+                                          </code>
+                                        </div>
+                                      </div>
                                     );
                                   })}
                                 </div>
@@ -662,7 +1198,11 @@ export default function ApiDocs() {
                                 <div>{k.request_count || 0} req</div>
                                 {k.last_used_at && (
                                   <div style={{ fontSize: '0.72rem' }}>
-                                    {new Date(k.last_used_at).toLocaleDateString('pt-BR', {timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short'})}
+                                    {new Date(k.last_used_at).toLocaleString('pt-BR', {
+                                      timeZone: 'America/Sao_Paulo',
+                                      dateStyle: 'short',
+                                      timeStyle: 'short'
+                                    })}
                                   </div>
                                 )}
                               </td>
@@ -913,10 +1453,29 @@ print(res.json())  # {"posicao": 5, "status": "confirmado", ...}`} />
                             {selecionado && <i className="bi bi-check" style={{ fontSize: '0.65rem', color: '#fff' }}></i>}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: selecionado ? meta.cor : 'var(--cor-texto)' }}>
+                            <div style={{
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: selecionado ? meta.cor : 'var(--cor-texto)',
+                            }}>
                               {meta.label}
                             </div>
-                            <code style={{ fontSize: '0.7rem', color: 'var(--cor-texto-suave)' }}>{scope}</code>
+
+                            <div style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--cor-texto-suave)',
+                              marginTop: '1px',
+                            }}>
+                              {meta.descricao}
+                            </div>
+
+                            <code style={{
+                              fontSize: '0.65rem',
+                              color: 'var(--cor-texto-suave)',
+                              opacity: 0.75,
+                            }}>
+                              {scope}
+                            </code>
                           </div>
                         </label>
                       );

@@ -18,15 +18,37 @@ from app.schemas.atendimento_schema import (
 )
 from app.services import atendimento_service, audit_service
 
+from fastapi import HTTPException
+from app.core.security import get_current_user_with_api_key
+from app.services.api_key_service import verificar_scope
+
 router = APIRouter(tags=["atendimentos"])
 
 
 @router.get("/atendimentos", response_model=list[AtendimentoTipoResponse])
 def listar_tipos_atendimento(
     ativos: bool = Query(default=False),
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:read"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:read",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     return atendimento_service.listar_tipos(
         db,
         terreiro_id=user.terreiro_id,
@@ -42,9 +64,27 @@ def listar_tipos_atendimento(
 def criar_tipo_atendimento(
     data: AtendimentoTipoCreate,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:create"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:create",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     tipo = atendimento_service.criar_tipo(db, data, user)
     audit_service.log(
         db,
@@ -64,9 +104,27 @@ def atualizar_tipo_atendimento(
     tipo_id: UUID,
     data: AtendimentoTipoUpdate,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:update"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:update",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     tipo = atendimento_service.atualizar_tipo(db, tipo_id, data, user)
     audit_service.log(
         db,
@@ -85,9 +143,27 @@ def atualizar_tipo_atendimento(
 def remover_tipo_atendimento(
     tipo_id: UUID,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:delete"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:delete",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     resultado = atendimento_service.remover_tipo(db, tipo_id, user)
     audit_service.log(
         db,
@@ -105,9 +181,27 @@ def remover_tipo_atendimento(
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
 def listar_agendamentos(
     status_filter: Optional[str] = Query(default=None, alias="status"),
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:read"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:read",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     return atendimento_service.listar_agendamentos(
         db,
         terreiro_id=user.terreiro_id,
@@ -123,9 +217,27 @@ def listar_agendamentos(
 def criar_agendamento(
     data: AgendamentoCreate,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:write",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     agendamento = atendimento_service.criar_agendamento(db, data, user)
     audit_service.log(
         db,
@@ -145,9 +257,27 @@ def atualizar_agendamento(
     agendamento_id: UUID,
     data: AgendamentoUpdate,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:write",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     agendamento = atendimento_service.atualizar_agendamento(db, agendamento_id, data, user)
     audit_service.log(
         db,
@@ -167,9 +297,27 @@ def alterar_status_agendamento(
     agendamento_id: UUID,
     data: AgendamentoStatusUpdate,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:write",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     agendamento = atendimento_service.alterar_status_agendamento(
         db,
         agendamento_id,
@@ -193,9 +341,27 @@ def alterar_status_agendamento(
 def cancelar_agendamento(
     agendamento_id: UUID,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:write",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     agendamento = atendimento_service.alterar_status_agendamento(
         db,
         agendamento_id,
@@ -219,9 +385,27 @@ def cancelar_agendamento(
 def concluir_agendamento(
     agendamento_id: UUID,
     request: Request,
-    user: Usuario = Depends(require_role("admin", "operador")),
+    auth=Depends(get_current_user_with_api_key),
     db: Session = Depends(get_db),
 ):
+    user, api_key = auth
+
+    if api_key is not None:
+        if not verificar_scope(api_key, "atendimentos:write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key sem permissão para atendimentos:write",
+            )
+
+    elif user.role not in ("admin", "operador"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Acesso negado. Necessário: admin, operador. "
+                f"Seu perfil: {user.role}"
+            ),
+        )
+
     agendamento = atendimento_service.alterar_status_agendamento(
         db,
         agendamento_id,

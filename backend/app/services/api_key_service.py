@@ -45,6 +45,18 @@ SCOPES_DISPONIVEIS = {
     "presenca:write":    "Marcar presença/falta",
     "relatorios:read":   "Relatórios e ranking de consulentes",
     "membros:read":      "Leitura de membros do terreiro",
+    
+    # Atendimentos
+    "atendimentos:read": "Leitura de tipos de atendimento",
+    "atendimentos:write": "Criar, editar e remover tipos de atendimento",
+
+    # Agendamentos
+    "agendamentos:read": "Leitura de agendamentos",
+    "agendamentos:write": "Criar, editar e cancelar/concluir agendamentos",
+    
+    # Financeiro
+    "financeiro:read":  "Leitura de informações financeiras",
+    "financeiro:write": "Criar, editar e registrar operações financeiras",
 }
 
 

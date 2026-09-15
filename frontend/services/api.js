@@ -124,6 +124,55 @@ export const updateAgendamentoStatus = (id, status) => api.patch(`/agendamentos/
 export const cancelarAgendamento = (id) => api.post(`/agendamentos/${id}/cancelar`);
 export const concluirAgendamento = (id) => api.post(`/agendamentos/${id}/concluir`);
 
+
+// ── Financeiro ─────────────────────────────────────────
+
+// Formas de pagamento
+export const listFormasPagamento = () =>
+  api.get('/formas-pagamento');
+
+export const createFormaPagamento = (data) =>
+  api.post('/formas-pagamento', data);
+
+export const updateFormaPagamento = (id, data) =>
+  api.patch(`/formas-pagamento/${id}`, data);
+
+export const deleteFormaPagamento = (id) =>
+  api.delete(`/formas-pagamento/${id}`);
+
+// Contas a receber
+export const listContasReceber = () =>
+  api.get('/contas-receber');
+
+export const getContaReceber = (id) =>
+  api.get(`/contas-receber/${id}`);
+
+export const createContaReceber = (data) =>
+  api.post('/contas-receber', data);
+
+// Pagamentos
+export const listPagamentos = (contaId) =>
+  api.get('/pagamentos', {
+    params: contaId
+      ? { conta_id: contaId }
+      : {},
+  });
+
+export const createPagamento = (contaId, data) =>
+  api.post(`/contas-receber/${contaId}/pagamentos`, data);
+
+// Recibos
+export const gerarRecibo = (pagamentoId) =>
+  api.post(`/pagamentos/${pagamentoId}/recibo`);
+
+export const getRecibo = (reciboId) =>
+  api.get(`/recibos/${reciboId}`);
+
+export const getReciboPdf = (reciboId) =>
+  api.get(`/recibos/${reciboId}/pdf`, {
+    responseType: 'blob',
+  });
+
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)              => api.get(`/public/gira/${slug}`);
 export const inscreverPublico = (slug, data)        => api.post(`/public/gira/${slug}/inscrever`, data);

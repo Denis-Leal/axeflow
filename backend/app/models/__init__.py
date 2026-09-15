@@ -39,3 +39,6 @@ from app.models.gira_item_consumption import GiraItemConsumption
 
 # Atendimentos e agendamentos
 from app.models.atendimento import AtendimentoTipo, Agendamento
+
+# Financeiro
+from app.models.financeiro import FormaPagamento, ContaReceber, Pagamento, Recibo
