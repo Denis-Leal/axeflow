@@ -10,6 +10,19 @@ from app.services import consulentes_service
 
 router = APIRouter(prefix="/consulentes", tags=["consulentes"])
 
+@router.post("", status_code=201)
+def criar_consulente(
+    dados: consulente_schema.ConsulenteCreateSchema,
+    user: Usuario = Depends(require_role("admin", "operador")),
+    db: Session = Depends(get_db),
+):
+    return consulentes_service.criar_consulente(
+        db=db,
+        terreiro_id=user.terreiro_id,
+        user_id=user.id,
+        dados=dados,
+    )
+
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
 @router.get("/lista")

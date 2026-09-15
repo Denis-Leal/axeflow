@@ -36,3 +36,6 @@ from app.models.inventory_owner import InventoryOwner
 from app.models.inventory_movement import InventoryMovement
 from app.models.inventory_alert import InventoryAlert
 from app.models.gira_item_consumption import GiraItemConsumption
+
+# Atendimentos e agendamentos
+from app.models.atendimento import AtendimentoTipo, Agendamento

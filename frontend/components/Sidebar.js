@@ -52,6 +52,12 @@ export default function Sidebar() {
         <Link href="/consulentes" className={`nav-item-custom ${isActive('/consulentes')}`}>
           <i className="bi bi-people"></i> Consulentes
         </Link>
+        <Link href="/atendimentos" className={`nav-item-custom ${isActive('/atendimentos')}`}>
+          <i className="bi bi-calendar2-heart"></i> Atendimentos
+        </Link>
+        <Link href="/agendamentos" className={`nav-item-custom ${isActive('/agendamentos')}`}>
+          <i className="bi bi-calendar-check"></i> Agendamentos
+        </Link>
         <Link href="/membros" className={`nav-item-custom ${isActive('/membros')}`}>
           <i className="bi bi-person-badge"></i> Membros
         </Link>

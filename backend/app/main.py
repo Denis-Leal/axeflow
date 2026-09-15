@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import Base, engine, get_db
 from app.routers import (
     auth_router, gira_router, inscricao_router,
-    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router, ajeum_router, inventory_router, consulentes_router
+    public_router, membros_router, push_router, audit_router, contato_router, api_key_router, password_reset_router, ajeum_router, inventory_router, consulentes_router, atendimento_router
 )
 
 # Models importados para o Alembic autogenerate detectar as tabelas
@@ -28,6 +28,7 @@ from app.models.terreiro import Terreiro
 from app.models.usuario import Usuario
 from app.models.gira import Gira
 from app.models.consulente import Consulente
+from app.models.atendimento import AtendimentoTipo, Agendamento
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_membro import InscricaoMembro
 from app.models.push_subscription import PushSubscription
@@ -103,6 +104,7 @@ app.include_router(password_reset_router.router)
 app.include_router(ajeum_router.router)
 app.include_router(inventory_router.router)
 app.include_router(consulentes_router.router)
+app.include_router(atendimento_router.router)
 
 @app.api_route("/ping", methods=["GET", "HEAD"], include_in_schema=False)
 def ping():

@@ -110,6 +110,20 @@ export const updateConsulente = (id, data) => api.put(`/consulentes/${id}`, data
 export const atualizarNotaConsulente = (id, data) => api.patch(`/consulentes/${id}/notas`, data);
 export const deleteConsulente = (id) => api.delete(`/consulentes/${id}`);
 
+// Atendimentos
+export const listAtendimentos = (ativos = false) => api.get('/atendimentos', { params: ativos ? { ativos: true } : {} });
+export const createAtendimento = (data) => api.post('/atendimentos', data);
+export const updateAtendimento = (id, data) => api.patch(`/atendimentos/${id}`, data);
+export const deleteAtendimento = (id) => api.delete(`/atendimentos/${id}`);
+
+// Agendamentos
+export const listAgendamentos = (status) => api.get('/agendamentos', { params: status ? { status } : {} });
+export const createAgendamento = (data) => api.post('/agendamentos', data);
+export const updateAgendamento = (id, data) => api.patch(`/agendamentos/${id}`, data);
+export const updateAgendamentoStatus = (id, status) => api.patch(`/agendamentos/${id}/status`, { status });
+export const cancelarAgendamento = (id) => api.post(`/agendamentos/${id}/cancelar`);
+export const concluirAgendamento = (id) => api.post(`/agendamentos/${id}/concluir`);
+
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)              => api.get(`/public/gira/${slug}`);
 export const inscreverPublico = (slug, data)        => api.post(`/public/gira/${slug}/inscrever`, data);

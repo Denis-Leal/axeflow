@@ -33,6 +33,7 @@ class Consulente(Base):
     terreiro        = relationship("Terreiro", back_populates="consulente")
     # Relacionamento com o novo model separado de inscrição de consulentes
     inscricoes      = relationship("InscricaoConsulente", back_populates="consulente")
+    agendamentos    = relationship("Agendamento", back_populates="consulente")
     deleted_at      : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (
     Index(

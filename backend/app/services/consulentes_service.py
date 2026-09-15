@@ -14,11 +14,37 @@ from app.services.presenca_consulente_service import (
     get_ranking_consulentes,
     get_score_consulente,
 )
+from app.services.inscricao_service import find_or_create_consulente
 from app.utils.datetime_utils import utcnow
 from app.utils.enuns import StatusInscricaoEnum
 
 
 logger = logging.getLogger(__name__)
+
+def criar_consulente(
+    db: Session,
+    terreiro_id: UUID,
+    user_id: UUID,
+    dados: consulente_schema.ConsulenteCreateSchema,
+) -> Consulente:
+    """Cria ou reaproveita consulente ativo seguindo o padrao de inscricoes."""
+
+    consulente = find_or_create_consulente(
+        db=db,
+        nome=dados.nome,
+        telefone=dados.telefone,
+        terreiro_id=terreiro_id,
+        source=dados.source or "cadastro_manual",
+        created_by=user_id,
+        primeira_visita=dados.primeira_visita,
+    )
+
+    if dados.notas is not None:
+        consulente.notas = dados.notas.strip()[:1000] or None
+
+    db.commit()
+    db.refresh(consulente)
+    return consulente
 
 def listar_consulentes(db: Session, terreiro_id: UUID) -> list[dict]:
     """Lista consulentes do terreiro com contagem de inscrições e comparecimentos."""

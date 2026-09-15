@@ -17,3 +17,5 @@ class Terreiro(Base):
     usuarios = relationship("Usuario", back_populates="terreiro")
     giras = relationship("Gira", back_populates="terreiro")
     consulente = relationship("Consulente", back_populates="terreiro")
+    atendimento_tipos = relationship("AtendimentoTipo", back_populates="terreiro")
+    agendamentos = relationship("Agendamento", back_populates="terreiro")
