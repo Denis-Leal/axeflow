@@ -127,21 +127,68 @@ function AtendimentoCard({ item, podeGerenciar, onEdit, onDelete }) {
 export default function AtendimentosPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
+
   const { atendimentos, loading, criar, atualizar, remover } = useAtendimentos();
+
   const [user, setUser] = useState(null);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
   const [busca, setBusca] = useState('');
   const [modalForm, setModalForm] = useState(null);
   const [modalConfirm, setModalConfirm] = useState({ aberto: false });
 
+  const podeGerenciarAtendimentos = ['admin', 'operador'].includes(user?.role);
+
   useEffect(() => {
-    if (!localStorage.getItem('token')) router.push('/login');
-    getMe().then(r => setUser(r.data)).catch(() => {});
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
+
+    getMe()
+      .then(r => {
+        setUser(r.data);
+      })
+      .catch(() => {
+        router.replace('/login');
+      })
+      .finally(() => {
+        setCarregandoUsuario(false);
+      });
   }, [router]);
 
-  const podeGerenciar = ['admin', 'operador'].includes(user?.role);
+  useEffect(() => {
+    if (!carregandoUsuario && user && !podeGerenciarAtendimentos) {
+      toast.error(handleApiError({ message: 'Você não tem permissão para acessar esta página' }));
+      router.replace('/');
+    }
+  }, [carregandoUsuario, user, podeGerenciarAtendimentos, router]);
+
   const filtrados = useMemo(() => (
     atendimentos.filter(item => item.nome?.toLowerCase().includes(busca.toLowerCase()))
   ), [atendimentos, busca]);
+
+  if (carregandoUsuario || !user) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div className="spinner-gold" />
+      </div>
+    );
+  }
+
+  if (!podeGerenciarAtendimentos) {
+    return null;
+  }
+
+  const podeGerenciar = ['admin', 'operador'].includes(user?.role);
 
   const handleSave = (data) => modalForm?.id ? atualizar(modalForm.id, data) : criar(data);
 

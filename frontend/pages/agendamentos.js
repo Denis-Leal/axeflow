@@ -230,18 +230,60 @@ function AgendamentoCard({ item, podeGerenciar, onEdit, onCancelar, onConcluir }
 export default function AgendamentosPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
+
   const [status, setStatus] = useState('');
-  const { agendamentos, loading, criar, atualizar, cancelar, concluir } = useAgendamentos(status || null);
-  const { atendimentos: tiposAtivos } = useAtendimentos({ ativos: true });
-  const [consulentes, setConsulentes] = useState([]);
   const [user, setUser] = useState(null);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+  const [consulentes, setConsulentes] = useState([]);
   const [busca, setBusca] = useState('');
   const [modalForm, setModalForm] = useState(null);
   const [modalConfirm, setModalConfirm] = useState({ aberto: false });
 
+  const podeGerenciarAgendamentos = ['admin', 'operador'].includes(user?.role);
 
-  // Abre o modal de novo agendamento quando
-  // a página é acessada através de /agendamentos?action=novo
+  const {
+    agendamentos,
+    loading,
+    criar,
+    atualizar,
+    cancelar,
+    concluir,
+  } = useAgendamentos(status || null);
+
+  const { atendimentos: tiposAtivos } = useAtendimentos({ ativos: true });
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
+
+    getMe()
+      .then(r => {
+        setUser(r.data);
+      })
+      .catch(() => {
+        router.replace('/login');
+      })
+      .finally(() => {
+        setCarregandoUsuario(false);
+      });
+  }, [router]);
+
+  useEffect(() => {
+    if (!carregandoUsuario && user && !podeGerenciarAgendamentos) {
+      toast.error(handleApiError({ message: 'Você não tem permissão para acessar esta página' }));
+      router.replace('/');
+    }
+  }, [
+    carregandoUsuario,
+    user,
+    podeGerenciarAgendamentos,
+    router,
+  ]);
+
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -249,26 +291,34 @@ export default function AgendamentosPage() {
       setModalForm({});
     }
   }, [router.isReady, router.query.action]);
-  
-  const carregarConsulentes = async () => {
-    const res = await listConsulentes();
-    setConsulentes(res.data || []);
-  };
 
-  useEffect(() => {
-    if (!localStorage.getItem('token')) router.push('/login');
-    getMe().then(r => setUser(r.data)).catch(() => {});
-    carregarConsulentes().catch(() => {});
-  }, [router]);
-
-  const podeGerenciar = ['admin', 'operador'].includes(user?.role);
-
-  const filtrados = useMemo(() => (
+    const filtrados = useMemo(() => (
     agendamentos.filter(item => {
       const alvo = `${item.consulente?.nome || ''} ${item.atendimento_tipo?.nome || ''}`.toLowerCase();
       return alvo.includes(busca.toLowerCase());
     })
   ), [agendamentos, busca]);
+
+  if (carregandoUsuario || !user) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div className="spinner-gold" />
+      </div>
+    );
+  }
+
+  if (!podeGerenciarAgendamentos) {
+    return null;
+  }
+
+  const podeGerenciar = ['admin', 'operador'].includes(user?.role);
 
   const handleSave = (data) => modalForm?.id ? atualizar(modalForm.id, data) : criar(data);
 

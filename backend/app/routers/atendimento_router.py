@@ -24,7 +24,7 @@ router = APIRouter(tags=["atendimentos"])
 @router.get("/atendimentos", response_model=list[AtendimentoTipoResponse])
 def listar_tipos_atendimento(
     ativos: bool = Query(default=False),
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
     return atendimento_service.listar_tipos(
@@ -105,7 +105,7 @@ def remover_tipo_atendimento(
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
 def listar_agendamentos(
     status_filter: Optional[str] = Query(default=None, alias="status"),
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
     return atendimento_service.listar_agendamentos(
