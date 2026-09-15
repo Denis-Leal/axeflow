@@ -104,7 +104,7 @@ function AtendimentoCard({ item, podeGerenciar, onEdit, onDelete }) {
     <div style={{ background: 'var(--cor-card)', border: '1px solid var(--cor-borda)', borderRadius: 10, padding: '0.85rem', marginBottom: '0.75rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
         <div>
-          <strong>{item.nome}</strong>
+          <strong style={{color: 'white'}}>{item.nome}</strong>
           <div style={{ color: 'var(--cor-texto-suave)', fontSize: '0.8rem', marginTop: 2 }}>{item.descricao || 'Sem descrição'}</div>
         </div>
         <StatusBadge ativo={item.ativo} />
