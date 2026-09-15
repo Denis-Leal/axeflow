@@ -241,6 +241,15 @@ export default function AgendamentosPage() {
 
   const podeGerenciarAgendamentos = ['admin', 'operador'].includes(user?.role);
 
+  const carregarConsulentes = async () => {
+    try {
+      const res = await listConsulentes();
+      setConsulentes(res.data || []);
+    } catch (err) {
+      toast.error(handleApiError(err, 'Carregar consulentes'));
+    }
+  };
+
   const {
     agendamentos,
     loading,
@@ -263,6 +272,9 @@ export default function AgendamentosPage() {
     getMe()
       .then(r => {
         setUser(r.data);
+        if (['admin', 'operador'].includes(r.data?.role)) {
+        carregarConsulentes();
+      }
       })
       .catch(() => {
         router.replace('/login');
@@ -274,7 +286,7 @@ export default function AgendamentosPage() {
 
   useEffect(() => {
     if (!carregandoUsuario && user && !podeGerenciarAgendamentos) {
-      toast.error(handleApiError({ message: 'Você não tem permissão para acessar esta página' }));
+      toast.error('Você não tem permissão para acessar esta página');
       router.replace('/');
     }
   }, [

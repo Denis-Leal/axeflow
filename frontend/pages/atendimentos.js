@@ -160,7 +160,7 @@ export default function AtendimentosPage() {
 
   useEffect(() => {
     if (!carregandoUsuario && user && !podeGerenciarAtendimentos) {
-      toast.error(handleApiError({ message: 'Você não tem permissão para acessar esta página' }));
+      toast.error('Você não tem permissão para acessar esta página');
       router.replace('/');
     }
   }, [carregandoUsuario, user, podeGerenciarAtendimentos, router]);
