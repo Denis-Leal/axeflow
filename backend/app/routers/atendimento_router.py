@@ -204,7 +204,7 @@ def listar_agendamentos(
 
     return atendimento_service.listar_agendamentos(
         db,
-        terreiro_id=user.terreiro_id,
+        user=user,
         status_filter=status_filter,
     )
 

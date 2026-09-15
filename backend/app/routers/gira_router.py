@@ -38,7 +38,7 @@ def list_giras(
         # Verifica se a API Key tem permissão para listar giras
         if not verificar_scope(api_key, "giras:read"):
             raise HTTPException(status_code=403, detail="API Key não tem permissão para listar giras")
-    elif user.role not in ("admin", "operador"):
+    elif user.role not in ("admin", "operador", "membro"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(

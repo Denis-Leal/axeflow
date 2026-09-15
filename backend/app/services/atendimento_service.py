@@ -133,6 +133,27 @@ def _agendamento_to_dict(agendamento: Agendamento) -> dict:
         "consulente": agendamento.consulente,
         "atendimento_tipo": agendamento.atendimento_tipo,
     }
+    
+def _get_agendamento(db: Session, agendamento_id: UUID, user: Usuario,) -> Agendamento:
+    query = db.query(Agendamento).filter(
+        Agendamento.id == agendamento_id,
+        Agendamento.terreiro_id == user.terreiro_id,
+    )
+
+    if user.role == "operador":
+        query = query.filter(
+            Agendamento.created_by == user.id
+        )
+
+    agendamento = query.first()
+
+    if not agendamento:
+        raise HTTPException(
+            status_code=404,
+            detail="Agendamento nao encontrado",
+        )
+
+    return agendamento
 
 
 def listar_tipos(db: Session, terreiro_id: UUID, somente_ativos: bool = False) -> list[dict]:
@@ -227,21 +248,33 @@ def remover_tipo(db: Session, tipo_id: UUID, user: Usuario) -> dict:
     return {"ok": True, "desativado": False}
 
 
-def listar_agendamentos(db: Session, terreiro_id: UUID, status_filter: str | None = None) -> list[dict]:
+def listar_agendamentos(db: Session, user: Usuario, status_filter: str | None = None,) -> list[dict]:
     query = (
         db.query(Agendamento)
         .options(
             joinedload(Agendamento.consulente),
             joinedload(Agendamento.atendimento_tipo),
         )
-        .filter(Agendamento.terreiro_id == terreiro_id)
+        .filter(
+            Agendamento.terreiro_id == user.terreiro_id
+        )
         .order_by(Agendamento.inicio.desc())
     )
 
-    if status_filter:
-        query = query.filter(Agendamento.status == status_filter)
+    if user.role == "operador":
+        query = query.filter(
+            Agendamento.created_by == user.id
+        )
 
-    return [_agendamento_to_dict(agendamento) for agendamento in query.all()]
+    if status_filter:
+        query = query.filter(
+            Agendamento.status == status_filter
+        )
+
+    return [
+        _agendamento_to_dict(agendamento)
+        for agendamento in query.all()
+    ]
 
 
 def criar_agendamento(db: Session, data: AgendamentoCreate, user: Usuario) -> Agendamento:
@@ -279,20 +312,9 @@ def criar_agendamento(db: Session, data: AgendamentoCreate, user: Usuario) -> Ag
     return agendamento
 
 
-def atualizar_agendamento(
-    db: Session,
-    agendamento_id: UUID,
-    data: AgendamentoUpdate,
-    user: Usuario,
-) -> Agendamento:
-    agendamento = (
-        db.query(Agendamento)
-        .filter(
-            Agendamento.id == agendamento_id,
-            Agendamento.terreiro_id == user.terreiro_id,
-        )
-        .first()
-    )
+def atualizar_agendamento(db: Session, agendamento_id: UUID, data: AgendamentoUpdate, user: Usuario,) -> Agendamento:
+    agendamento = _get_agendamento(db, agendamento_id, user,)
+    
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
 
@@ -337,14 +359,8 @@ def alterar_status_agendamento(
     novo_status: str,
     user: Usuario,
 ) -> Agendamento:
-    agendamento = (
-        db.query(Agendamento)
-        .filter(
-            Agendamento.id == agendamento_id,
-            Agendamento.terreiro_id == user.terreiro_id,
-        )
-        .first()
-    )
+    agendamento = _get_agendamento(db, agendamento_id, user,)
+    
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
 
