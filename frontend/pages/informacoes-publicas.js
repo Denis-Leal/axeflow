@@ -142,7 +142,7 @@ export default function InformacoesPublicas() {
               O perfil é privado por padrão. Ative-o somente quando estiver
               pronto para aparecer no portal.
             </div>
-            {toastContainer}
+
             <div className="row g-4">
               <div className="col-lg-7">
                 <form className="card-custom p-4" onSubmit={salvar}>
