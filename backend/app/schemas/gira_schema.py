@@ -26,6 +26,7 @@ class GiraCreate(BaseModel):
     abertura_lista: Optional[datetime] = None
     fechamento_lista: Optional[datetime] = None
     responsavel_lista_id: Optional[UUID] = None
+    visivel_portal: bool = False
 
 
 class GiraUpdate(BaseModel):
@@ -40,6 +41,7 @@ class GiraUpdate(BaseModel):
     fechamento_lista: Optional[datetime] = None
     status: Optional[str] = None
     responsavel_lista_id: Optional[UUID] = None
+    visivel_portal: Optional[bool] = None
 
     @model_validator(mode="after")
     def validar_consistencia(self):
@@ -65,6 +67,7 @@ class GiraResponse(BaseModel):
     fechamento_lista: Optional[datetime] = None
     status: StatusGiraEnum
     slug_publico: Optional[str] = None
+    visivel_portal: bool = False
     terreiro_id: UUID
     responsavel_lista_id: Optional[UUID] = None
     responsavel_lista_nome: Optional[str] = None

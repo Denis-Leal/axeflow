@@ -196,6 +196,7 @@ function mappedGira(g) {
     titulo:               g.titulo || '',
     tipo:                 g.tipo || '',
     acesso:               g.acesso || 'publica',
+    visivel_portal:       g.visivel_portal || false,
     data:                 g.data || '',
     horario:              g.horario ? g.horario.slice(0, 5) : '',
     limite_consulentes:   g.limite_consulentes || 20,
@@ -305,6 +306,7 @@ useEffect(() => {
             abertura_lista: form.acesso !== 'fechada' ? localDatetimeToUTC(form.abertura_lista) : null,
             fechamento_lista: form.acesso !== 'fechada' ? localDatetimeToUTC(form.fechamento_lista) : null,
             responsavel_lista_id: form.acesso !== 'fechada' ? form.responsavel_lista_id || null : null,
+            visivel_portal: form.acesso !== 'fechada' ? form.visivel_portal : false,
           };
 
           const initialNormalized = normalize(initialForm);
@@ -472,6 +474,13 @@ useEffect(() => {
 
                       {form.acesso !== 'fechada' && (
                         <>
+                          <div className="col-12">
+                            <label style={{ display:'flex', gap:'.65rem', alignItems:'center', color:'var(--cor-texto)', cursor:'pointer' }}>
+                              <input type="checkbox" checked={form.visivel_portal}
+                                onChange={e => set('visivel_portal', e.target.checked)} />
+                              <span><b>Exibir no Portal Público AxeFlow</b><small className="d-block" style={{color:'var(--cor-texto-suave)'}}>O link direto continua funcionando mesmo se esta opção estiver desativada.</small></span>
+                            </label>
+                          </div>
                           <div className="col-md-6">
                             <label className="form-label-custom">Responsável pela lista</label>
                             <select className="form-control-custom" value={form.responsavel_lista_id}

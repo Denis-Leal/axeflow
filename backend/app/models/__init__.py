@@ -5,6 +5,7 @@ Importa todos os models para que o Alembic e o SQLAlchemy os detectem.
 ORDEM: models referenciados por ForeignKey devem vir antes dos que os usam.
 """
 from app.models.terreiro import Terreiro
+from app.models.publicacao_terreiro import PublicacaoTerreiro
 from app.models.usuario import Usuario
 from app.models.gira import Gira
 from app.models.consulente import Consulente

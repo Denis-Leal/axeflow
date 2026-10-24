@@ -66,6 +66,11 @@ export default function Sidebar() {
         <Link href="/inventario" className={`nav-item-custom ${isActive('/inventario') || isActive('/estoque') || isActive('/gira/')}`}>
           <i className="bi bi-box-seam"></i> Estoque
         </Link>
+        {(user?.role === 'admin' || user?.role === 'operador') && (
+          <Link href="/informacoes-publicas" className={`nav-item-custom ${isActive('/informacoes-publicas')}`}>
+            <i className="bi bi-globe2"></i> Informações públicas
+          </Link>
+        )}
 
         {/* Divisor ornamental */}
         <div className="divider-ornamental" style={{ margin: '1rem 1.5rem' }}>

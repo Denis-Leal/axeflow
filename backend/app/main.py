@@ -32,10 +32,12 @@ from app.routers import (
     consulentes_router, 
     atendimento_router,
     financeiro_router,
+    public_portal_router,
 )
 
 # Models importados para o Alembic autogenerate detectar as tabelas
 from app.models.terreiro import Terreiro
+from app.models.publicacao_terreiro import PublicacaoTerreiro
 from app.models.usuario import Usuario
 from app.models.gira import Gira
 from app.models.consulente import Consulente
@@ -117,6 +119,7 @@ app.include_router(inventory_router.router)
 app.include_router(consulentes_router.router)
 app.include_router(atendimento_router.router)
 app.include_router(financeiro_router.router)
+app.include_router(public_portal_router.router)
 
 @app.api_route("/ping", methods=["GET", "HEAD"], include_in_schema=False)
 def ping():

@@ -85,6 +85,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
         fechamento_lista=data.fechamento_lista if is_publica else None,
         responsavel_lista_id=data.responsavel_lista_id,
         slug_publico=slug,
+        visivel_portal=data.visivel_portal if is_publica else False,
     )
     db.add(gira)
     db.commit()

@@ -24,6 +24,7 @@ const PAGINAS_MAIS = [
   '/api-docs',
   '/inventario',
   '/estoque',
+  '/informacoes-publicas',
 ];
 
 // Itens administrativos/secundários
@@ -52,6 +53,7 @@ const ITENS_MAIS = [
 
 // Itens de administração
 const ITENS_ADMINISTRACAO = [
+  { href: '/informacoes-publicas', icon: 'bi-globe2', label: 'Informações públicas' },
   {
     href: '/configuracoes',
     icon: 'bi-gear',

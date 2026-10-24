@@ -49,6 +49,7 @@ class Gira(Base):
     status               : Mapped[StatusGiraEnum] = mapped_column(Enum(StatusGiraEnum), default=StatusGiraEnum.aberta)
     acesso               : Mapped[AcessoGiraEnum] = mapped_column(Enum(AcessoGiraEnum), default=AcessoGiraEnum.publica)
     slug_publico         : Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    visivel_portal       : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at           : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at           : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     deleted_at           : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

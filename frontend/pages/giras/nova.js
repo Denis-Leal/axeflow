@@ -27,6 +27,7 @@ export default function NovaGira() {
     limite_membros: 0,
     abertura_lista: '', fechamento_lista: '',
     responsavel_lista_id: '',
+    visivel_portal: false,
   });
   const [membros, setMembros] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -175,6 +176,13 @@ export default function NovaGira() {
                   {/* Abertura e Fechamento — apenas giras públicas */}
                   {form.acesso === 'publica' && (
                   <div className="row g-3 mb-4">
+                    <div className="col-12">
+                      <label style={{ display:'flex', gap:'.65rem', alignItems:'center', color:'var(--cor-texto)', cursor:'pointer' }}>
+                        <input type="checkbox" checked={form.visivel_portal}
+                          onChange={e => setForm({ ...form, visivel_portal: e.target.checked })} />
+                        <span><b>Divulgar no Portal Público AxeFlow</b><small className="d-block" style={{color:'var(--cor-texto-suave)'}}>A gira também aparecerá para visitantes que descobrirem seu terreiro pelo portal.</small></span>
+                      </label>
+                    </div>
                     {/* Responsável pela lista */}
                   <FormField label={"Responsável pela Lista (opcional)"} hint="Membro responsável por gerenciar as inscrições desta gira" required={true}>
                     <select

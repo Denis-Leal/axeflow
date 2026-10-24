@@ -176,6 +176,14 @@ export const getReciboPdf = (reciboId) =>
 // ── Público ───────────────────────────────────────────
 export const getGiraPublica   = (slug)              => api.get(`/public/gira/${slug}`);
 export const inscreverPublico = (slug, data)        => api.post(`/public/gira/${slug}/inscrever`, data);
+export const getPerfilPublico = () => api.get('/informacoes-publicas/perfil');
+export const salvarPerfilPublico = (data) => api.put('/informacoes-publicas/perfil', data);
+export const listPublicacoes = () => api.get('/informacoes-publicas/publicacoes');
+export const criarPublicacao = (data) => api.post('/informacoes-publicas/publicacoes', data);
+export const atualizarPublicacao = (id, data) => api.patch(`/informacoes-publicas/publicacoes/${id}`, data);
+export const excluirPublicacao = (id) => api.delete(`/informacoes-publicas/publicacoes/${id}`);
+export const explorarPortal = (params) => api.get('/public/portal/explorar', { params });
+export const getTerreiroPublico = (slug) => api.get(`/public/portal/terreiros/${slug}`);
 export const inscreverInterno = (giraId, data)      => api.post(`/gira/${giraId}/inscrever/interno`, data);
 export const buscarNome       = (value)             => api.get(`/consulentes/search?q=${encodeURIComponent(value)}`);
 

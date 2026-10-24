@@ -1,11 +1,1 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/dashboard": "pages/dashboard.js",
-  "/": "pages/index.js",
-  "/giras": "pages/giras.js",
-  "/configuracoes": "pages/configuracoes.js",
-  "/consulentes": "pages/consulentes.js",
-  "/giras/nova": "pages/giras/nova.js"
-}
+{"/_error":"pages/_error.js","/_app":"pages/_app.js","/agendamentos":"pages/agendamentos.html","/api-docs":"pages/api-docs.html","/atendimentos":"pages/atendimentos.html","/configuracoes":"pages/configuracoes.html","/consulentes":"pages/consulentes.html","/consulentes/[id]":"pages/consulentes/[id].html","/dashboard":"pages/dashboard.html","/contato":"pages/contato.html","/esqueci-senha":"pages/esqueci-senha.html","/estoque":"pages/estoque.html","/financeiro":"pages/financeiro.html","/giras":"pages/giras.html","/giras/[id]":"pages/giras/[id].html","/giras/editar/[id]":"pages/giras/editar/[id].html","/giras/[id]/consumo":"pages/giras/[id]/consumo.html","/giras/nova":"pages/giras/nova.html","/informacoes-publicas":"pages/informacoes-publicas.html","/":"pages/index.html","/inventario":"pages/inventario.html","/giras/[id]/inscricoes":"pages/giras/[id]/inscricoes.html","/login":"pages/login.html","/membros":"pages/membros.html","/membros/[id]":"pages/membros/[id].html","/registro":"pages/registro.html","/redefinir-senha":"pages/redefinir-senha.html","/_document":"pages/_document.js","/portal":"pages/portal.js","/portal/[slug]":"pages/portal/[slug].js","/sobre":"pages/sobre.html","/public/[slug]":"pages/public/[slug].js","/404":"pages/404.html"}
