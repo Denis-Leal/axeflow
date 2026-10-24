@@ -26,6 +26,19 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 export default function App({ Component, pageProps }) {
+  const host =
+  typeof window !== 'undefined'
+    ? window.location.hostname.toLowerCase()
+    : '';
+
+  const isPortal =
+    host === 'portal.axeflow.dbltech.com.br' ||
+    host === 'www.portal.axeflow.dbltech.com.br';
+
+  const manifestHref = isPortal
+    ? '/manifest-portal.json'
+    : '/manifest.json';
+    
   const isMobile = useIsMobile();
   const router = useRouter();
   // Ref para evitar múltiplos registros do listener entre re-renders
@@ -142,7 +155,7 @@ useEffect(() => {
         <meta name="theme-color" content="#1e1040" />
         <link rel="icon" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href={manifestHref} />
       </Head>
       {/*
         GiraProvider envolve toda a aplicação para que qualquer página
