@@ -2,5 +2,12 @@
   "pages\\_app.js -> firebase/messaging": {
     "id": 2806,
     "files": []
+  },
+  "pages\\informacoes-publicas.js -> ../components/portal/LocationMapPicker": {
+    "id": 9123,
+    "files": [
+      "static/chunks/0b7b90cd.abad55a865e4a8c0.js",
+      "static/chunks/123.4ee98f543289bb40.js"
+    ]
   }
 }
