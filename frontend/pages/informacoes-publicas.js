@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import Head from "next/head";
 import Sidebar from "../components/Sidebar";
 import BottomNav from "../components/BottomNav";
+import { toast } from 'react-toastify';
 import {
   criarPublicacao,
   excluirPublicacao,
@@ -58,7 +59,7 @@ export default function InformacoesPublicas() {
     try {
       const r = await salvarPerfilPublico(perfil);
       setPerfil({ ...vazio, ...r.data });
-      setMsg("Informações públicas salvas.");
+      toast.success("Informações públicas salvas.");
     } catch (e) {
       setMsg(e.response?.data?.detail || "Não foi possível salvar.");
     }
