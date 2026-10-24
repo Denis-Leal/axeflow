@@ -19,6 +19,7 @@ from app.services.inventory_service import finalizar_gira
 from app.utils.datetime_utils import utcnow
 from typing import Optional
 from app.models.gira_item_consumption import ConsumptionStatusEnum, GiraItemConsumption
+from app.models.terreiro import Terreiro
 from typing import List
 
 def _count_inscritos(db: Session, gira: Gira) -> int:
@@ -90,6 +91,7 @@ def create_gira(db: Session, data: GiraCreate, user: Usuario) -> GiraResponse:
     db.add(gira)
     db.commit()
     db.refresh(gira)
+    _enqueue_portal_gira(db, gira, "published")
 
     data_fmt     = gira.data.strftime("%d/%m/%Y")
     horario_fmt  = gira.horario.strftime("%H:%M")
@@ -179,6 +181,10 @@ def update_gira(db: Session, gira_id: UUID, data: GiraUpdate, user: Usuario) -> 
 
     db.commit()
     db.refresh(gira)
+    if _is_portal_gira(gira) and ("visivel_portal" in campos_alterados or "acesso" in campos_alterados or "status" in campos_alterados):
+        _enqueue_portal_gira(db, gira, "published")
+    elif _is_portal_gira(gira) and ("data" in campos_alterados or "horario" in campos_alterados):
+        _enqueue_portal_gira(db, gira, "changed")
     
     usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
     if user.id:
@@ -329,8 +335,11 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID, usuario_id: UUID)
         raise HTTPException(status_code=404, detail="Gira não encontrada")
 
     titulo = gira.titulo
+    was_portal = _is_portal_gira(gira)
     gira.deleted_at = utcnow()
     db.commit()
+    if was_portal:
+        _enqueue_portal_gira(db, gira, "cancelled")
     
     usuario = None  # Placeholder — implementar busca do usuário logado via usuario_id se necessário
     if usuario_id:
@@ -354,3 +363,21 @@ def delete_gira(db: Session, gira_id: UUID, terreiro_id: UUID, usuario_id: UUID)
     )
 
     return {"ok": True}
+
+
+def _is_portal_gira(gira: Gira) -> bool:
+    return bool(gira.visivel_portal and gira.acesso == AcessoGiraEnum.publica and gira.status == StatusGiraEnum.aberta)
+
+
+def _enqueue_portal_gira(db: Session, gira: Gira, transition: str) -> None:
+    if transition != "cancelled" and not _is_portal_gira(gira):
+        return
+    terreiro = db.get(Terreiro, gira.terreiro_id)
+    if not terreiro or not terreiro.publico_ativo or not terreiro.slug_publico:
+        return
+    from app.services.public_push_service import enqueue
+    when = f"{gira.data.strftime('%d/%m/%Y')} às {gira.horario.strftime('%H:%M')}"
+    labels = {"published": ("Nova gira pública", f"{gira.titulo} — {when}"), "changed": ("Gira alterada", f"{gira.titulo}: {when}"), "cancelled": ("Gira cancelada", gira.titulo)}
+    title, body = labels[transition]
+    key = f"gira:{transition}:{gira.id}:{gira.updated_at.isoformat() if transition == 'changed' else 'v1'}"
+    enqueue(db, gira.terreiro_id, key, {"context": "portal", "title": f"{terreiro.nome}: {title}", "body": body, "url": f"/portal/{terreiro.slug_publico}", "content_type": "gira", "content_id": str(gira.id)})

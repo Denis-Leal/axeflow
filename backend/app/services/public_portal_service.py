@@ -58,6 +58,8 @@ def create_publicacao(db: Session, terreiro_id: UUID, data: PublicacaoCreate):
         values["publicado_em"] = utcnow()
     item = PublicacaoTerreiro(terreiro_id=terreiro_id, **values)
     db.add(item); db.commit(); db.refresh(item)
+    if item.publicado:
+        _enqueue_publicacao_push(db, item)
     return item
 
 
@@ -70,7 +72,20 @@ def update_publicacao(db: Session, terreiro_id: UUID, publicacao_id: UUID, data:
         item.publicado_em = utcnow()
     for key, value in values.items(): setattr(item, key, value)
     db.commit(); db.refresh(item)
+    if values.get("publicado") is True and item.publicado_em:
+        _enqueue_publicacao_push(db, item)
     return item
+
+
+def _enqueue_publicacao_push(db: Session, item: PublicacaoTerreiro) -> None:
+    terreiro = db.get(Terreiro, item.terreiro_id)
+    if not terreiro or not terreiro.publico_ativo or not terreiro.slug_publico:
+        return
+    from app.services.public_push_service import enqueue
+    enqueue(db, item.terreiro_id, f"publicacao:published:{item.id}", {
+        "context": "portal", "title": terreiro.nome, "body": item.titulo[:180],
+        "url": f"/portal/{terreiro.slug_publico}", "content_type": "publicacao", "content_id": str(item.id),
+    })
 
 
 def delete_publicacao(db: Session, terreiro_id: UUID, publicacao_id: UUID):

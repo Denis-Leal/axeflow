@@ -78,6 +78,12 @@ def _purge_audit_logs() -> None:
         db.close()
 
 
+def _retry_public_push_events() -> None:
+    """Retries the durable portal push outbox without adding another service."""
+    from app.services.public_push_service import process_pending
+    process_pending()
+
+
 def start_scheduler() -> None:
     """
     Inicia o scheduler em background.
@@ -101,6 +107,14 @@ def start_scheduler() -> None:
         # misfire_grace_time: se o processo estava dormindo no horário agendado
         # (comum no plano free do Render), executa assim que acordar
         misfire_grace_time=3600,
+    )
+    _scheduler.add_job(
+        func=_retry_public_push_events,
+        trigger="interval",
+        minutes=10,
+        id="retry_public_push_events",
+        name="Reprocessamento de notificações públicas",
+        replace_existing=True,
     )
 
     _scheduler.start()

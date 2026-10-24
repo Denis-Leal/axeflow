@@ -1,47 +1,26 @@
-// public/firebase-messaging-sw.js
-
 importScripts("https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js");
 
-firebase.initializeApp({
-    apiKey: "AIzaSyDbrC_QQffBttmg0W2POqv41ls6Abb4BIA",//process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: "axeflow-6546a.firebaseapp.com", //process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: "axeflow-6546a", //process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: "axeflow-6546a.firebasestorage.app", //process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: "412400342317", //process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: "1:412400342317:web:1daa7a2f0e801e6bb92fa4", //process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    measurementId: "G-GNC45K00S9"
+firebase.initializeApp({ apiKey: "AIzaSyDbrC_QQffBttmg0W2POqv41ls6Abb4BIA", authDomain: "axeflow-6546a.firebaseapp.com", projectId: "axeflow-6546a", storageBucket: "axeflow-6546a.firebasestorage.app", messagingSenderId: "412400342317", appId: "1:412400342317:web:1daa7a2f0e801e6bb92fa4" });
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  const data = payload.data || {};
+  self.registration.showNotification(data.title || "AxeFlow", { body: data.body || "", icon: data.icon || "/icons/icon-192.png", badge: "/icons/notification-icon.png", data: { url: data.url || "/", context: data.context || "internal" } });
 });
 
-const messaging = firebase.messaging();
-const channel = new BroadcastChannel('push_channel');
-messaging.onBackgroundMessage(function(payload) {
-  const data = payload.data || {};
-  console.log("[Push] Background:", payload);
-
-  // 🔴 App fechado → mostra notificação
-  self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || '/icons/icon-192.png',
-      badge: data.badge || '/icons/notification-icon.png',
-      image: data.image || undefined,
-      vibrate: [200, 100, 200],
-      data: {
-        url: data.url || "/giras",
-        terreiro_id: data.terreiro_id || null,
-      }
-  });
-
-// 🔥 CLICK HANDLER (fora!)
-self.addEventListener('notificationclick', function(event) {
-  const data = event.notification.data;
-
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
-  event.waitUntil(
-    clients.openWindow(
-      `${data.url}?from_push=1&terreiro_id=${data.terreiro_id}&target=${encodeURIComponent(data.url)}`
-    )
-  );
-})
+  const data = event.notification.data || {};
+  const portal = data.context === "portal";
+  const fallback = portal ? "/portal" : "/giras";
+  let target;
+  try {
+    const candidate = new URL(data.url || fallback, self.location.origin);
+    target = candidate.origin === self.location.origin && (!portal || candidate.pathname.startsWith("/portal")) ? candidate : new URL(fallback, self.location.origin);
+  } catch (_) { target = new URL(fallback, self.location.origin); }
+  event.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    const existing = windows.find((client) => client.url === target.href);
+    return existing ? existing.focus() : clients.openWindow(target.href);
+  }));
 });

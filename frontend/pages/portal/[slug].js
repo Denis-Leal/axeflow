@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
+import PortalPushButton from "../../components/portal/PortalPushButton";
 const backend = process.env.BACKEND_URL || "http://backend:8000";
 export default function TerreiroPortal({ terreiro }) {
   if (!terreiro)
@@ -54,6 +55,7 @@ export default function TerreiroPortal({ terreiro }) {
               Falar no WhatsApp
             </a>
           )}
+          <PortalPushButton terreiroSlug={terreiro.slug_publico} />
         </header>
         <section className="mt-5">
           <h2 style={{ fontSize: "1.2rem" }}>Próximas giras</h2>
