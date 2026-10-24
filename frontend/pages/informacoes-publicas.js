@@ -35,7 +35,6 @@ export default function InformacoesPublicas() {
   const [perfil, setPerfil] = useState(vazio);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState("");
   const [mapaAberto, setMapaAberto] = useState(false);
   const [post, setPost] = useState({
     titulo: "",
@@ -50,12 +49,12 @@ export default function InformacoesPublicas() {
   };
   useEffect(() => {
     carregar()
-      .catch(() => setMsg("Não foi possível carregar as informações."))
+      .catch(() => toast.error("Não foi possível carregar as informações."))
       .finally(() => setLoading(false));
   }, []);
   const salvar = async (e) => {
     e.preventDefault();
-    setMsg("");
+    toast.dismiss();
     try {
       const r = await salvarPerfilPublico(perfil);
       setPerfil({ ...vazio, ...r.data });
@@ -76,21 +75,23 @@ export default function InformacoesPublicas() {
       });
       await carregar();
     } catch (e) {
-      setMsg(
+      toast.error(
         e.response?.data?.detail || "Não foi possível criar a publicação.",
       );
     }
   };
   const buscarCep = async () => {
     const cep = (perfil.cep || "").replace(/\D/g, "");
-    if (cep.length !== 8) return setMsg("Informe um CEP com 8 números.");
+    if (cep.length !== 8) return toast.error("Informe um CEP com 8 números.");
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await response.json();
-      if (data.erro) return setMsg("CEP não encontrado.");
+      if (data.erro) return toast.error("CEP não encontrado.");
       setPerfil(v => ({ ...v, cep, endereco_linha: data.logradouro || v.endereco_linha, bairro: data.bairro || v.bairro, cidade: data.localidade || v.cidade, uf: data.uf || v.uf }));
-      setMsg("Endereço preenchido pelo CEP. Selecione o ponto no mapa para registrar as coordenadas.");
-    } catch { setMsg("Não foi possível consultar o CEP agora."); }
+      toast.success("Endereço preenchido pelo CEP. Selecione o ponto no mapa para registrar as coordenadas.");
+    } catch (error) {
+      toast.error("Não foi possível consultar o CEP agora.");
+    }
   };
   if (loading)
     return <div className="spinner-gold" style={{ margin: "45vh auto" }} />;
@@ -141,11 +142,7 @@ export default function InformacoesPublicas() {
               O perfil é privado por padrão. Ative-o somente quando estiver
               pronto para aparecer no portal.
             </div>
-            {msg && (
-              <div className="alert-custom alert-success-custom mb-3">
-                {msg}
-              </div>
-            )}
+            {toastContainer}
             <div className="row g-4">
               <div className="col-lg-7">
                 <form className="card-custom p-4" onSubmit={salvar}>
@@ -234,7 +231,7 @@ export default function InformacoesPublicas() {
                   </div>
                   <button type="button" className="btn-outline-gold me-2" onClick={() => navigator.geolocation?.getCurrentPosition(
                     p => setPerfil(v => ({ ...v, latitude: String(p.coords.latitude), longitude: String(p.coords.longitude) })),
-                    () => setMsg("Não foi possível obter a localização. Verifique a permissão do navegador."),
+                    () => toast.error("Não foi possível obter a localização. Verifique a permissão do navegador."),
                   )}>
                     Usar minha localização
                   </button>
