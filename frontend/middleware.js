@@ -1,12 +1,22 @@
+
 import { NextResponse } from 'next/server';
 
-// O mesmo deploy atende app interno e portal. No subdomínio, a raiz abre o feed.
 export function middleware(request) {
-  const host = request.headers.get('host') || '';
-  if (host.toLowerCase().startsWith('portal.') && request.nextUrl.pathname === '/') {
+  const host = (request.headers.get('host') || '')
+    .toLowerCase()
+    .split(':')[0];
+
+  const isPortalHost =
+    host === 'portal.axeflow.dbltech.com.br' ||
+    host === 'www.portal.axeflow.dbltech.com.br';
+
+  if (isPortalHost && request.nextUrl.pathname === '/') {
     return NextResponse.rewrite(new URL('/portal', request.url));
   }
+
   return NextResponse.next();
 }
 
-export const config = { matcher: ['/'] };
+export const config = {
+  matcher: ['/'],
+};
