@@ -45,6 +45,8 @@ from app.models.atendimento import AtendimentoTipo, Agendamento
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.inscricao_membro import InscricaoMembro
 from app.models.push_subscription import PushSubscription
+from app.models.public_push_subscription import PublicPushSubscription
+from app.models.public_push_event import PublicPushEvent
 
 #Sistema de inventário e consumo por gira
 from app.models.inventory_owner import InventoryOwner

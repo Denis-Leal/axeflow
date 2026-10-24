@@ -30,8 +30,10 @@ export async function getFCMToken() {
   const messaging = await getFirebaseMessaging();
   if (!messaging) return null;
 
+  const registration = await navigator.serviceWorker.ready;
   const token = await getToken(messaging, {
-    vapidKey: "BK8yUbAAObmhuq2F88jrhcVdBKlpWw_DkQk3gPa93idqZVhDK1mLMs2JrqDCBpXeIQYG-P9VhQL0g0nl7dVVVKI"//process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+    vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "BK8yUbAAObmhuq2F88jrhcVdBKlpWw_DkQk3gPa93idqZVhDK1mLMs2JrqDCBpXeIQYG-P9VhQL0g0nl7dVVVKI",
+    serviceWorkerRegistration: registration,
   });
 
   return token;

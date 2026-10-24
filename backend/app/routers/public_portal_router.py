@@ -1,17 +1,53 @@
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import require_role
 from app.models.usuario import Usuario
+from app.models.terreiro import Terreiro
 from app.schemas.public_portal_schema import PerfilPublicoUpdate, PublicacaoCreate, PublicacaoUpdate, PublicacaoResponse
 from app.services import public_portal_service
 
 router = APIRouter(tags=["portal público"])
 internal = APIRouter(prefix="/informacoes-publicas", tags=["informações públicas"])
 public = APIRouter(prefix="/public/portal", tags=["portal público"])
+
+class PublicPushSubscriptionRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=4096)
+    terreiro_slug: str = Field(min_length=1, max_length=120)
+
+
+@public.post("/push/subscriptions", status_code=status.HTTP_201_CREATED)
+def subscribe_push(data: PublicPushSubscriptionRequest, db: Session = Depends(get_db)):
+    terreiro = db.query(Terreiro).filter_by(slug_publico=data.terreiro_slug, publico_ativo=True).first()
+    if not terreiro:
+        raise HTTPException(404, "Terreiro público não encontrado")
+    from app.services.public_push_service import upsert_subscription
+    upsert_subscription(db, data.token, terreiro.id)
+    return {"ok": True, "context": "portal", "terreiro_slug": terreiro.slug_publico}
+
+
+@public.get("/push/subscriptions/status")
+def push_status(token: str = Query(min_length=20, max_length=4096), terreiro_slug: str = Query(min_length=1, max_length=120), db: Session = Depends(get_db)):
+    terreiro = db.query(Terreiro).filter_by(slug_publico=terreiro_slug, publico_ativo=True).first()
+    if not terreiro:
+        raise HTTPException(404, "Terreiro público não encontrado")
+    from app.models.public_push_subscription import PublicPushSubscription
+    active = db.query(PublicPushSubscription.id).filter_by(token=token, terreiro_id=terreiro.id, active=True).first() is not None
+    return {"active": active, "context": "portal"}
+
+
+@public.delete("/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT)
+def unsubscribe_push(data: PublicPushSubscriptionRequest, db: Session = Depends(get_db)):
+    terreiro = db.query(Terreiro).filter_by(slug_publico=data.terreiro_slug, publico_ativo=True).first()
+    if not terreiro:
+        raise HTTPException(404, "Terreiro público não encontrado")
+    from app.services.public_push_service import deactivate_subscription
+    deactivate_subscription(db, data.token, terreiro.id)
+    return None
 
 @internal.get("/perfil")
 def get_perfil(user: Usuario = Depends(require_role("admin", "operador")), db: Session = Depends(get_db)):

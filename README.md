@@ -426,3 +426,11 @@ Observação: o cliente HTTP do frontend usa `/api` como base. Em Docker/Next.js
 - A autenticação de integrações usa `Authorization: Bearer axf_...`.
 - Fluxos sensíveis usam rate limiting e auditoria.
 - Exclusões principais são lógicas quando o histórico precisa ser preservado.
+# Notificações do Portal Público
+
+O Portal usa o mesmo projeto Firebase do painel, mas persiste os tokens FCM em
+`public_push_subscriptions`, separado dos dispositivos autenticados. Configure
+`NEXT_PUBLIC_FIREBASE_VAPID_KEY` no frontend (a chave pública VAPID do projeto
+Firebase). As credenciais administrativas continuam exclusivamente em
+`FIREBASE_CREDENTIALS` no backend. A migration `0028_public_portal_push` deve
+ser aplicada antes do deploy.

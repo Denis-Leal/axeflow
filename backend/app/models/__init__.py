@@ -17,6 +17,8 @@ from app.models.inscricao_membro import InscricaoMembro
 from app.models.push_subscription import PushSubscription
 from app.models.device import Device
 from app.models.notification_log import NotificationLog
+from app.models.public_push_subscription import PublicPushSubscription
+from app.models.public_push_event import PublicPushEvent
 
 
 # AuditLog deve estar aqui para o Alembic detectar a tabela no autogenerate
