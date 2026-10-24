@@ -35,6 +35,7 @@ export default function InformacoesPublicas() {
   const [perfil, setPerfil] = useState(vazio);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
   const [mapaAberto, setMapaAberto] = useState(false);
   const [post, setPost] = useState({
     titulo: "",
@@ -142,7 +143,11 @@ export default function InformacoesPublicas() {
               O perfil é privado por padrão. Ative-o somente quando estiver
               pronto para aparecer no portal.
             </div>
-            {toastContainer}
+            {msg && (
+              <div className="alert-custom alert-success-custom mb-3">
+                {msg}
+              </div>
+            )}
             <div className="row g-4">
               <div className="col-lg-7">
                 <form className="card-custom p-4" onSubmit={salvar}>
