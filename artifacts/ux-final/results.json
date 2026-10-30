@@ -1,0 +1,301 @@
+[
+  {
+    "name": "consulentes: edit busy/error/success, delete cancel/confirm, empty state",
+    "status": "passed"
+  },
+  {
+    "name": "consulentes/ranking: errors, explicit retry and no request loop",
+    "status": "passed"
+  },
+  {
+    "name": "public registration: native validation, checkbox, failure and success",
+    "status": "passed"
+  },
+  {
+    "name": "members: create modal keyboard lifecycle",
+    "status": "passed"
+  },
+  {
+    "name": "appointments: create modal keyboard lifecycle",
+    "status": "passed"
+  },
+  {
+    "name": "services: create modal keyboard lifecycle",
+    "status": "passed"
+  },
+  {
+    "name": "finance: details and payment modal keyboard lifecycle",
+    "status": "passed"
+  },
+  {
+    "name": "1440x900-gira metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "none",
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1425,
+      "width": 1440
+    }
+  },
+  {
+    "name": "visual 1440x900 gira",
+    "status": "passed"
+  },
+  {
+    "name": "1440x900-consulentes metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "none",
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440,
+      "width": 1440
+    }
+  },
+  {
+    "name": "visual 1440x900 consulentes",
+    "status": "passed"
+  },
+  {
+    "name": "1440x900-stock metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "none",
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440,
+      "width": 1440
+    }
+  },
+  {
+    "name": "visual 1440x900 stock",
+    "status": "passed"
+  },
+  {
+    "name": "1440x900-appointments metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "none",
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440,
+      "width": 1440
+    }
+  },
+  {
+    "name": "visual 1440x900 appointments",
+    "status": "passed"
+  },
+  {
+    "name": "1440x900-public metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": null,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1425,
+      "width": 1440
+    }
+  },
+  {
+    "name": "visual 1440x900 public",
+    "status": "passed"
+  },
+  {
+    "name": "390x844-gira metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 844,
+      "overflow": false,
+      "scrollWidth": 375,
+      "width": 390
+    }
+  },
+  {
+    "name": "visual 390x844 gira",
+    "status": "passed"
+  },
+  {
+    "name": "390x844-consulentes metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 844,
+      "overflow": false,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "name": "visual 390x844 consulentes",
+    "status": "passed"
+  },
+  {
+    "name": "390x844-stock metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 844,
+      "overflow": false,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "name": "visual 390x844 stock",
+    "status": "passed"
+  },
+  {
+    "name": "390x844-appointments metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 844,
+      "overflow": false,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "name": "visual 390x844 appointments",
+    "status": "passed"
+  },
+  {
+    "name": "390x844-public metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": null,
+      "height": 844,
+      "overflow": false,
+      "scrollWidth": 375,
+      "width": 390
+    }
+  },
+  {
+    "name": "visual 390x844 public",
+    "status": "passed"
+  },
+  {
+    "name": "320x740-gira metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 740,
+      "overflow": false,
+      "scrollWidth": 305,
+      "width": 320
+    }
+  },
+  {
+    "name": "visual 320x740 gira",
+    "status": "passed"
+  },
+  {
+    "name": "320x740-consulentes metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 740,
+      "overflow": false,
+      "scrollWidth": 320,
+      "width": 320
+    }
+  },
+  {
+    "name": "visual 320x740 consulentes",
+    "status": "passed"
+  },
+  {
+    "name": "320x740-stock metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 740,
+      "overflow": false,
+      "scrollWidth": 305,
+      "width": 320
+    }
+  },
+  {
+    "name": "visual 320x740 stock",
+    "status": "passed"
+  },
+  {
+    "name": "320x740-appointments metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": "flex",
+      "height": 740,
+      "overflow": false,
+      "scrollWidth": 320,
+      "width": 320
+    }
+  },
+  {
+    "name": "visual 320x740 appointments",
+    "status": "passed"
+  },
+  {
+    "name": "320x740-public metrics",
+    "status": "observed",
+    "metrics": {
+      "bottomNav": null,
+      "height": 740,
+      "overflow": false,
+      "scrollWidth": 305,
+      "width": 320
+    }
+  },
+  {
+    "name": "visual 320x740 public",
+    "status": "passed"
+  },
+  {
+    "name": "mobile: appointment form focus and overflow",
+    "status": "passed"
+  },
+  {
+    "name": "inventory: history error and retry",
+    "status": "passed"
+  },
+  {
+    "name": "giras: create failure/success, edit and confirmation cancellation",
+    "status": "failed",
+    "error": "Save stays disabled after cancelling confirmation"
+  },
+  {
+    "name": "hook: real React StrictMode nested dialogs",
+    "status": "passed"
+  },
+  {
+    "name": "mobile menus: Escape, focus restoration, navigation",
+    "status": "passed"
+  },
+  {
+    "name": "gira save confirmation: successful fixture update",
+    "status": "passed"
+  },
+  {
+    "name": "history overlay: Escape dismissal",
+    "status": "failed",
+    "error": "History overlay stays open after Escape (pre-existing)"
+  },
+  {
+    "name": "navigation: unauthenticated redirect and fixture member role",
+    "status": "passed"
+  },
+  {
+    "name": "login: native required fields and fixture login",
+    "status": "passed"
+  },
+  {
+    "name": "payment: busy state, error, preserved input and cancel",
+    "status": "passed"
+  },
+  {
+    "name": "desktop 1024x600: sidebar scrolling and navigation",
+    "status": "passed"
+  }
+]

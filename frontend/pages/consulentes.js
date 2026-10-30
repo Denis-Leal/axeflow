@@ -1,3 +1,4 @@
+import { useModalDialog } from '../hooks/useModalDialog';
 /**
  * pages/consulentes.js — AxeFlow
  */
@@ -81,10 +82,10 @@ function ConsulenteCard({ consulente, onEdit, onDelete }) {
         <Link href={`/consulentes/${consulente.id}`} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--cor-acento)', borderRadius: '6px', padding: '0.3rem 0.5rem', textDecoration: 'none', fontSize: '0.8rem' }}>
           <i className="bi bi-person-lines-fill" />
         </Link>
-        <button onClick={() => onEdit(consulente)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+        <button aria-label={`Editar ${consulente.nome}`} onClick={() => onEdit(consulente)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
           <i className="bi bi-pencil" />
         </button>
-        <button onClick={() => onDelete(consulente)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+        <button aria-label={`Excluir ${consulente.nome}`} onClick={() => onDelete(consulente)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>
           <i className="bi bi-trash" />
         </button>
       </div>
@@ -172,10 +173,10 @@ function ConsulentesTable({ consulentes, onEdit, onDelete }) {
                   <Link href={`/consulentes/${c.id}`} style={{ display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--cor-acento)', borderRadius: '8px', padding: '0.2rem 0.6rem', textDecoration: 'none', fontSize: '0.8rem' }}>
                     <i className="bi bi-person-lines-fill" />
                   </Link>
-                  <button onClick={() => onEdit(c)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  <button aria-label={`Editar ${c.nome}`} onClick={() => onEdit(c)} style={{ background: 'transparent', border: '1px solid rgba(148,163,184,0.3)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
                     <i className="bi bi-pencil" />
                   </button>
-                  <button onClick={() => onDelete(c)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  <button aria-label={`Excluir ${c.nome}`} onClick={() => onDelete(c)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '8px', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem' }}>
                     <i className="bi bi-trash" />
                   </button>
                 </div>
@@ -301,6 +302,7 @@ function ScoreLegenda() {
 // ─── Modal de Edição ──────────────────────────────────────────────────────────
 
 function ModalEditar({ consulente, onClose, onSave }) {
+  const [modalError, setModalError] = useState('');
   const [form, setForm] = useState({
     nome:     consulente.nome        || '',
     telefone: consulente.telefoneCru || '',
@@ -309,7 +311,8 @@ function ModalEditar({ consulente, onClose, onSave }) {
   const [salvando, setSalvando] = useState(false);
 
   const handleSave = async () => {
-    if (!form.nome.trim()) return;
+    if (salvando || !form.nome.trim()) return;
+    setModalError('');
     setSalvando(true);
     try {
       await onSave(consulente.id, form);
@@ -319,16 +322,19 @@ function ModalEditar({ consulente, onClose, onSave }) {
     catch (err) {
       console.log('[ModalEditar] Erro ao salvar consulente:', err);
       const message = handleApiError(err, 'Erro ao atualizar consulente') || 'Erro ao atualizar consulente';
-      toast.error(message);
+      setModalError(message);
     } finally {
       setSalvando(false);
     }
     
   };
 
+  const dialogProps = useModalDialog({ open: true, onClose: onClose, busy: salvando, label: 'Editar consulente' });
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ background: 'var(--cor-card)', border: '1px solid var(--cor-borda)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '420px' }}>
+    <div {...dialogProps} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ background: 'var(--cor-card)', border: '1px solid var(--cor-borda)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '420px' }}>
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
         <h6 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1.25rem' }}>
           Editar Consulente
         </h6>
@@ -338,12 +344,13 @@ function ModalEditar({ consulente, onClose, onSave }) {
           { label: 'Notas',    key: 'notas',    type: 'text', placeholder: 'Observações internas' },
         ].map(({ label, key, type, placeholder }) => (
           <div key={key} style={{ marginBottom: '0.875rem' }}>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', display: 'block', marginBottom: '4px' }}>
+            <label htmlFor={`pages-consulentes-js-1-${key}`} style={{ fontSize: '0.75rem', color: 'var(--cor-texto-suave)', display: 'block', marginBottom: '4px' }}>
               {label}
             </label>
-            <input
+            <input id={`pages-consulentes-js-1-${key}`}
               className="form-control-custom"
               type={type}
+              required={key === "nome"}
               placeholder={placeholder}
               value={form[key]}
               onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
@@ -352,14 +359,14 @@ function ModalEditar({ consulente, onClose, onSave }) {
           </div>
         ))}
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+          <button type="button" disabled={salvando} onClick={() => { if (!salvando) onClose(); }} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
             Cancelar
           </button>
-          <button onClick={handleSave} disabled={salvando || !form.nome.trim()} style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--cor-acento)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: salvando ? 0.6 : 1 }}>
+          <button type="submit" disabled={salvando} style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--cor-acento)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: salvando ? 0.6 : 1 }}>
             {salvando ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
@@ -367,9 +374,12 @@ function ModalEditar({ consulente, onClose, onSave }) {
 // ─── Modal de Confirmação de Delete ──────────────────────────────────────────
 
 function ModalConfirmarDelete({ nome, onClose, onConfirm }) {
+  const [modalError, setModalError] = useState('');
   const [deletando, setDeletando] = useState(false);
 
   const handleConfirm = async () => {
+    if (deletando) return;
+    setModalError('');
     setDeletando(true);
     try {
       await onConfirm();
@@ -377,23 +387,26 @@ function ModalConfirmarDelete({ nome, onClose, onConfirm }) {
       onClose();
     } catch (err) {
       const message = handleApiError(err, 'Erro ao deletar consulente') || 'Erro ao deletar consulente';
-      toast.error(message);
+      setModalError(message);
     }
      finally {
       setDeletando(false);
     }
   };
 
+  const dialogProps = useModalDialog({ open: true, onClose: onClose, busy: deletando, label: 'Excluir consulente' });
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+    <div {...dialogProps} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ background: 'var(--cor-card)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '380px' }}>
         <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>🗑️</div>
         <h6 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>Deletar consulente?</h6>
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
         <p style={{ fontSize: '0.85rem', color: 'var(--cor-texto-suave)', marginBottom: '1.25rem' }}>
-          <strong style={{ color: 'var(--cor-texto)' }}>{nome}</strong> será removido permanentemente, incluindo todas as inscrições e histórico de presença.
+          <strong style={{ color: 'var(--cor-texto)' }}>{nome}</strong> será removido da lista e suas inscrições serão canceladas. Confirme para continuar.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+          <button type="button" disabled={deletando} onClick={() => { if (!deletando) onClose(); }} style={{ background: 'transparent', border: '1px solid var(--cor-borda)', color: 'var(--cor-texto-suave)', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
             Cancelar
           </button>
           <button onClick={handleConfirm} disabled={deletando} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: deletando ? 0.6 : 1 }}>
@@ -413,8 +426,8 @@ export default function Consulentes() {
 
   // ── Uma única chamada ao hook ──
   const {
-    consulentes, loading,
-    ranking, loadingRanking, rankingCarregado,
+    consulentes, loading, error, reload,
+    ranking, loadingRanking, rankingCarregado, rankingError,
     loadRanking,
     editarConsulente,
     deletarConsulente,
@@ -447,9 +460,9 @@ export default function Consulentes() {
     [consultesVM, busca]
   );
 
-  if (loading) return (
+  if (loading && !consulentes.length) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div className="spinner-gold" />
+      <div role="status" aria-label="Carregando consulentes" className="spinner-gold" />
     </div>
   );
 
@@ -516,6 +529,7 @@ export default function Consulentes() {
             <div style={{ marginBottom: '1rem' }}>
               <input
                 className="form-control-custom"
+                aria-label="Buscar consulente por nome"
                 placeholder="🔍  Buscar consulente por nome..."
                 value={busca}
                 onChange={e => setBusca(e.target.value)}
@@ -523,7 +537,15 @@ export default function Consulentes() {
               />
             </div>
 
-            {aba === 'lista' && (
+            {aba === 'lista' && loading && consulentes.length > 0 && <p role="status">Atualizando consulentes...</p>}
+            {(aba === 'lista' ? error : rankingError) && (
+              <div role="alert" className="alert-custom alert-danger-custom">
+                <p>{handleApiError(aba === 'lista' ? error : rankingError, 'Carregar consulentes')}</p>
+                <button type="button" className="btn-outline-gold" disabled={aba === 'lista' ? loading : loadingRanking}
+                  onClick={() => aba === 'lista' ? reload() : loadRanking(true)}>Tentar novamente</button>
+              </div>
+            )}
+            {aba === 'lista' && (!error || consulentes.length > 0) && (
               <div className="card-custom">
                 {isMobile ? (
                   listaFiltrada.length > 0
@@ -550,7 +572,7 @@ export default function Consulentes() {
               <div>
                 {loadingRanking && (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-                    <div className="spinner-gold" />
+                    <div role="status" aria-label="Carregando consulentes" className="spinner-gold" />
                   </div>
                 )}
 

@@ -134,22 +134,22 @@ export default function Configuracoes() {
                     )}
                     <form onSubmit={handleSenha}>
                       <div className="mb-3">
-                        <label className="form-label-custom">Senha atual</label>
-                        <input type="password" className="form-control-custom"
+                        <label htmlFor="pages-configuracoes-js-1" className="form-label-custom">Senha atual</label>
+                        <input id="pages-configuracoes-js-1" type="password" className="form-control-custom"
                           value={formSenha.senha_atual}
                           onChange={e => setFormSenha({ ...formSenha, senha_atual: e.target.value })}
                           required />
                       </div>
                       <div className="mb-3">
-                        <label className="form-label-custom">Nova senha</label>
-                        <input type="password" className="form-control-custom"
+                        <label htmlFor="pages-configuracoes-js-2" className="form-label-custom">Nova senha</label>
+                        <input id="pages-configuracoes-js-2" type="password" className="form-control-custom"
                           value={formSenha.nova_senha}
                           onChange={e => setFormSenha({ ...formSenha, nova_senha: e.target.value })}
                           required minLength={6} />
                       </div>
                       <div className="mb-4">
-                        <label className="form-label-custom">Confirmar nova senha</label>
-                        <input type="password" className="form-control-custom"
+                        <label htmlFor="pages-configuracoes-js-3" className="form-label-custom">Confirmar nova senha</label>
+                        <input id="pages-configuracoes-js-3" type="password" className="form-control-custom"
                           value={formSenha.confirmar}
                           onChange={e => setFormSenha({ ...formSenha, confirmar: e.target.value })}
                           required minLength={6} />

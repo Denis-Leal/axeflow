@@ -80,6 +80,8 @@ html h1, html h2, html h3, html .font-display {
 .sidebar-nav {
   padding: 1rem 0;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .nav-item-custom {
@@ -593,7 +595,7 @@ html h1, html h2, html h3, html .font-display {
 
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 1rem;
 }
 
@@ -674,7 +676,8 @@ html h1, html h2, html h3, html .font-display {
 /* ── Botões de ação em mobile: mínimo de 44px para toque ── */
 @media (max-width: 768px) {
   button, [role="button"], .btn-gold, .btn-outline-gold {
-    min-height: 36px;
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
@@ -723,3 +726,28 @@ html h1, html h2, html h3, html .font-display {
 .Toastify__toast--info {
   border-left: 4px solid var(--cor-secundaria);
 }
+/* Teclado: foco consistente, inclusive em controles com estilos inline. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--cor-acento-claro);
+  outline-offset: 3px;
+}
+.public-first-visit:focus-within {
+  outline: 2px solid var(--cor-acento-claro);
+  outline-offset: 3px;
+}
+@media (max-width: 768px) {
+  .bottom-nav {
+    height: calc(60px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .main-content { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+}
+
+[data-modal-dialog] { outline: none; }
+[data-modal-dialog] > form,
+[data-modal-dialog] > .modal-dialog,
+[data-modal-dialog] > div {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+[data-modal-dialog] .modal-dialog { width: calc(100% - 2rem); }

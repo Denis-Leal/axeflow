@@ -1,3 +1,4 @@
+import { useModalDialog } from '../hooks/useModalDialog';
 // pages/financeiro.js
 
 import { useEffect, useMemo, useState } from 'react';
@@ -82,6 +83,7 @@ function ModalPagamento({
   onFechar,
   onSucesso,
 }) {
+  const [modalError, setModalError] = useState('');
   const [formaPagamentoId, setFormaPagamentoId] = useState('');
   const [valor, setValor] = useState('');
   const [observacoes, setObservacoes] = useState('');
@@ -95,6 +97,8 @@ function ModalPagamento({
     setObservacoes('');
   }, [aberto, conta, formas]);
 
+  const dialogProps = useModalDialog({ open: aberto && !!conta, onClose: onFechar, busy: salvando, label: 'Registrar pagamento' });
+
   if (!aberto || !conta) return null;
 
   const valorConta = Number(conta.valor || 0);
@@ -107,15 +111,16 @@ function ModalPagamento({
     );
 
     if (!formaPagamentoId) {
-      toast.error('Selecione a forma de pagamento.');
+      setModalError('Selecione a forma de pagamento.');
       return;
     }
 
     if (!valorPagamento || valorPagamento <= 0) {
-      toast.error('Informe um valor válido.');
+      setModalError('Informe um valor válido.');
       return;
     }
 
+    setModalError('');
     setSalvando(true);
 
     try {
@@ -134,23 +139,24 @@ function ModalPagamento({
         error.response?.data?.detail ||
         'Não foi possível registrar o pagamento.';
 
-      toast.error(mensagem);
+      setModalError(mensagem);
     } finally {
       setSalvando(false);
     }
   };
 
   return (
-    <div
+    <div {...dialogProps}
       className="modal d-block"
       style={{ background: 'rgba(0,0,0,.65)' }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onFechar();
+        if (!salvando && e.target === e.currentTarget) onFechar();
       }}
     >
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content card-custom">
           <form onSubmit={enviar}>
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
             <div className="modal-header">
               <h5 className="modal-title">
                 Registrar pagamento
@@ -158,8 +164,9 @@ function ModalPagamento({
 
               <button
                 type="button"
+                aria-label="Fechar"
                 className="btn-close btn-close-white"
-                onClick={onFechar}
+                onClick={() => { if (!salvando) onFechar(); }}
               />
             </div>
 
@@ -197,11 +204,11 @@ function ModalPagamento({
               </div>
 
               <div className="mb-3">
-                <label className="form-label">
+                <label htmlFor="pages-financeiro-js-1" className="form-label">
                   Forma de pagamento
                 </label>
 
-                <select
+                <select id="pages-financeiro-js-1"
                   className="form-control-custom"
                   value={formaPagamentoId}
                   onChange={(e) =>
@@ -227,11 +234,11 @@ function ModalPagamento({
               </div>
 
               <div className="mb-3">
-                <label className="form-label">
+                <label htmlFor="pages-financeiro-js-2" className="form-label">
                   Valor do pagamento
                 </label>
 
-                <input
+                <input id="pages-financeiro-js-2"
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -246,11 +253,11 @@ function ModalPagamento({
               </div>
 
               <div>
-                <label className="form-label">
+                <label htmlFor="pages-financeiro-js-3" className="form-label">
                   Observações
                 </label>
 
-                <textarea
+                <textarea id="pages-financeiro-js-3"
                   className="form-control-custom"
                   rows="3"
                   maxLength="2000"
@@ -266,7 +273,7 @@ function ModalPagamento({
               <button
                 type="button"
                 className="btn btn-outline-gold"
-                onClick={onFechar}
+                onClick={() => { if (!salvando) onFechar(); }}
                 disabled={salvando}
               >
                 Cancelar
@@ -298,6 +305,8 @@ function ModalDetalhesConta({
   onPagar,
   onRecibo,
 }) {
+  const dialogProps = useModalDialog({ open: aberto && !!conta, onClose: onFechar, busy: false, label: 'Detalhes da cobrança' });
+
   if (!aberto || !conta) return null;
 
   const totalPago = pagamentos.reduce(
@@ -312,7 +321,7 @@ function ModalDetalhesConta({
   );
 
   return (
-    <div
+    <div {...dialogProps}
       className="modal d-block"
       style={{ background: 'rgba(0,0,0,.65)' }}
       onMouseDown={(e) => {
@@ -334,7 +343,8 @@ function ModalDetalhesConta({
 
             <button
               type="button"
-              className="btn-close btn-close-white"
+              aria-label="Fechar"
+                className="btn-close btn-close-white"
               onClick={onFechar}
             />
           </div>
@@ -480,6 +490,7 @@ function ModalFormaPagamento({
   onFechar,
   onSucesso,
 }) {
+  const [modalError, setModalError] = useState('');
   const [nome, setNome] = useState('');
   const [salvando, setSalvando] = useState(false);
 
@@ -487,16 +498,19 @@ function ModalFormaPagamento({
     setNome(forma?.nome || '');
   }, [forma, aberto]);
 
+  const dialogProps = useModalDialog({ open: aberto, onClose: onFechar, busy: salvando, label: forma ? 'Editar forma de pagamento' : 'Nova forma de pagamento' });
+
   if (!aberto) return null;
 
   const salvar = async (e) => {
     e.preventDefault();
 
     if (!nome.trim()) {
-      toast.error('Informe o nome da forma de pagamento.');
+      setModalError('Informe o nome da forma de pagamento.');
       return;
     }
 
+    setModalError('');
     setSalvando(true);
 
     try {
@@ -517,7 +531,7 @@ function ModalFormaPagamento({
 
       onSucesso();
     } catch (error) {
-      toast.error(
+      setModalError(
         error.response?.data?.detail ||
           'Não foi possível salvar a forma de pagamento.'
       );
@@ -527,13 +541,14 @@ function ModalFormaPagamento({
   };
 
   return (
-    <div
+    <div {...dialogProps}
       className="modal d-block"
       style={{ background: 'rgba(0,0,0,.65)' }}
     >
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content card-custom">
           <form onSubmit={salvar}>
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
             <div className="modal-header">
               <h5 className="modal-title">
                 {forma
@@ -543,17 +558,18 @@ function ModalFormaPagamento({
 
               <button
                 type="button"
+                aria-label="Fechar"
                 className="btn-close btn-close-white"
-                onClick={onFechar}
+                onClick={() => { if (!salvando) onFechar(); }}
               />
             </div>
 
             <div className="modal-body">
-              <label className="form-label">
+              <label htmlFor="pages-financeiro-js-4" className="form-label">
                 Nome
               </label>
 
-              <input
+              <input id="pages-financeiro-js-4"
                 className="form-control-custom"
                 maxLength="100"
                 value={nome}
@@ -568,7 +584,7 @@ function ModalFormaPagamento({
               <button
                 type="button"
                 className="btn btn-outline-gold"
-                onClick={onFechar}
+                onClick={() => { if (!salvando) onFechar(); }}
                 disabled={salvando}
               >
                 Cancelar
@@ -887,6 +903,7 @@ export default function Financeiro() {
                 <select
                   className="form-control-custom"
                   style={{ width: 180 }}
+                  aria-label="Filtrar contas por status"
                   value={statusFiltro}
                   onChange={(e) =>
                     setStatusFiltro(e.target.value)

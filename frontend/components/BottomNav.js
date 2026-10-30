@@ -9,7 +9,7 @@
 // O botão "+" concentra ações de criação rápida.
 // =====================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -105,6 +105,24 @@ export default function BottomNav() {
     setCriarAberto(v => !v);
   };
 
+  useEffect(() => {
+    setMaisAberto(false);
+    setCriarAberto(false);
+  }, [router.asPath]);
+  useEffect(() => {
+    if (!maisAberto && !criarAberto) return;
+    const trigger = document.activeElement;
+    const handleKey = e => {
+      if (e.key === 'Escape') {
+        setMaisAberto(false);
+        setCriarAberto(false);
+        trigger?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [maisAberto, criarAberto]);
+
   const renderItem = (item) => {
     const ativo = p === item.href || p.startsWith(`${item.href}/`);
 
@@ -113,6 +131,7 @@ export default function BottomNav() {
         key={item.href}
         href={item.href}
         onClick={fecharMenus}
+        aria-current={ativo ? "page" : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -160,10 +179,10 @@ export default function BottomNav() {
           Menu de criação rápida
           ================================================= */}
       {criarAberto && (
-        <div
+        <div id="nav-criar"
           style={{
             position: 'fixed',
-            bottom: '68px',
+            bottom: 'calc(68px + env(safe-area-inset-bottom))',
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'var(--cor-card)',
@@ -223,10 +242,10 @@ export default function BottomNav() {
           Menu "Mais"
           ================================================= */}
       {maisAberto && (
-        <div
+        <div id="nav-mais"
           style={{
             position: 'fixed',
-            bottom: '68px',
+            bottom: 'calc(68px + env(safe-area-inset-bottom))',
             right: '8px',
             background: 'var(--cor-card)',
             border: '1px solid var(--cor-borda)',
@@ -342,6 +361,8 @@ export default function BottomNav() {
         <button
           onClick={toggleCriar}
           aria-label="Criar"
+          aria-expanded={criarAberto}
+          aria-controls={criarAberto ? "nav-criar" : undefined}
           style={{
             flex: 'none',
             width: '52px',
@@ -385,6 +406,8 @@ export default function BottomNav() {
           onClick={toggleMais}
           className={maisAtivo ? 'active' : ''}
           aria-label="Mais"
+          aria-expanded={maisAberto}
+          aria-controls={maisAberto ? "nav-mais" : undefined}
           style={{
             flex: 1,
             display: 'flex',

@@ -19,6 +19,7 @@ import {
   StatCard, EmptyState, Spinner,
 } from '../components/ui';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useModalDialog } from '../hooks/useModalDialog';
 import { buildItensEstoqueViewModel } from '../viewModels/estoqueViewModel';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -50,18 +51,31 @@ function ModalHistorico({ item, onClose }) {
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading]     = useState(true);
 
+  const [historyError, setHistoryError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!item) return;
+    let active = true;
+    setLoading(true);
+    setHistoryError('');
+    setHistorico([]);
     getHistoricoItem(item.id, 30)
-      .then(res => setHistorico(res.data))
-      .catch(() => setHistorico([]))
-      .finally(() => setLoading(false));
-  }, [item]);
+      .then(res => { if (active) setHistorico(res.data); })
+      .catch(err => { if (active) setHistoryError(handleApiError(err, 'Carregar historico')); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [item, attempt]);
+
+  const dialogProps = useModalDialog({
+    open: !!item,
+    onClose,
+    label: `Histórico de ${item?.name || 'estoque'}`,
+  });
 
   if (!item) return null;
 
   return (
-    <div
+    <div {...dialogProps} aria-busy={loading || undefined}
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
@@ -85,7 +99,7 @@ function ModalHistorico({ item, onClose }) {
               </strong>
             </span>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}>
+          <Button aria-label="Fechar histórico" variant="ghost" size="sm" onClick={onClose} style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}>
             ×
           </Button>
         </CardHeader>
@@ -97,7 +111,13 @@ function ModalHistorico({ item, onClose }) {
             </div>
           )}
 
-          {!loading && historico.length === 0 && (
+          {historyError && (
+            <div role="alert" className="alert-custom alert-danger-custom">
+              <p>{historyError}</p>
+              <Button variant="outline" onClick={() => setAttempt(v => v + 1)}>Tentar novamente</Button>
+            </div>
+          )}
+          {!loading && !historyError && historico.length === 0 && (
             <EmptyState icon="clock-history" title="Nenhuma movimentação registrada." />
           )}
 
@@ -298,6 +318,7 @@ export default function InventarioDashboard() {
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
                     className="form-control-custom"
+                    aria-label="Buscar item"
                     placeholder="Buscar item..."
                     value={busca}
                     onChange={e => setBusca(e.target.value)}
@@ -306,6 +327,7 @@ export default function InventarioDashboard() {
                   <Button
                     variant="outline"
                     size="sm"
+                    aria-label="Atualizar estoque"
                     onClick={carregarItens}
                     disabled={loading}
                     loading={loading}
@@ -321,7 +343,7 @@ export default function InventarioDashboard() {
                 </CardBody>
               )}
 
-              {!loading && itensFiltrados.length === 0 && (
+              {!loading && !erro && itensFiltrados.length === 0 && (
                 <EmptyState
                   icon="box-seam"
                   title={busca ? `Nenhum item encontrado para "${busca}".` : 'Nenhum item cadastrado ainda.'}

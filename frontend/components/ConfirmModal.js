@@ -34,7 +34,8 @@
  *   labelCancelar  {string}  — texto do botão de cancelar (padrão: "Cancelar")
  */
 
-import { useEffect } from 'react';
+import { useId } from 'react';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 export default function ConfirmModal({
   aberto,
@@ -47,18 +48,9 @@ export default function ConfirmModal({
   labelConfirmar = apenasOk ? 'OK' : 'Confirmar',
   labelCancelar  = 'Cancelar',
 }) {
-  // Fecha com Escape
-  useEffect(() => {
-    if (!aberto) return;
-    const handleKey = (e) => {
-      if (e.key === 'Escape') {
-        if (apenasOk) onConfirmar?.();
-        else onCancelar?.();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [aberto, apenasOk, onConfirmar, onCancelar]);
+  const titleId = useId();
+  const messageId = useId();
+  const dialogProps = useModalDialog({ open: aberto, onClose: apenasOk ? onConfirmar : onCancelar, label: titulo });
 
   if (!aberto) return null;
 
@@ -71,7 +63,7 @@ export default function ConfirmModal({
 
   return (
     /* Overlay */
-    <div
+    <div {...dialogProps} aria-labelledby={titleId} aria-describedby={messageId}
       onClick={() => { if (apenasOk) onConfirmar?.(); else onCancelar?.(); }}
       style={{
         position: 'fixed', inset: 0,
@@ -91,11 +83,13 @@ export default function ConfirmModal({
           padding: '1.75rem',
           width: '100%',
           maxWidth: '420px',
+          maxHeight: 'calc(100dvh - 2rem)',
+          overflowY: 'auto',
           boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
         }}
       >
         {/* Título */}
-        <h5 style={{
+        <h5 id={titleId} style={{
           fontFamily: 'Cinzel, serif',
           color: 'var(--cor-acento)',
           fontSize: '1rem',
@@ -106,7 +100,7 @@ export default function ConfirmModal({
         </h5>
 
         {/* Mensagem */}
-        <p style={{
+        <p id={messageId} style={{
           color: 'var(--cor-texto-suave)',
           fontSize: '0.9rem',
           lineHeight: 1.6,
@@ -117,9 +111,10 @@ export default function ConfirmModal({
         </p>
 
         {/* Botões */}
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!apenasOk && (
             <button
+              type="button"
               onClick={onCancelar}
               className="btn-outline-gold"
               style={{ padding: '0.5rem 1.25rem', fontSize: '0.88rem' }}
@@ -128,6 +123,7 @@ export default function ConfirmModal({
             </button>
           )}
           <button
+              type="button"
             onClick={onConfirmar}
             style={{
               background: corBotao.bg,

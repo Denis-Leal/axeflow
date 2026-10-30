@@ -176,8 +176,8 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
       )}
 
       <div className="mb-3">
-        <label className="form-label-custom">Nome completo</label>
-        <input
+        <label htmlFor="pages-giras--id--inscricoes-js-1" className="form-label-custom">Nome completo</label>
+        <input id="pages-giras--id--inscricoes-js-1"
           className="form-control-custom"
           value={form.nome}
           onChange={e => {
@@ -213,8 +213,8 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
       )}
 
       <div className="mb-3">
-        <label className="form-label-custom">WhatsApp / Telefone</label>
-        <input
+        <label htmlFor="pages-giras--id--inscricoes-js-2" className="form-label-custom">WhatsApp / Telefone</label>
+        <input id="pages-giras--id--inscricoes-js-2"
           className="form-control-custom"
           value={form.telefone}
           onChange={(e) => {
@@ -288,13 +288,13 @@ function FormularioInscricao({ listaEspera, posicaoFila, giraId }) {
 
       {/* ── Campo de observações — opcional ─────────────────────────────────── */}
       <div className="mb-4">
-        <label className="form-label-custom">
+        <label htmlFor="pages-giras--id--inscricoes-js-3" className="form-label-custom">
           Observações
           <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
             (opcional)
           </span>
         </label>
-        <textarea
+        <textarea id="pages-giras--id--inscricoes-js-3"
           className="form-control-custom"
           value={form.observacoes}
           onChange={e => setForm({ ...form, observacoes: e.target.value })}

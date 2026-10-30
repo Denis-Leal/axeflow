@@ -231,7 +231,7 @@ function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
     <div style={{ padding: '1.25rem' }}>
 
       <div style={{ marginBottom: '1.25rem' }}>
-        <label style={{
+        <label htmlFor="components-AjeumPanel-js-1" style={{
           fontSize: '0.78rem',
           color: 'var(--cor-texto-suave)',
           display: 'block',
@@ -247,7 +247,7 @@ function FormCriarAjeum({ giraId, onCriado, exibirToast }) {
           </span>
         </label>
 
-        <input
+        <input id="components-AjeumPanel-js-1"
           className="form-control-custom"
           value={observacoes}
           onChange={e => setObservacoes(e.target.value)}

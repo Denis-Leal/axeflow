@@ -1,3 +1,5 @@
+import { Children, cloneElement, isValidElement, useId } from 'react';
+
 /**
  * components/ui/index.js — AxeFlow Design System
  * Componentes base reutilizáveis. Importar daqui sempre.
@@ -86,12 +88,29 @@ export function  Button({
     : children;
 
   if (href) {
-    return <a href={href} style={finalStyle} title={title} {...props}>{content}</a>;
+    return (
+      <a
+        {...props}
+        href={disabled || loading ? undefined : href}
+        aria-disabled={disabled || loading || undefined}
+        aria-busy={loading || undefined}
+        tabIndex={disabled || loading ? -1 : props.tabIndex}
+        onClick={e => {
+          if (disabled || loading) { e.preventDefault(); return; }
+          onClick?.(e);
+        }}
+        style={finalStyle}
+        title={title}
+      >
+        {content}
+      </a>
+    );
   }
 
   const Component = Tag || 'button';
   return (
     <Component
+      aria-busy={loading || undefined}
       onClick={!disabled && !loading ? onClick : undefined}
       disabled={disabled || loading}
       style={finalStyle}
@@ -295,6 +314,11 @@ export function StatCard({ label, value, color, sub, onClick, style, size = 'md'
   return (
     <div
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); }
+      } : undefined}
       style={{
         background:   'var(--cor-card)',
         border:       '1px solid var(--cor-borda)',
@@ -339,7 +363,7 @@ export function EmptyState({ icon, title, action }) {
 // ── Spinner ───────────────────────────────────────────────────────────────────
 export function Spinner({ center = false }) {
   const el = (
-    <div style={{
+    <div role="status" aria-label="Carregando" style={{
       width:        '36px',
       height:       '36px',
       border:       '3px solid rgba(212,175,55,0.2)',
@@ -358,9 +382,17 @@ export function Spinner({ center = false }) {
 
 // ── FormField ───────────────────────────────────────────────────────────────
 export function FormField({ label, children, hint, required }) {
+  const generatedId = useId();
+  const control = Children.toArray(children).find(child => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type));
+  const controlId = control?.props.id || generatedId;
+  const hintId = `${controlId}-hint`;
+  const fields = Children.map(children, child => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type) ? cloneElement(child, {
+    id: controlId,
+    'aria-describedby': [child.props['aria-describedby'], hint ? hintId : null].filter(Boolean).join(' ') || undefined,
+  }) : child);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '0.85rem' }}>
-      <label style={{
+      <label htmlFor={controlId} style={{
         fontSize: '0.8rem',
         fontWeight: 600,
         color: 'var(--cor-texto)'
@@ -368,10 +400,10 @@ export function FormField({ label, children, hint, required }) {
         {label} {required && '*'}
       </label>
 
-      {children}
+      {fields}
 
       {hint && (
-        <span style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
+        <span id={hintId} style={{ fontSize: '0.72rem', color: 'var(--cor-texto-suave)' }}>
           {hint}
         </span>
       )}

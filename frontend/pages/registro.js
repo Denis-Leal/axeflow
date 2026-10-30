@@ -45,13 +45,13 @@ export default function Registro() {
             <h6 style={{ color: 'var(--cor-acento)', fontFamily: 'Cinzel', marginBottom: '1rem' }}>✦ Dados do Terreiro</h6>
             <div className="row g-3 mb-3">
               <div className="col-8">
-                <label className="form-label-custom">Nome do Terreiro</label>
-                <input className="form-control-custom" value={form.terreiro_nome}
+                <label htmlFor="pages-registro-js-1" className="form-label-custom">Nome do Terreiro</label>
+                <input id="pages-registro-js-1" className="form-control-custom" value={form.terreiro_nome}
                   onChange={e => setForm({ ...form, terreiro_nome: e.target.value })} required />
               </div>
               <div className="col-4">
-                <label className="form-label-custom">Cidade</label>
-                <input className="form-control-custom" value={form.terreiro_cidade}
+                <label htmlFor="pages-registro-js-2" className="form-label-custom">Cidade</label>
+                <input id="pages-registro-js-2" className="form-control-custom" value={form.terreiro_cidade}
                   onChange={e => setForm({ ...form, terreiro_cidade: e.target.value })} required />
               </div>
             </div>
@@ -59,25 +59,25 @@ export default function Registro() {
             <div className="divider-ornamental"><span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>Administrador</span></div>
 
             <div className="mb-3">
-              <label className="form-label-custom">Nome</label>
-              <input className="form-control-custom" value={form.nome}
+              <label htmlFor="pages-registro-js-3" className="form-label-custom">Nome</label>
+              <input id="pages-registro-js-3" className="form-control-custom" value={form.nome}
                 onChange={e => setForm({ ...form, nome: e.target.value })} required />
             </div>
             <div className="row g-3 mb-3">
               <div className="col-7">
-                <label className="form-label-custom">Email</label>
-                <input type="email" className="form-control-custom" value={form.email}
+                <label htmlFor="pages-registro-js-4" className="form-label-custom">Email</label>
+                <input id="pages-registro-js-4" type="email" className="form-control-custom" value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })} required />
               </div>
               <div className="col-5">
-                <label className="form-label-custom">Telefone</label>
-                <input className="form-control-custom" value={form.telefone}
+                <label htmlFor="pages-registro-js-5" className="form-label-custom">Telefone</label>
+                <input id="pages-registro-js-5" className="form-control-custom" value={form.telefone}
                   onChange={e => setForm({ ...form, telefone: e.target.value })} />
               </div>
             </div>
             <div className="mb-4">
-              <label className="form-label-custom">Senha</label>
-              <input type="password" className="form-control-custom" value={form.senha}
+              <label htmlFor="pages-registro-js-6" className="form-label-custom">Senha</label>
+              <input id="pages-registro-js-6" type="password" className="form-control-custom" value={form.senha}
                 onChange={e => setForm({ ...form, senha: e.target.value })} required minLength={6} />
             </div>
 

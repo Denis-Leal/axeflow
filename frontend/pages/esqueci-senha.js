@@ -163,7 +163,7 @@ export default function EsqueciSenha() {
 
               <form onSubmit={handleBuscarTerreiros}>
                 <div className="mb-4">
-                  <label className="form-label-custom">Email</label>
+                  <label htmlFor="pages-esqueci-senha-js-1" className="form-label-custom">Email</label>
                   <div style={{ position: 'relative' }}>
                     <i className="bi bi-envelope" style={{
                       position: 'absolute', left: '0.75rem', top: '50%',
@@ -171,7 +171,7 @@ export default function EsqueciSenha() {
                       color: 'var(--cor-texto-suave)', fontSize: '0.9rem',
                       pointerEvents: 'none',
                     }}></i>
-                    <input
+                    <input id="pages-esqueci-senha-js-1"
                       type="email"
                       className="form-control-custom"
                       style={{ paddingLeft: '2.25rem' }}

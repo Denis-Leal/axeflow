@@ -102,7 +102,7 @@ export default function NovaGira() {
 
                 <form onSubmit={handleSubmit}>
                   {/* Tipo de acesso — primeira decisão */}
-                  <div style={{ display: 'flex', gap: '0.75rem', color: 'var(--cor-texto)' }}>
+                  <div role="group" aria-label="Acesso à gira" style={{ display: 'flex', gap: '0.75rem', color: 'var(--cor-texto)' }}>
                     {[
                       { value: 'publica', emoji: '🌐', label: 'Aberta', desc: 'Consulentes externos' },
                       { value: 'fechada', emoji: '🔒', label: 'Fechada', desc: 'Somente membros' },
@@ -112,6 +112,10 @@ export default function NovaGira() {
                       return (
                         <Card
                           key={opt.value}
+                          role="button"
+                          aria-pressed={active}
+                          tabIndex={0}
+                          onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setForm({ ...form, acesso: opt.value }); } }}
                           onClick={() => setForm({ ...form, acesso: opt.value })}
                           highlight={active}
                           style={{
@@ -184,7 +188,7 @@ export default function NovaGira() {
                       </label>
                     </div>
                     {/* Responsável pela lista */}
-                  <FormField label={"Responsável pela Lista (opcional)"} hint="Membro responsável por gerenciar as inscrições desta gira" required={true}>
+                  <FormField label={"Responsável pela Lista (opcional)"} hint="Membro responsável por gerenciar as inscrições desta gira">
                     <select
                       className="form-control-custom"
                       value={form.responsavel_lista_id}

@@ -212,9 +212,9 @@ export default function RedefinirSenha() {
 
                 {/* Nova senha */}
                 <div className="mb-3">
-                  <label className="form-label-custom">Nova senha</label>
+                  <label htmlFor="pages-redefinir-senha-js-1" className="form-label-custom">Nova senha</label>
                   <div style={{ position: 'relative' }}>
-                    <input
+                    <input id="pages-redefinir-senha-js-1"
                       type={mostrarSenha ? 'text' : 'password'}
                       className="form-control-custom"
                       style={{ paddingRight: '2.75rem' }}
@@ -272,9 +272,9 @@ export default function RedefinirSenha() {
 
                 {/* Confirmar senha */}
                 <div className="mb-4">
-                  <label className="form-label-custom">Confirmar nova senha</label>
+                  <label htmlFor="pages-redefinir-senha-js-2" className="form-label-custom">Confirmar nova senha</label>
                   <div style={{ position: 'relative' }}>
-                    <input
+                    <input id="pages-redefinir-senha-js-2"
                       type={mostrarSenha ? 'text' : 'password'}
                       className="form-control-custom"
                       style={{

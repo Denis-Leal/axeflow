@@ -1,3 +1,4 @@
+import { useModalDialog } from '../hooks/useModalDialog';
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -23,6 +24,7 @@ function StatusBadge({ ativo }) {
 }
 
 function AtendimentoFormModal({ atendimento, onClose, onSave }) {
+  const [modalError, setModalError] = useState('');
   const [form, setForm] = useState({
     nome: atendimento?.nome || '',
     descricao: atendimento?.descricao || '',
@@ -36,6 +38,7 @@ function AtendimentoFormModal({ atendimento, onClose, onSave }) {
     e.preventDefault();
     if (!form.nome.trim() || Number(form.valor) <= 0) return;
 
+    setModalError('');
     setSalvando(true);
     try {
       await onSave({
@@ -47,36 +50,39 @@ function AtendimentoFormModal({ atendimento, onClose, onSave }) {
       toast.success(atendimento?.id ? 'Atendimento atualizado' : 'Atendimento cadastrado');
       onClose();
     } catch (err) {
-      toast.error(handleApiError(err, 'Salvar atendimento'));
+      setModalError(handleApiError(err, 'Salvar atendimento'));
     } finally {
       setSalvando(false);
     }
   };
 
+  const dialogProps = useModalDialog({ open: true, onClose: onClose, busy: salvando, label: atendimento?.id ? 'Editar atendimento' : 'Novo atendimento' });
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+    <div {...dialogProps} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <form onSubmit={handleSubmit} style={{ background: 'var(--cor-card)', border: '1px solid var(--cor-borda)', borderRadius: 12, padding: '1.5rem', width: '100%', maxWidth: 520 }}>
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
         <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', marginBottom: '1rem' }}>
           {atendimento?.id ? 'Editar Atendimento' : 'Novo Atendimento'}
         </h5>
 
         <div style={{ display: 'grid', gap: '0.85rem' }}>
           <div>
-            <label className="form-label-custom">Nome</label>
-            <input className="form-control-custom" value={form.nome} onChange={e => setForm(v => ({ ...v, nome: e.target.value }))} required />
+            <label htmlFor="pages-atendimentos-js-1" className="form-label-custom">Nome</label>
+            <input id="pages-atendimentos-js-1" className="form-control-custom" value={form.nome} onChange={e => setForm(v => ({ ...v, nome: e.target.value }))} required />
           </div>
           <div>
-            <label className="form-label-custom">Descrição</label>
-            <textarea className="form-control-custom" rows={3} value={form.descricao} onChange={e => setForm(v => ({ ...v, descricao: e.target.value }))} />
+            <label htmlFor="pages-atendimentos-js-2" className="form-label-custom">Descrição</label>
+            <textarea id="pages-atendimentos-js-2" className="form-control-custom" rows={3} value={form.descricao} onChange={e => setForm(v => ({ ...v, descricao: e.target.value }))} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
             <div>
-              <label className="form-label-custom">Valor</label>
-              <input className="form-control-custom" type="number" min="0.01" step="0.01" value={form.valor} onChange={e => setForm(v => ({ ...v, valor: e.target.value }))} required />
+              <label htmlFor="pages-atendimentos-js-3" className="form-label-custom">Valor</label>
+              <input id="pages-atendimentos-js-3" className="form-control-custom" type="number" min="0.01" step="0.01" value={form.valor} onChange={e => setForm(v => ({ ...v, valor: e.target.value }))} required />
             </div>
             <div>
-              <label className="form-label-custom">Cobrança</label>
-              <select className="form-control-custom" value={form.tipo_cobranca} onChange={e => setForm(v => ({ ...v, tipo_cobranca: e.target.value }))}>
+              <label htmlFor="pages-atendimentos-js-4" className="form-label-custom">Cobrança</label>
+              <select id="pages-atendimentos-js-4" className="form-control-custom" value={form.tipo_cobranca} onChange={e => setForm(v => ({ ...v, tipo_cobranca: e.target.value }))}>
                 <option value="servico">Por serviço</option>
                 <option value="hora">Por hora</option>
               </select>
@@ -89,7 +95,7 @@ function AtendimentoFormModal({ atendimento, onClose, onSave }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-          <button type="button" className="btn-outline-gold" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn-outline-gold" onClick={() => { if (!salvando) onClose(); }}>Cancelar</button>
           <button className="btn-gold" disabled={salvando || !form.nome.trim() || Number(form.valor) <= 0}>
             {salvando ? 'Salvando...' : 'Salvar'}
           </button>
