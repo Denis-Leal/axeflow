@@ -232,8 +232,8 @@ export default function Contato() {
 
                       {/* Seleção de tipo de feedback */}
                       <div style={{ marginBottom: '1.5rem' }}>
-                        <label className="form-label-custom">Tipo de feedback *</label>
-                        <div style={{
+                        <span id="feedback-tipo" className="form-label-custom">Tipo de feedback *</span>
+                        <div role="group" aria-labelledby="feedback-tipo" style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
                           gap: '0.5rem',
@@ -245,6 +245,7 @@ export default function Contato() {
                             return (
                               <button
                                 key={tipo.value}
+                                aria-pressed={ativo}
                                 type="button"
                                 onClick={() => setForm({ ...form, tipo: tipo.value })}
                                 style={{
@@ -282,13 +283,13 @@ export default function Contato() {
 
                       {/* Assunto (opcional) */}
                       <div style={{ marginBottom: '1rem' }}>
-                        <label className="form-label-custom">
+                        <label htmlFor="pages-contato-js-1" className="form-label-custom">
                           Assunto
                           <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
                             (opcional)
                           </span>
                         </label>
-                        <input
+                        <input id="pages-contato-js-1"
                           className="form-control-custom"
                           value={form.assunto}
                           onChange={e => setForm({ ...form, assunto: e.target.value })}
@@ -299,8 +300,8 @@ export default function Contato() {
 
                       {/* Mensagem principal */}
                       <div style={{ marginBottom: '1.5rem' }}>
-                        <label className="form-label-custom">Mensagem *</label>
-                        <textarea
+                        <label htmlFor="pages-contato-js-2" className="form-label-custom">Mensagem *</label>
+                        <textarea id="pages-contato-js-2"
                           className="form-control-custom"
                           value={form.mensagem}
                           onChange={e => setForm({ ...form, mensagem: e.target.value })}

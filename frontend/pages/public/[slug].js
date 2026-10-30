@@ -116,6 +116,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setError('');
     try {
@@ -144,7 +145,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
   if (resultado) {
     const naFila = resultado.status === 'lista_espera';
     return (
-      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+      <div role="status" style={{ textAlign: 'center', padding: '1rem 0' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>
           {naFila ? '⏳' : '✦'}
         </div>
@@ -171,7 +172,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
   }
 
   return (
-    <div>
+    <form onSubmit={handleSubmit}>
       {/* ── Aviso de lista de espera (visível apenas quando vagas esgotadas) ── */}
       {listaEspera && (
         <div style={{
@@ -204,15 +205,18 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
       </h6>
 
       {error && (
-        <div className="alert-custom alert-danger-custom mb-3">
+        <div role="alert" className="alert-custom alert-danger-custom mb-3">
           <i className="bi bi-exclamation-circle me-2"></i>{error}
         </div>
       )}
 
       <div className="mb-3">
-        <label className="form-label-custom">Nome completo</label>
+        <label htmlFor="inscricao-nome" className="form-label-custom">Nome completo</label>
         <input
           className="form-control-custom"
+          id="inscricao-nome"
+          autoComplete="name"
+          pattern={".*\\S.*"}
           value={form.nome}
           onChange={e => setForm({ ...form, nome: e.target.value })}
           placeholder="Seu nome completo"
@@ -221,9 +225,11 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
       </div>
 
       <div className="mb-3">
-        <label className="form-label-custom">WhatsApp / Telefone</label>
+        <label htmlFor="inscricao-telefone" className="form-label-custom">WhatsApp / Telefone</label>
         <input
           className="form-control-custom"
+          id="inscricao-telefone"
+          autoComplete="tel"
           value={form.telefone}
           onChange={(e) => {
             const formatted = formatTelefone(e.target.value);
@@ -240,6 +246,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
       ── */}
       <div className="mb-3">
         <label
+          className="public-first-visit"
           htmlFor="primeira-visita"
           style={{
             display: 'flex',
@@ -280,7 +287,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
             type="checkbox"
             checked={form.primeira_visita}
             onChange={e => setForm({ ...form, primeira_visita: e.target.checked })}
-            style={{ display: 'none' }}
+            className="visually-hidden"
           />
 
           <div>
@@ -296,13 +303,14 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
 
       {/* ── Campo de observações — opcional ─────────────────────────────────── */}
       <div className="mb-4">
-        <label className="form-label-custom">
+        <label htmlFor="inscricao-observacoes" className="form-label-custom">
           Observações
           <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
             (opcional)
           </span>
         </label>
         <textarea
+          id="inscricao-observacoes"
           className="form-control-custom"
           value={form.observacoes}
           onChange={e => setForm({ ...form, observacoes: e.target.value })}
@@ -319,9 +327,10 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
       </div>
 
       <button
-        onClick={handleSubmit}
+        type="submit"
+        aria-busy={submitting || undefined}
         className="btn-gold w-100"
-        disabled={submitting || !form.nome || !form.telefone}
+        disabled={submitting}
         style={{
           padding: '0.85rem',
           // Cor diferenciada para lista de espera (âmbar em vez de dourado)
@@ -334,7 +343,7 @@ function FormularioInscricao({ listaEspera, posicaoFila, slug }) {
         }
         {listaEspera ? 'Entrar na Fila de Espera' : 'Confirmar Inscrição'}
       </button>
-    </div>
+    </form>
   );
 }
 

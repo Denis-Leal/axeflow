@@ -97,8 +97,8 @@ export default function InformacoesPublicas() {
     return <div className="spinner-gold" style={{ margin: "45vh auto" }} />;
   const field = (key, label, extra = {}) => (
     <div className="mb-3">
-      <label className="form-label-custom">{label}</label>
-      <input
+      <label htmlFor={`pages-informacoes-publicas-js-1-${key}`} className="form-label-custom">{label}</label>
+      <input id={`pages-informacoes-publicas-js-1-${key}`}
         className="form-control-custom"
         value={perfil[key] || ""}
         onChange={(e) => setPerfil({ ...perfil, [key]: e.target.value })}
@@ -176,8 +176,8 @@ export default function InformacoesPublicas() {
                     placeholder: "ex: casa-de-ogum",
                   })}
                   <div className="mb-3">
-                    <label className="form-label-custom">Apresentação</label>
-                    <textarea
+                    <label htmlFor="pages-informacoes-publicas-js-2" className="form-label-custom">Apresentação</label>
+                    <textarea id="pages-informacoes-publicas-js-2"
                       className="form-control-custom"
                       rows="4"
                       value={perfil.descricao_publica || ""}
@@ -223,7 +223,7 @@ export default function InformacoesPublicas() {
                   <div className="row">
                     <div className="col-md-7">{field("cidade", "Cidade")}</div>
                     <div className="col-md-2">{field("uf", "UF")}</div>
-                    <div className="col-md-3"><div className="mb-3"><label className="form-label-custom">CEP</label><div style={{display:'flex',gap:8}}><input className="form-control-custom" value={perfil.cep || ''} maxLength={9} onChange={e => setPerfil({...perfil, cep:e.target.value})}/><button type="button" className="btn-outline-gold" onClick={buscarCep}>Buscar</button></div></div></div>
+                    <div className="col-md-3"><div className="mb-3"><label htmlFor="pages-informacoes-publicas-js-3" className="form-label-custom">CEP</label><div style={{display:'flex',gap:8}}><input id="pages-informacoes-publicas-js-3" className="form-control-custom" value={perfil.cep || ''} maxLength={9} onChange={e => setPerfil({...perfil, cep:e.target.value})}/><button type="button" className="btn-outline-gold" onClick={buscarCep}>Buscar</button></div></div></div>
                   </div>
                   <div className="row">
                     <div className="col-md-6">{field("latitude", "Latitude")}</div>

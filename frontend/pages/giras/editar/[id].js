@@ -27,7 +27,7 @@ import BottomNav from '../../../components/BottomNav';
 import { getGira, listMembros, updateGira } from '../../../services/api';
 import { handleApiError } from '../../../services/errorHandler';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { Button, Card, CardHeader, CardBody, Spinner, StatCard } from '../../../components/ui';
+import { Badge, Button, Card, CardHeader, CardBody, Spinner, StatCard } from '../../../components/ui';
 
 // ── Helper: monta link wa.me com mensagem pré-preenchida ──────────────────────
 function linkWhatsApp(telefone, mensagem) {
@@ -282,7 +282,6 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
 
     setModal({
@@ -293,6 +292,7 @@ useEffect(() => {
       labelConfirmar: 'Sim, salvar',
       onConfirmar: async () => {
         fecharModal();
+        setSaving(true);
         try {
           const raw = {
             titulo:  form.titulo,
@@ -402,8 +402,8 @@ useEffect(() => {
                     <div className="row g-3">
 
                       <div className="col-12">
-                        <label className="form-label-custom">Tipo de Gira</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <span id="gira-tipo" className="form-label-custom">Tipo de Gira</span>
+                        <div role="group" aria-labelledby="gira-tipo" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
                           <StatCard value={"pública 🌐"} sub={"Aberta ao público"} onClick={() => set('acesso', 'publica')}
                             style={{ flex: 1, borderRadius: '8px',background: form.acesso === "publica" ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
                                   border: `1.5px solid ${form.acesso === "publica" ? 'var(--cor-acento)' : 'var(--cor-borda)'}`,
@@ -418,20 +418,20 @@ useEffect(() => {
                       </div>
 
                       <div className="col-12">
-                        <label className="form-label-custom">Título *</label>
-                        <input className="form-control-custom" value={form.titulo} required
+                        <label htmlFor="pages-giras-editar--id--js-1" className="form-label-custom">Título *</label>
+                        <input id="pages-giras-editar--id--js-1" className="form-control-custom" value={form.titulo} required
                           onChange={e => set('titulo', e.target.value)} />
                       </div>
 
                       <div className="col-md-6">
-                        <label className="form-label-custom">Tipo</label>
-                        <input className="form-control-custom" value={form.tipo}
+                        <label htmlFor="pages-giras-editar--id--js-2" className="form-label-custom">Tipo</label>
+                        <input id="pages-giras-editar--id--js-2" className="form-control-custom" value={form.tipo}
                           onChange={e => set('tipo', e.target.value)} placeholder="Ex: Umbanda, Candomblé..." />
                       </div>
 
                       <div className="col-md-6">
-                        <label className="form-label-custom">Status</label>
-                        <select className="form-control-custom" value={form.status}
+                        <label htmlFor="pages-giras-editar--id--js-3" className="form-label-custom">Status</label>
+                        <select id="pages-giras-editar--id--js-3" className="form-control-custom" value={form.status}
                           onChange={e => set('status', e.target.value)}>
                           <option value="aberta" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Aberta</option>
                           <option value="fechada" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Fechada</option>
@@ -440,34 +440,34 @@ useEffect(() => {
                       </div>
 
                       <div className="col-md-6">
-                        <label className="form-label-custom">Data *</label>
-                        <input type="date" className="form-control-custom" value={form.data} required
+                        <label htmlFor="pages-giras-editar--id--js-4" className="form-label-custom">Data *</label>
+                        <input id="pages-giras-editar--id--js-4" type="date" className="form-control-custom" value={form.data} required
                           onChange={e => set('data', e.target.value)} />
                       </div>
 
                       <div className="col-md-6">
-                        <label className="form-label-custom">Horário *</label>
-                        <input type="time" className="form-control-custom" value={form.horario} required
+                        <label htmlFor="pages-giras-editar--id--js-5" className="form-label-custom">Horário *</label>
+                        <input id="pages-giras-editar--id--js-5" type="time" className="form-control-custom" value={form.horario} required
                           onChange={e => set('horario', e.target.value)} />
                       </div>
 
                       {form.acesso === 'fechada' && (
                         <div className="col-md-6">
-                          <label className="form-label-custom">Limite de membros *</label>
-                          <input type="number" className="form-control-custom" value={form.limite_membros} required
+                          <label htmlFor="pages-giras-editar--id--js-6" className="form-label-custom">Limite de membros *</label>
+                          <input id="pages-giras-editar--id--js-6" type="number" className="form-control-custom" value={form.limite_membros} required
                             min="1" max="999" onChange={e => set('limite_membros', e.target.value)} />
                         </div>
                       )}
 
                       {form.acesso !== 'fechada' && (
                         <div className="col-md-6">
-                          <label className="form-label-custom">
+                          <label htmlFor="pages-giras-editar--id--js-7" className="form-label-custom">
                             Limite de consulentes *
                             <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
                               (aumentar libera vagas da fila de espera)
                             </span>
                           </label>
-                          <input type="number" className="form-control-custom" value={form.limite_consulentes} required
+                          <input id="pages-giras-editar--id--js-7" type="number" className="form-control-custom" value={form.limite_consulentes} required
                             min="1" max="999" onChange={e => set('limite_consulentes', e.target.value)} />
                         </div>
                       )}
@@ -482,8 +482,8 @@ useEffect(() => {
                             </label>
                           </div>
                           <div className="col-md-6">
-                            <label className="form-label-custom">Responsável pela lista</label>
-                            <select className="form-control-custom" value={form.responsavel_lista_id}
+                            <label htmlFor="pages-giras-editar--id--js-8" className="form-label-custom">Responsável pela lista</label>
+                            <select id="pages-giras-editar--id--js-8" className="form-control-custom" value={form.responsavel_lista_id}
                               onChange={e => set('responsavel_lista_id', e.target.value)}>
                               <option value="" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>
                                 — Nenhum —
@@ -497,14 +497,14 @@ useEffect(() => {
                           </div>
 
                           <div className="col-md-6">
-                            <label className="form-label-custom">Abertura da lista *</label>
-                            <input type="datetime-local" className="form-control-custom" value={form.abertura_lista}
+                            <label htmlFor="pages-giras-editar--id--js-9" className="form-label-custom">Abertura da lista *</label>
+                            <input id="pages-giras-editar--id--js-9" type="datetime-local" className="form-control-custom" value={form.abertura_lista}
                               onChange={e => set('abertura_lista', e.target.value)} required />
                           </div>
 
                           <div className="col-md-6">
-                            <label className="form-label-custom">Fechamento da lista *</label>
-                            <input type="datetime-local" className="form-control-custom" value={form.fechamento_lista}
+                            <label htmlFor="pages-giras-editar--id--js-10" className="form-label-custom">Fechamento da lista *</label>
+                            <input id="pages-giras-editar--id--js-10" type="datetime-local" className="form-control-custom" value={form.fechamento_lista}
                               onChange={e => set('fechamento_lista', e.target.value)} required />
                           </div>
                         </>

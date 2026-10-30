@@ -1396,8 +1396,8 @@ print(res.json())  # {"posicao": 5, "status": "confirmado", ...}`} />
               )}
               <form onSubmit={handleCriar}>
                 <div className="mb-3">
-                  <label className="form-label-custom">Nome da chave *</label>
-                  <input
+                  <label htmlFor="pages-api-docs-js-1" className="form-label-custom">Nome da chave *</label>
+                  <input id="pages-api-docs-js-1"
                     className="form-control-custom"
                     value={formNome}
                     onChange={e => setFormNome(e.target.value)}
@@ -1406,13 +1406,13 @@ print(res.json())  # {"posicao": 5, "status": "confirmado", ...}`} />
                   />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label-custom">
+                  <label htmlFor="pages-api-docs-js-2" className="form-label-custom">
                     Descrição
                     <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
                       (opcional)
                     </span>
                   </label>
-                  <input
+                  <input id="pages-api-docs-js-2"
                     className="form-control-custom"
                     value={formDesc}
                     onChange={e => setFormDesc(e.target.value)}
@@ -1423,7 +1423,7 @@ print(res.json())  # {"posicao": 5, "status": "confirmado", ...}`} />
 
                 {/* Seleção de scopes */}
                 <div className="mb-4">
-                  <label className="form-label-custom">Permissões (scopes) *</label>
+                  <label htmlFor="pages-api-docs-js-3" className="form-label-custom">Permissões (scopes) *</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem' }}>
                     {Object.entries(SCOPES_META).map(([scope, meta]) => {
                       const selecionado = scopesSel.includes(scope);
@@ -1438,7 +1438,7 @@ print(res.json())  # {"posicao": 5, "status": "confirmado", ...}`} />
                             transition: 'all 0.15s',
                           }}
                         >
-                          <input
+                          <input id="pages-api-docs-js-3"
                             type="checkbox"
                             checked={selecionado}
                             onChange={() => toggleScope(scope)}

@@ -1,3 +1,4 @@
+import { useModalDialog } from '../hooks/useModalDialog';
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -169,6 +170,7 @@ function AgendamentoModal({
   onSave,
   onConsulenteCriado,
 }) {
+  const [modalError, setModalError] = useState('');
   const [form, setForm] = useState({
     consulente_id: agendamento?.consulente_id || '',
     atendimento_tipo_id:
@@ -228,7 +230,7 @@ function AgendamentoModal({
 
   const criarNovoConsulente = async () => {
     if (!novoConsulente.nome.trim()) {
-      toast.error('Informe o nome do consulente.');
+      setModalError('Informe o nome do consulente.');
       return;
     }
 
@@ -255,7 +257,7 @@ function AgendamentoModal({
 
       toast.success('Consulente cadastrado');
     } catch (err) {
-      toast.error(
+      setModalError(
         handleApiError(
           err,
           'Cadastrar consulente'
@@ -283,6 +285,7 @@ function AgendamentoModal({
       return;
     }
 
+    setModalError('');
     setSalvando(true);
 
     try {
@@ -308,7 +311,7 @@ function AgendamentoModal({
 
       onClose();
     } catch (err) {
-      toast.error(
+      setModalError(
         handleApiError(
           err,
           'Salvar agendamento'
@@ -319,8 +322,10 @@ function AgendamentoModal({
     }
   };
 
+  const dialogProps = useModalDialog({ open: true, onClose: onClose, busy: salvando, label: agendamento ? 'Editar agendamento' : 'Novo agendamento' });
+
   return (
-    <div
+    <div {...dialogProps}
       style={{
         position: 'fixed',
         inset: 0,
@@ -344,6 +349,7 @@ function AgendamentoModal({
           maxWidth: 640,
         }}
       >
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
         <h5
           style={{
             fontFamily: 'Cinzel',
@@ -363,7 +369,7 @@ function AgendamentoModal({
           }}
         >
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-1" className="form-label-custom">
               Consulente
             </label>
 
@@ -374,7 +380,7 @@ function AgendamentoModal({
                 gap: '0.5rem',
               }}
             >
-              <select
+              <select id="pages-agendamentos-js-1"
                 className="form-control-custom"
                 value={form.consulente_id}
                 onChange={(e) =>
@@ -441,6 +447,7 @@ function AgendamentoModal({
               >
                 <input
                   className="form-control-custom"
+                  aria-label="Nome do novo consulente"
                   placeholder="Nome do consulente"
                   value={novoConsulente.nome}
                   onChange={(e) =>
@@ -455,6 +462,7 @@ function AgendamentoModal({
 
                 <input
                   className="form-control-custom"
+                  aria-label="Telefone do novo consulente"
                   placeholder="Telefone"
                   value={
                     novoConsulente.telefone
@@ -484,11 +492,11 @@ function AgendamentoModal({
           )}
 
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-2" className="form-label-custom">
               Tipo de atendimento
             </label>
 
-            <select
+            <select id="pages-agendamentos-js-2"
               className="form-control-custom"
               value={
                 form.atendimento_tipo_id
@@ -534,11 +542,11 @@ function AgendamentoModal({
             }}
           >
             <div>
-              <label className="form-label-custom">
+              <label htmlFor="pages-agendamentos-js-3" className="form-label-custom">
                 Data
               </label>
 
-              <input
+              <input id="pages-agendamentos-js-3"
                 className="form-control-custom"
                 type="date"
                 value={form.data}
@@ -553,14 +561,14 @@ function AgendamentoModal({
             </div>
 
             <div>
-              <label className="form-label-custom">
+              <label htmlFor="pages-agendamentos-js-4" className="form-label-custom">
                 {tipoSelecionado?.tipo_cobranca ===
                 'hora'
                   ? 'Hora inicial'
                   : 'Hora'}
               </label>
 
-              <input
+              <input id="pages-agendamentos-js-4"
                 className="form-control-custom"
                 type="time"
                 value={form.hora_inicio}
@@ -578,11 +586,11 @@ function AgendamentoModal({
             {tipoSelecionado?.tipo_cobranca ===
               'hora' && (
               <div>
-                <label className="form-label-custom">
+                <label htmlFor="pages-agendamentos-js-5" className="form-label-custom">
                   Hora final
                 </label>
 
-                <input
+                <input id="pages-agendamentos-js-5"
                   className="form-control-custom"
                   type="time"
                   value={form.hora_fim}
@@ -648,11 +656,11 @@ function AgendamentoModal({
           )}
 
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-6" className="form-label-custom">
               Observações
             </label>
 
-            <textarea
+            <textarea id="pages-agendamentos-js-6"
               className="form-control-custom"
               rows={3}
               value={form.observacoes}
@@ -678,7 +686,7 @@ function AgendamentoModal({
           <button
             type="button"
             className="btn-outline-gold"
-            onClick={onClose}
+            onClick={() => { if (!salvando) onClose(); }}
           >
             Cancelar
           </button>
@@ -713,6 +721,8 @@ function FinanceiroAgendamentoModal({
   onPagar,
   onRecibo,
 }) {
+  const dialogProps = useModalDialog({ open: aberto, onClose: onFechar, busy: false, label: 'Financeiro do agendamento' });
+
   if (!aberto) return null;
 
   const valorAgendamento = Number(
@@ -735,7 +745,7 @@ function FinanceiroAgendamentoModal({
   const semCobranca = conta?.inexistente;
 
   return (
-    <div
+    <div {...dialogProps}
       className="modal d-block"
       style={{
         background: 'rgba(0,0,0,.65)',
@@ -762,7 +772,8 @@ function FinanceiroAgendamentoModal({
 
             <button
               type="button"
-              className="btn-close btn-close-white"
+              aria-label="Fechar"
+                className="btn-close btn-close-white"
               onClick={onFechar}
             />
           </div>
@@ -975,6 +986,7 @@ function PagamentoAgendamentoModal({
   onFechar,
   onSucesso,
 }) {
+  const [modalError, setModalError] = useState('');
   const [formaPagamentoId, setFormaPagamentoId] =
     useState('');
 
@@ -997,6 +1009,8 @@ function PagamentoAgendamentoModal({
     setObservacoes('');
   }, [aberto, formas]);
 
+  const dialogProps = useModalDialog({ open: aberto && !!conta, onClose: onFechar, busy: salvando, label: 'Registrar pagamento' });
+
   if (!aberto || !conta) {
     return null;
   }
@@ -1013,7 +1027,7 @@ function PagamentoAgendamentoModal({
     );
 
     if (!formaPagamentoId) {
-      toast.error(
+      setModalError(
         'Selecione a forma de pagamento.'
       );
       return;
@@ -1023,12 +1037,13 @@ function PagamentoAgendamentoModal({
       !valorPagamento ||
       valorPagamento <= 0
     ) {
-      toast.error(
+      setModalError(
         'Informe um valor válido.'
       );
       return;
     }
 
+    setModalError('');
     setSalvando(true);
 
     try {
@@ -1053,7 +1068,7 @@ function PagamentoAgendamentoModal({
 
       onSucesso();
     } catch (error) {
-      toast.error(
+      setModalError(
         error.response?.data?.detail ||
           'Não foi possível registrar o pagamento.'
       );
@@ -1063,7 +1078,7 @@ function PagamentoAgendamentoModal({
   };
 
   return (
-    <div
+    <div {...dialogProps}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1088,6 +1103,7 @@ function PagamentoAgendamentoModal({
           maxWidth: 480,
         }}
       >
+        {modalError && <div role="alert" className="alert-custom alert-danger-custom">{modalError}</div>}
         <h5
           style={{
             fontFamily: 'Cinzel',
@@ -1105,11 +1121,11 @@ function PagamentoAgendamentoModal({
           }}
         >
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-7" className="form-label-custom">
               Forma de pagamento
             </label>
 
-            <select
+            <select id="pages-agendamentos-js-7"
               className="form-control-custom"
               value={formaPagamentoId}
               onChange={(e) =>
@@ -1139,11 +1155,11 @@ function PagamentoAgendamentoModal({
           </div>
 
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-8" className="form-label-custom">
               Valor
             </label>
 
-            <input
+            <input id="pages-agendamentos-js-8"
               type="number"
               min="0.01"
               step="0.01"
@@ -1167,11 +1183,11 @@ function PagamentoAgendamentoModal({
           </div>
 
           <div>
-            <label className="form-label-custom">
+            <label htmlFor="pages-agendamentos-js-9" className="form-label-custom">
               Observações
             </label>
 
-            <textarea
+            <textarea id="pages-agendamentos-js-9"
               className="form-control-custom"
               rows={3}
               maxLength={2000}
@@ -1197,7 +1213,7 @@ function PagamentoAgendamentoModal({
           <button
             type="button"
             className="btn-outline-gold"
-            onClick={onFechar}
+            onClick={() => { if (!salvando) onFechar(); }}
             disabled={salvando}
           >
             Cancelar
@@ -2094,6 +2110,7 @@ export default function AgendamentosPage() {
             >
               <input
                 className="form-control-custom"
+                aria-label="Buscar agendamento por consulente ou atendimento"
                 placeholder="Buscar por consulente ou atendimento..."
                 value={busca}
                 onChange={(e) =>
@@ -2108,6 +2125,7 @@ export default function AgendamentosPage() {
 
               <select
                 className="form-control-custom"
+                aria-label="Filtrar agendamentos por status"
                 value={status}
                 onChange={(e) =>
                   setStatus(

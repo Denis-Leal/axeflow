@@ -1,3 +1,4 @@
+import { useModalDialog } from '../hooks/useModalDialog';
 /**
  * pages/membros.js — AxeFlow
  *
@@ -65,16 +66,18 @@ function ScoreLegenda() {
 
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
 
-function Modal({ titulo, onClose, children }) {
+function Modal({ titulo, onClose, children, busy }) {
+  const dialogProps = useModalDialog({ open: true, onClose: onClose, busy, label: titulo });
+
   return (
-    <div style={{
+    <div {...dialogProps} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <Card style={{ width: '100%', maxWidth: '460px', margin: '1rem' }}>
         <CardHeader style={{ justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)' }}>✦ {titulo}</span>
-          <Button variant="ghost" size="sm" onClick={onClose} style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}>×</Button>
+          <Button aria-label="Fechar" variant="ghost" size="sm" disabled={busy} onClick={onClose} style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}>×</Button>
         </CardHeader>
         <CardBody>{children}</CardBody>
       </Card>
@@ -286,6 +289,7 @@ export default function Membros() {
                     <div style={{ marginBottom: '1rem' }}>
                       <input
                         className="form-control-custom"
+                        aria-label="Buscar membro por nome"
                         placeholder="🔍  Buscar membro por nome..."
                         value={busca}
                         onChange={e => setBusca(e.target.value)}
@@ -334,28 +338,28 @@ export default function Membros() {
 
       {/* ── Modal: Convidar ── */}
       {showModal && (
-        <Modal titulo="Convidar Membro" onClose={() => setShowModal(false)}>
-          {formError && <div className="alert-custom alert-danger-custom mb-3">{formError}</div>}
+        <Modal busy={saving} titulo="Convidar Membro" onClose={() => setShowModal(false)}>
+          {formError && <div role="alert" className="alert-custom alert-danger-custom mb-3">{formError}</div>}
           <form onSubmit={handleConvidar}>
             <div className="mb-3">
-              <label className="form-label-custom">Nome</label>
-              <input className="form-control-custom" value={form.nome}
+              <label htmlFor="pages-membros-js-1" className="form-label-custom">Nome</label>
+              <input id="pages-membros-js-1" className="form-control-custom" value={form.nome}
                 onChange={e => setForm({ ...form, nome: e.target.value })} required />
             </div>
             <div className="mb-3">
-              <label className="form-label-custom">Email</label>
-              <input type="email" className="form-control-custom" value={form.email}
+              <label htmlFor="pages-membros-js-2" className="form-label-custom">Email</label>
+              <input id="pages-membros-js-2" type="email" className="form-control-custom" value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })} required />
             </div>
             <div className="row g-3 mb-3">
               <div className="col-6">
-                <label className="form-label-custom">Telefone</label>
-                <input className="form-control-custom" value={form.telefone}
+                <label htmlFor="pages-membros-js-3" className="form-label-custom">Telefone</label>
+                <input id="pages-membros-js-3" className="form-control-custom" value={form.telefone}
                   onChange={e => setForm({ ...form, telefone: e.target.value })} />
               </div>
               <div className="col-6">
-                <label className="form-label-custom">Perfil</label>
-                <select className="form-control-custom" value={form.role}
+                <label htmlFor="pages-membros-js-4" className="form-label-custom">Perfil</label>
+                <select id="pages-membros-js-4" className="form-control-custom" value={form.role}
                   onChange={e => setForm({ ...form, role: e.target.value })}>
                   <option value="membro" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Membro</option>
                   <option value="operador" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Operador</option>
@@ -364,12 +368,12 @@ export default function Membros() {
               </div>
             </div>
             <div className="mb-4">
-              <label className="form-label-custom">Senha provisória</label>
-              <input type="password" className="form-control-custom" value={form.senha}
+              <label htmlFor="pages-membros-js-5" className="form-label-custom">Senha provisória</label>
+              <input id="pages-membros-js-5" type="password" className="form-control-custom" value={form.senha}
                 onChange={e => setForm({ ...form, senha: e.target.value })} required minLength={6} />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button type="button" variant="outline" fullWidth onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" fullWidth disabled={saving} onClick={() => setShowModal(false)}>Cancelar</Button>
               <Button type="submit" variant="primary" fullWidth disabled={saving} loading={saving}>Convidar</Button>
             </div>
           </form>
@@ -378,28 +382,28 @@ export default function Membros() {
 
       {/* ── Modal: Editar ── */}
       {showEditModal && membroEditando && (
-        <Modal titulo="Editar Membro" onClose={() => setShowEditModal(false)}>
-          {formError && <div className="alert-custom alert-danger-custom mb-3">{formError}</div>}
+        <Modal busy={saving} titulo="Editar Membro" onClose={() => setShowEditModal(false)}>
+          {formError && <div role="alert" className="alert-custom alert-danger-custom mb-3">{formError}</div>}
           <form onSubmit={handleEditar}>
             <div className="mb-3">
-              <label className="form-label-custom">Nome</label>
-              <input className="form-control-custom" value={editForm.nome}
+              <label htmlFor="pages-membros-js-6" className="form-label-custom">Nome</label>
+              <input id="pages-membros-js-6" className="form-control-custom" value={editForm.nome}
                 onChange={e => setEditForm({ ...editForm, nome: e.target.value })} required />
             </div>
             <div className="mb-3">
-              <label className="form-label-custom">Email</label>
-              <input className="form-control-custom" value={membroEditando.email} disabled style={{ opacity: 0.5 }} />
+              <label htmlFor="pages-membros-js-7" className="form-label-custom">Email</label>
+              <input id="pages-membros-js-7" className="form-control-custom" value={membroEditando.email} disabled style={{ opacity: 0.5 }} />
               <small style={{ color: 'var(--cor-texto-suave)', fontSize: '0.75rem' }}>O email não pode ser alterado</small>
             </div>
             <div className="row g-3 mb-3">
               <div className="col-6">
-                <label className="form-label-custom">Telefone</label>
-                <input className="form-control-custom" value={editForm.telefone}
+                <label htmlFor="pages-membros-js-8" className="form-label-custom">Telefone</label>
+                <input id="pages-membros-js-8" className="form-control-custom" value={editForm.telefone}
                   onChange={e => setEditForm({ ...editForm, telefone: e.target.value })} />
               </div>
               <div className="col-6">
-                <label className="form-label-custom">Perfil</label>
-                <select className="form-control-custom" value={editForm.role}
+                <label htmlFor="pages-membros-js-9" className="form-label-custom">Perfil</label>
+                <select id="pages-membros-js-9" className="form-control-custom" value={editForm.role}
                   onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
                   <option value="membro" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Membro</option>
                   <option value="operador" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Operador</option>
@@ -408,21 +412,21 @@ export default function Membros() {
               </div>
             </div>
             <div className="mb-3">
-              <label className="form-label-custom">
+              <label htmlFor="pages-membros-js-10" className="form-label-custom">
                 Nova senha <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400 }}>(deixe em branco para manter)</span>
               </label>
-              <input type="password" className="form-control-custom" value={editForm.senha}
+              <input id="pages-membros-js-10" type="password" className="form-control-custom" value={editForm.senha}
                 onChange={e => setEditForm({ ...editForm, senha: e.target.value })}
                 minLength={6} placeholder="••••••" />
             </div>
             <div className="mb-4">
-              <label className="form-label-custom">Status</label>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <span id="membro-status-label" className="form-label-custom">Status</span>
+              <div role="group" aria-labelledby="membro-status-label" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                 {[
                   { val: true,  label: '✓ Ativo',  cor: '#10b981' },
                   { val: false, label: '✗ Inativo', cor: '#ef4444' },
                 ].map(opt => (
-                  <button key={String(opt.val)} type="button"
+                  <button key={String(opt.val)} type="button" aria-pressed={editForm.ativo === opt.val}
                     onClick={() => setEditForm({ ...editForm, ativo: opt.val })}
                     style={{
                       flex: 1, padding: '0.5rem', borderRadius: '8px',
@@ -444,7 +448,7 @@ export default function Membros() {
               )}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button type="button" variant="outline" fullWidth onClick={() => setShowEditModal(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" fullWidth disabled={saving} onClick={() => setShowEditModal(false)}>Cancelar</Button>
               <Button type="submit" variant="primary" fullWidth disabled={saving} loading={saving}>Salvar</Button>
             </div>
           </form>

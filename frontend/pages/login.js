@@ -91,8 +91,8 @@ export default function Login() {
 
             {/* Email */}
             <div className="mb-3">
-              <label className="form-label-custom">Email</label>
-              <input
+              <label htmlFor="pages-login-js-1" className="form-label-custom">Email</label>
+              <input id="pages-login-js-1"
                 type="email"
                 className="form-control-custom"
                 value={form.email}
@@ -106,7 +106,7 @@ export default function Login() {
             {/* Senha + link "Esqueci minha senha" */}
             <div className="mb-4">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
-                <label className="form-label-custom" style={{ margin: 0 }}>Senha</label>
+                <label htmlFor="login-senha" className="form-label-custom" style={{ margin: 0 }}>Senha</label>
                 {/* Link discreto de recuperação — alinhado à direita do label */}
                 <Link
                   href="/esqueci-senha"
@@ -123,7 +123,7 @@ export default function Login() {
                 </Link>
               </div>
               <input
-                type="password"
+                id="login-senha" type="password"
                 className="form-control-custom"
                 value={form.senha}
                 onChange={e => setForm({ ...form, senha: e.target.value })}
