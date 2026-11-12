@@ -1,0 +1,34 @@
+title = "Verificação de segredos do AxeFlow"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "vapid-private-key"
+description = "Chave privada VAPID em configuração ou variável de ambiente"
+regex = '''(?i)(?:VAPID_PRIVATE_KEY[ \t]*[:=][ \t]*["']?|key:[ \t]*VAPID_PRIVATE_KEY[ \t]*\r?\n[ \t]*value:[ \t]*["']?)([A-Za-z0-9_+/-]{40,}={0,2})'''
+secretGroup = 1
+keywords = ["vapid_private_key"]
+
+[[allowlists]]
+targetRules = ["gcp-api-key", "generic-api-key"]
+description = "Firebase cliente: somente chaves publicas ja identificadas nos arquivos cliente"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+    '''(^|/)frontend/services/firebase\.js$''',
+    '''(^|/)frontend/public/firebase-messaging-sw\.js$''',
+]
+regexes = [
+    '''^AIzaSyDbrC_QQffBttmg0W2POqv41ls6Abb4BIA$''',
+]
+
+[[rules]]
+id = "curl-auth-header"
+
+[[rules.allowlists]]
+description = "Placeholder literal da documentacao de integracao"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''(^|/)frontend/pages/api-docs\.js$''']
+regexes = ['''^axf_SUA_CHAVE_AQUI$''']

@@ -2,6 +2,39 @@
 .env
 .env.local
 .env*.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Credenciais e chaves privadas
+.aws/
+.ssh/
+.azure/
+.gcloud/
+.netrc
+.npmrc
+.pypirc
+credentials.json
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Cópias de bancos e dados locais
+*.backup
+*.dump
+*.bak
+*.sql.gz
+*.sql.zip
+*.sqlite
+*.sqlite3
+*.db
 
 # Python
 __pycache__/

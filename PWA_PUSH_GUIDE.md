@@ -177,11 +177,12 @@ backend/
 
 ---
 
-## 8. Chaves VAPID geradas para este projeto
+## 8. Configuração segura das chaves VAPID
 
-```
-VAPID_PUBLIC_KEY=BPVB0GWklvxVIo3GAtj2p1IDjZv1yTKSwVcwIWLCe3wygLbRDSJfOxSCvQd-ZUiTn-LvH0-jsPKflzlt4Tg8ufA
-VAPID_PRIVATE_KEY=MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgsxwmmzwI9U13ELFPbXSRKq9Kaz4hxIQ9y9scGnAbwgGhRANCAAT1QdBlpJb8VSKNxgLY9qdSA42b9ckyksFXMCFiwnt8MoC20Q0iXzsUgr0HfmVIk5_i7x9Po7Dyn5c5beE4PLnw
-```
+Gere um par VAPID por ambiente e configure a chave privada no gerenciador de
+segredos do backend. Disponibilize a chave pública correspondente aos clientes
+que usam esse par.
 
-> ⚠️ Para produção, gere novas chaves VAPID e configure via variáveis de ambiente no `.env`.
+As chaves anteriormente publicadas neste guia precisam de rotação coordenada.
+Consulte a etapa 2 de SECURITY_ACTION_PLAN.md para as verificações de integração,
+subscriptions e exposição histórica.
