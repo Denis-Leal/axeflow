@@ -230,6 +230,7 @@ def autenticar_por_api_key(
     # Busca o usuário dono da chave
     usuario = db.query(Usuario).filter(
         Usuario.id    == key.user_id,
+        Usuario.terreiro_id == key.terreiro_id,
         Usuario.ativo == True,
     ).first()
 

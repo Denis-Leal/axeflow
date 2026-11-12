@@ -14,7 +14,7 @@ from uuid import UUID
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_api_scope, require_role
 from app.schemas.gira_schema import GiraCreate, GiraUpdate, GiraResponse, GiraUpdateResponse
 from app.services import gira_service
 from app.services import audit_service
@@ -87,7 +87,7 @@ def create_gira(
 ):
     user, api_key = auth
     if api_key is not None:
-        if not verificar_scope(api_key, "giras:create"):
+        if not verificar_scope(api_key, "giras:write"):
             raise HTTPException(status_code=403, detail="API Key não tem permissão para criar gira")
     elif user.role not in ("admin", "operador"):
         raise HTTPException(
@@ -121,7 +121,7 @@ def update_gira(
 ):
     user, api_key = auth
     if api_key is not None:
-        if not verificar_scope(api_key, "giras:update"):
+        if not verificar_scope(api_key, "giras:write"):
             raise HTTPException(status_code=403, detail="API Key não tem permissão para atualizar gira")
     elif user.role not in ("admin", "operador"):
         raise HTTPException(
@@ -169,7 +169,7 @@ def delete_gira(
 def export_gira(
     gira_id: UUID,
     formato: str = Query("xlsx", pattern="^(xlsx|csv|pdf|docx)$"),
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_api_scope("relatorios:read")),
     db: Session = Depends(get_db),
 ):
     arquivo = export_service.export(

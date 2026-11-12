@@ -55,6 +55,7 @@ def create_membro(
     db: Session,
     *,
     terreiro_id: UUID,
+    actor_role: str,
     nome: str,
     email: str,
     senha: str,
@@ -68,6 +69,12 @@ def create_membro(
     Também tenta enviar o email de convite.
     A falha no envio do email não impede a criação do membro.
     """
+
+    if actor_role not in ("admin", "operador") or (role == "admin" and actor_role != "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Perfil sem permissão para criar membro com este papel",
+        )
 
     existing = (
         db.query(Usuario)

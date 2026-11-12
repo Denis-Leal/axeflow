@@ -70,10 +70,10 @@ def criar_tipo_atendimento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:create"):
+        if not verificar_scope(api_key, "atendimentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:create",
+                detail="API key sem permissão para atendimentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -110,10 +110,10 @@ def atualizar_tipo_atendimento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:update"):
+        if not verificar_scope(api_key, "atendimentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:update",
+                detail="API key sem permissão para atendimentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -149,10 +149,10 @@ def remover_tipo_atendimento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:delete"):
+        if not verificar_scope(api_key, "atendimentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:delete",
+                detail="API key sem permissão para atendimentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -187,10 +187,10 @@ def listar_agendamentos(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:read"):
+        if not verificar_scope(api_key, "agendamentos:read"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:read",
+                detail="API key sem permissão para agendamentos:read",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -223,10 +223,10 @@ def criar_agendamento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:write"):
+        if not verificar_scope(api_key, "agendamentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:write",
+                detail="API key sem permissão para agendamentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -263,10 +263,10 @@ def atualizar_agendamento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:write"):
+        if not verificar_scope(api_key, "agendamentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:write",
+                detail="API key sem permissão para agendamentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -303,10 +303,10 @@ def alterar_status_agendamento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:write"):
+        if not verificar_scope(api_key, "agendamentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:write",
+                detail="API key sem permissão para agendamentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -347,10 +347,10 @@ def cancelar_agendamento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:write"):
+        if not verificar_scope(api_key, "agendamentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:write",
+                detail="API key sem permissão para agendamentos:write",
             )
 
     elif user.role not in ("admin", "operador"):
@@ -391,10 +391,10 @@ def concluir_agendamento(
     user, api_key = auth
 
     if api_key is not None:
-        if not verificar_scope(api_key, "atendimentos:write"):
+        if not verificar_scope(api_key, "agendamentos:write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key sem permissão para atendimentos:write",
+                detail="API key sem permissão para agendamentos:write",
             )
 
     elif user.role not in ("admin", "operador"):

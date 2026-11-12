@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.utils.datetime_utils import utcnow
 
-from app.services.api_key_service import autenticar_por_api_key
+from app.services.api_key_service import autenticar_por_api_key, verificar_scope
 
 
 # Contexto responsável por gerar e validar hashes de senha.
@@ -164,42 +164,10 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    """
-    Dependency que autentica o usuário da requisição.
+    """Autentica por JWT as rotas do painel sem contrato de API key."""
+    if credentials.credentials.startswith("axf_"):
+        raise credentials_exception
 
-    Suporta dois tipos de credencial:
-
-        Authorization: Bearer <JWT>
-        Authorization: Bearer axf_<API_KEY>
-
-    JWT:
-        - valida assinatura e expiração;
-        - obtém o user_id;
-        - verifica se o usuário está ativo.
-
-    API Key:
-        - valida o hash da chave;
-        - verifica se está ativa e não expirada;
-        - verifica se o usuário proprietário está ativo.
-    """
-
-    token = credentials.credentials
-
-    # API Key do AxeFlow
-    if token.startswith("axf_"):
-        resultado = autenticar_por_api_key(
-            db,
-            token,
-        )
-
-        if resultado is None:
-            raise credentials_exception
-
-        user, _api_key = resultado
-
-        return user
-
-    # JWT tradicional
     user_id = _decode_token(credentials)
 
     return _get_authenticated_user(
@@ -297,3 +265,17 @@ def get_current_user_with_api_key(
     )
 
     return user, None
+
+
+def require_api_scope(scope: str):
+    """Exige o scope da API key e preserva a autenticação JWT do painel."""
+    def checker(auth=Depends(get_current_user_with_api_key)):
+        user, api_key = auth
+        if api_key is not None and not verificar_scope(api_key, scope):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Scope insuficiente: necessário '{scope}'",
+            )
+        return user
+
+    return checker

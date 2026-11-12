@@ -15,7 +15,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import require_api_scope, require_role
 from app.models.inscricao_consulente import InscricaoConsulente
 from app.models.usuario import Usuario
 from app.schemas.inscricao_schema import InscricaoPublicaRequest, PresencaUpdate
@@ -33,7 +33,7 @@ router = APIRouter(tags=["inscricoes"])
 @router.get("/giras/{gira_id}/inscricoes")
 def list_inscricoes(
     gira_id: UUID,
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_api_scope("inscricoes:read")),
     db: Session = Depends(get_db),
 ):
     """Lista inscrições de consulentes com score de presença histórico."""
@@ -76,10 +76,10 @@ def inscrever_interno(
     data: InscricaoPublicaRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_role("admin", "operador")),
 ):
     """Inscreve consulente em gira interna pelo painel administrativo."""
-    return inscricao_service.inscrever_interno(db, gira_id, data, user.id)
+    return inscricao_service.inscrever_interno(db, gira_id, data, user)
 
 
 # ── Presença e cancelamento ────────────────────────────────────────────────────

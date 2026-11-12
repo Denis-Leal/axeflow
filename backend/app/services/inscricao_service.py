@@ -408,9 +408,9 @@ def inscrever_publico(db: Session, slug: str, data: InscricaoPublicaRequest):
         source=inscricao_nova.source
     )
 
-def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest, usuario_id: UUID):
+def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest, usuario: Usuario):
     """
-    Inscrição interna feita por um usuário logado (membro do terreiro).
+    Inscrição interna feita por admin ou operador do terreiro autenticado.
     Funcionalmente similar à inscrição pública, mas sem validação de telefone
     e com acesso controlado por autenticação.
     """
@@ -418,8 +418,13 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
     # e com lógica de criação de consulente adaptada para membros internos.
     # O fluxo de lock e decisão de vaga permanece o mesmo.
      # Placeholder — implementar seguindo a mesma estrutura da função pública
+    if usuario.role not in ("admin", "operador"):
+        raise HTTPException(status_code=403, detail="Acesso restrito a admin e operador")
+
+    usuario_id = usuario.id
     gira = db.query(Gira).filter(
         Gira.id == gira_id,
+        Gira.terreiro_id == usuario.terreiro_id,
         Gira.status == StatusGiraEnum.aberta,
         Gira.deleted_at.is_(None),
     ).first()
@@ -483,9 +488,6 @@ def inscrever_interno(db: Session, gira_id: UUID, data: InscricaoPublicaRequest,
         if confirmados >= gira.limite_consulentes
         else StatusInscricaoEnum.confirmado
     )
-    
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-
     observacoes_sanitizadas = None
     if data.observacoes:
         observacoes_sanitizadas = data.observacoes.strip()[:500] or None

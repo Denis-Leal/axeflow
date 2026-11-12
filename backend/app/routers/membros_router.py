@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_api_scope, require_role
 from app.models.usuario import Usuario
 from app.models.inscricao_membro import InscricaoMembro
 from app.utils.enuns import StatusInscricaoEnum
@@ -36,7 +36,7 @@ router = APIRouter(prefix="/membros", tags=["membros"])
 # ── Membros ────────────────────────────────────────────────────────────────────
 
 @router.get("")
-def list_membros(user: Usuario = Depends(get_current_user), db: Session = Depends(get_db),):
+def list_membros(user: Usuario = Depends(require_api_scope("membros:read")), db: Session = Depends(get_db),):
     """Lista todos os membros ativos do terreiro."""
     return membros_service.list_membros(db=db, terreiro_id=user.terreiro_id)
 
@@ -55,6 +55,7 @@ def create_membro(
         senha=data.senha, 
         telefone=data.telefone, 
         role=data.role, 
+        actor_role=user.role,
         convidado_por=user.nome
     )
 
