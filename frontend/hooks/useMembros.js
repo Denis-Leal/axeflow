@@ -63,16 +63,20 @@ export function useMembros() {
   }, [rankingCarregado]);
 
   const convidar = useCallback(async (form) => {
-    await createMembro(form);
-    const res = await listMembros();
-    setMembros(res.data);
+    const criado = await createMembro(form);
+    setMembros(previous => [...previous, criado.data]);
+    try {
+      const res = await listMembros();
+      setMembros(res.data);
+    } catch {
+      // O cadastro concluído permanece visível se a atualização da lista falhar.
+    }
     setRankingCarregado(false); // invalida cache do ranking
+    return criado.data;
   }, []);
 
   const editar = useCallback(async (id, form) => {
-    const payload = { ...form };
-    if (!payload.senha) delete payload.senha;
-    await updateMembro(id, payload);
+    await updateMembro(id, form);
     const res = await listMembros();
     setMembros(res.data);
     setRankingCarregado(false);

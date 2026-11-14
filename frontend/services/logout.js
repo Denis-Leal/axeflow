@@ -58,6 +58,12 @@ async function removePushDataFromBackend() {
     console.warn('[Logout] Falha ao remover push:', err);
   }
 }
+export function clearSession() {
+  for (const key of ['token', 'terreiro_id', 'gira_ativa', 'fcm_token']) {
+    localStorage.removeItem(key);
+  }
+}
+
 /**
  * Executa o logout completo:
  *   - Desativa push (remove subscription do browser e do backend)
@@ -71,9 +77,7 @@ export async function logout(router) {
   removePushDataFromBackend();
 
   // 2. Limpa todos os dados de sessão do localStorage
-  localStorage.removeItem('token'); // 🔥 remove token JWT para encerrar sessão
-  localStorage.removeItem('terreiro_id'); // 🔥 importante para evitar confusão futura, mesmo que seja opcional
-  localStorage.removeItem('fcm_token'); // 🔥 limpa token FCM para evitar confusão futura
+  clearSession();
 
   // 3. Redireciona para login
   router.push('/login');

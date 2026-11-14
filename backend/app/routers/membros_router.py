@@ -14,12 +14,14 @@ Funções afetadas:
 InscricaoGira (legado) não é mais referenciado nestas funções.
 """
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.core.database import get_db
+from app.core.auth_rate_limit import check_account
+from app.core.auth_route import SensitiveRoute
 from app.core.security import get_current_user, require_api_scope, require_role
 from app.models.usuario import Usuario
 from app.models.inscricao_membro import InscricaoMembro
@@ -31,7 +33,7 @@ from app.schemas.membros_schema import MembroCreate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/membros", tags=["membros"])
+router = APIRouter(prefix="/membros", tags=["membros"], route_class=SensitiveRoute)
 
 # ── Membros ────────────────────────────────────────────────────────────────────
 
@@ -44,9 +46,12 @@ def list_membros(user: Usuario = Depends(require_api_scope("membros:read")), db:
 @router.post("")
 def create_membro(
     data: MembroCreate,
+    request: Request,
     user: Usuario = Depends(require_role("admin", "operador")),
     db: Session = Depends(get_db),
 ):
+    check_account("member-invite-actor", str(user.id))
+    check_account("member-invite", f"{user.terreiro_id}:{data.email}")
     return membros_service.create_membro(
         db=db, 
         terreiro_id=user.terreiro_id, 

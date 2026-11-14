@@ -104,10 +104,11 @@ export default function Membros() {
   const [showModal, setShowModal]           = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
   const [membroEditando, setMembroEditando] = useState(null);
-  const [form, setForm]         = useState({ nome: '', email: '', senha: '', telefone: '', role: 'membro' });
-  const [editForm, setEditForm] = useState({ nome: '', telefone: '', role: 'membro', ativo: true, senha: '' });
+  const [form, setForm]         = useState({ nome: '', email: '', telefone: '', role: 'membro' });
+  const [editForm, setEditForm] = useState({ nome: '', telefone: '', role: 'membro', ativo: true });
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError] = useState('');
+  const [conviteAviso, setConviteAviso] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -150,7 +151,6 @@ export default function Membros() {
       telefone: m.telefone === '—' ? '' : m.telefone,
       role:     m.role,
       ativo:    m.ativo,
-      senha:    '',
     });
     setFormError('');
     setShowEditModal(true);
@@ -160,10 +160,14 @@ export default function Membros() {
     e.preventDefault();
     setSaving(true);
     setFormError('');
+    setConviteAviso('');
     try {
-      await convidar(form);
+      const resultado = await convidar(form);
       setShowModal(false);
-      setForm({ nome: '', email: '', senha: '', telefone: '', role: 'membro' });
+      setForm({ nome: '', email: '', telefone: '', role: 'membro' });
+      setConviteAviso(resultado.email_convite_enviado
+        ? 'Membro criado. O convite para definir a senha foi enviado por email.'
+        : 'Membro criado. Houve falha no envio do convite. A pessoa pode solicitar um novo link em Esqueci minha senha.');
     } catch (err) {
       setFormError(handleApiError(err, 'Membros'));
     } finally {
@@ -204,7 +208,7 @@ export default function Membros() {
               <h5 style={{ fontFamily: 'Cinzel', color: 'var(--cor-acento)', margin: 0 }}>Membros</h5>
               <small style={{ color: 'var(--cor-texto-suave)' }}>Usuários do seu terreiro</small>
             </div>
-            {isAdmin && aba === 'lista' && (
+            {(isAdmin || me?.role === 'operador') && aba === 'lista' && (
               <Button variant="primary" size="sm" onClick={() => setShowModal(true)}>
                 <i className="bi bi-person-plus me-1" /> Convidar Membro
               </Button>
@@ -245,6 +249,7 @@ export default function Membros() {
           </div>
 
           <div className="page-content">
+            {conviteAviso && <div role="status" className="alert-custom mb-3">{conviteAviso}</div>}
 
             {/* ── ABA: LISTA ── */}
             {aba === 'lista' && (
@@ -363,15 +368,13 @@ export default function Membros() {
                   onChange={e => setForm({ ...form, role: e.target.value })}>
                   <option value="membro" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Membro</option>
                   <option value="operador" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Operador</option>
-                  <option value="admin" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Admin</option>
+                  {isAdmin && <option value="admin" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Admin</option>}
                 </select>
               </div>
             </div>
-            <div className="mb-4">
-              <label htmlFor="pages-membros-js-5" className="form-label-custom">Senha provisória</label>
-              <input id="pages-membros-js-5" type="password" className="form-control-custom" value={form.senha}
-                onChange={e => setForm({ ...form, senha: e.target.value })} required minLength={6} />
-            </div>
+            <p style={{ color: 'var(--cor-texto-suave)', fontSize: '0.85rem' }}>
+              A pessoa receberá um link por email para definir sua própria senha.
+            </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <Button type="button" variant="outline" fullWidth disabled={saving} onClick={() => setShowModal(false)}>Cancelar</Button>
               <Button type="submit" variant="primary" fullWidth disabled={saving} loading={saving}>Convidar</Button>
@@ -410,14 +413,6 @@ export default function Membros() {
                   <option value="admin" style={{ background: 'var(--cor-fundo)', color: 'var(--cor-texto)' }}>Admin</option>
                 </select>
               </div>
-            </div>
-            <div className="mb-3">
-              <label htmlFor="pages-membros-js-10" className="form-label-custom">
-                Nova senha <span style={{ color: 'var(--cor-texto-suave)', fontWeight: 400 }}>(deixe em branco para manter)</span>
-              </label>
-              <input id="pages-membros-js-10" type="password" className="form-control-custom" value={editForm.senha}
-                onChange={e => setEditForm({ ...editForm, senha: e.target.value })}
-                minLength={6} placeholder="••••••" />
             </div>
             <div className="mb-4">
               <span id="membro-status-label" className="form-label-custom">Status</span>

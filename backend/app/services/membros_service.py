@@ -13,16 +13,20 @@ A lógica de presença em giras permanece em:
 
 from datetime import date
 import logging
+import secrets
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.security import hash_password
 from app.models.usuario import Usuario
 from app.models.terreiro import Terreiro
 from app.services.email_service import send_convite_membro
+from app.services.password_token_service import issue_password_token
 from app.models.gira import Gira
 from app.models.inscricao_membro import InscricaoMembro
 from app.services.presenca_membro_service import calcular_score_membro
@@ -58,7 +62,7 @@ def create_membro(
     actor_role: str,
     nome: str,
     email: str,
-    senha: str,
+    senha: str | None = None,
     telefone: str | None = None,
     role: str = "membro",
     convidado_por: str | None = None,
@@ -76,9 +80,13 @@ def create_membro(
             detail="Perfil sem permissão para criar membro com este papel",
         )
 
+    email = str(email).strip().lower()
     existing = (
         db.query(Usuario)
-        .filter(Usuario.email == email)
+        .filter(
+            func.lower(func.trim(Usuario.email)) == email,
+            Usuario.terreiro_id == terreiro_id,
+        )
         .first()
     )
 
@@ -99,12 +107,18 @@ def create_membro(
         nome=nome,
         email=email,
         telefone=telefone,
-        senha_hash=hash_password(senha),
+        senha_hash=hash_password(secrets.token_urlsafe(48)),
         role=role,
     )
 
     db.add(novo)
-    db.commit()
+    try:
+        db.flush()
+        token = issue_password_token(db, novo, "invite")
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email já cadastrado neste terreiro")
     db.refresh(novo)
 
     terreiro = (
@@ -125,24 +139,16 @@ def create_membro(
         email_enviado = send_convite_membro(
             nome=nome,
             email=email,
-            senha_provisoria=senha,
+            link=f"{settings.app_url_resolved}/redefinir-senha#token={token}&purpose=invite",
             terreiro_nome=terreiro_nome,
             convidado_por=convidado_por or "Administrador",
-            app_url=settings.app_url_resolved,
         )
 
         if not email_enviado:
-            logger.warning(
-                "[Membros] Email de convite não enviado para %s "
-                "(BREVO_API_KEY configurada?)",
-                email,
-            )
+            logger.warning("[Membros] Envio de convite indisponível")
 
     except Exception:
-        logger.exception(
-            "[Membros] Erro ao enviar email de convite para %s",
-            email,
-        )
+        logger.error("[Membros] Falha no envio do convite")
 
     return {
         "id": str(novo.id),
@@ -192,7 +198,6 @@ def update_membro(
     telefone: str | None = None,
     role: str | None = None,
     ativo: bool | None = None,
-    senha: str | None = None,
     current_user_id: UUID | None = None,
 ) -> dict:
     """
@@ -237,9 +242,6 @@ def update_membro(
 
     if ativo is not None:
         membro.ativo = ativo
-
-    if senha:
-        membro.senha_hash = hash_password(senha)
 
     db.commit()
     db.refresh(membro)

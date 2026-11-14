@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Optional
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -79,6 +80,7 @@ def create_access_token(
     expiração definido em ACCESS_TOKEN_EXPIRE_MINUTES.
     """
     to_encode = data.copy()
+    to_encode.setdefault("ver", 0)
 
     if expires_delta:
         expire = utcnow() + expires_delta
@@ -99,11 +101,11 @@ def create_access_token(
 
 def _decode_token(
     credentials: HTTPAuthorizationCredentials,
-) -> str:
+) -> tuple[UUID, int]:
     """
     Valida e decodifica o JWT recebido no header Authorization.
 
-    Retorna o identificador do usuário armazenado na claim `sub`.
+    Retorna o identificador e a versão da sessão assinada.
 
     A função centraliza a validação do token para que
     get_current_user() e require_role() não precisem duplicar
@@ -117,22 +119,23 @@ def _decode_token(
         )
 
         # `sub` (subject) identifica o usuário proprietário do token.
-        user_id = payload.get("sub")
-
-        if user_id is None:
+        user_id = UUID(payload["sub"])
+        token_version = payload.get("ver", 0)
+        if type(token_version) is not int or token_version < 0:
             raise credentials_exception
 
-        return user_id
+        return user_id, token_version
 
-    except JWTError:
+    except (JWTError, ValueError, TypeError, KeyError, AttributeError):
         # Inclui token expirado, assinatura inválida,
         # token malformado ou qualquer outra falha de validação JWT.
         raise credentials_exception
 
 
 def _get_authenticated_user(
-    user_id: str,
+    user_id: UUID,
     db: Session,
+    token_version: int = 0,
 ):
     """
     Busca no banco o usuário correspondente ao ID presente no JWT.
@@ -154,7 +157,7 @@ def _get_authenticated_user(
         .first()
     )
 
-    if user is None:
+    if user is None or user.token_version != token_version:
         raise credentials_exception
 
     return user
@@ -168,11 +171,12 @@ def get_current_user(
     if credentials.credentials.startswith("axf_"):
         raise credentials_exception
 
-    user_id = _decode_token(credentials)
+    user_id, token_version = _decode_token(credentials)
 
     return _get_authenticated_user(
         user_id,
         db,
+        token_version,
     )
 
 
@@ -200,12 +204,13 @@ def require_role(*roles: str):
         db: Session = Depends(get_db),
     ):
         # Primeiro autentica o usuário através do JWT.
-        user_id = _decode_token(credentials)
+        user_id, token_version = _decode_token(credentials)
 
         # Depois verifica se o usuário existe e está ativo.
         user = _get_authenticated_user(
             user_id,
             db,
+            token_version,
         )
 
         # Autenticação foi bem-sucedida, mas o usuário também
@@ -257,11 +262,12 @@ def get_current_user_with_api_key(
         return user, api_key
 
     # JWT
-    user_id = _decode_token(credentials)
+    user_id, token_version = _decode_token(credentials)
 
     user = _get_authenticated_user(
         user_id,
         db,
+        token_version,
     )
 
     return user, None

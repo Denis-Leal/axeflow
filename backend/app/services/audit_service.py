@@ -88,7 +88,7 @@ def log(
         status     = status,
         code       = code,
         method     = request.method,
-        url        = str(request.url),
+        url        = str(request.url.replace(query="")) if context == "auth" else str(request.url),
         message    = message,
         user_agent = request.headers.get("user-agent"),
         trace_id   = tid,

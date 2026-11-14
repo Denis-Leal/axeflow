@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { register } from '../services/api';
-import { handleApiError } from '../services/errorHandler';
+import { getErrorMessage } from '../services/errorHandler';
+import { PASSWORD_POLICY_HINT, validateNewPassword } from '../utils/passwordPolicy';
 
 export default function Registro() {
   const router = useRouter();
@@ -16,13 +17,19 @@ export default function Registro() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const passwordError = validateNewPassword(form.senha);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       await register(form);
       router.push('/login?cadastro=ok');
     } catch (err) {
-      setError(handleApiError(err, 'Registro'));
+      const message = getErrorMessage(err);
+      setError(typeof message === 'string' ? message : 'Confira os dados do cadastro e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +85,9 @@ export default function Registro() {
             <div className="mb-4">
               <label htmlFor="pages-registro-js-6" className="form-label-custom">Senha</label>
               <input id="pages-registro-js-6" type="password" className="form-control-custom" value={form.senha}
-                onChange={e => setForm({ ...form, senha: e.target.value })} required minLength={6} />
+                onChange={e => setForm({ ...form, senha: e.target.value })} required
+                autoComplete="new-password" aria-describedby="registro-senha-ajuda" />
+              <small id="registro-senha-ajuda" style={{ color: 'var(--cor-texto-suave)' }}>{PASSWORD_POLICY_HINT}</small>
             </div>
 
             <button type="submit" className="btn-gold w-100" disabled={loading} style={{ padding: '0.75rem' }}>

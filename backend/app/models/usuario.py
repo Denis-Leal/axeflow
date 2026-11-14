@@ -7,7 +7,7 @@ model InscricaoMembro. O back_populates espelhado em inscricao_membro.py.
 """
 import uuid
 from app.utils.datetime_utils import utcnow
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, UniqueConstraint, Integer, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
@@ -32,6 +32,7 @@ class Usuario(Base):
     senha_hash  : Mapped[str] = mapped_column(String(255), nullable=False)
     role        : Mapped[str] = mapped_column(String(50), default=RoleEnum.membro)
     ativo       : Mapped[bool] = mapped_column(Boolean, default=True)
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
     created_at  : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at  : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

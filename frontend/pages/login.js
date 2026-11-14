@@ -18,14 +18,23 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { login, getMe } from '../services/api';
-import { handleApiError } from '../services/errorHandler';
 import { registerDevice } from '../services/pushFCM';
+import { clearSession } from '../services/logout';
 
 export default function Login() {
   const router = useRouter();
   const [form, setForm]       = useState({ email: '', senha: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  const [terreiros, setTerreiros] = useState([]);
+  const [terreiroId, setTerreiroId] = useState('');
+
+  const alterarCredencial = (campo, valor) => {
+    setForm(previous => ({ ...previous, [campo]: valor }));
+    setTerreiros([]);
+    setTerreiroId('');
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +43,17 @@ export default function Login() {
 
     try {
       // 1. Autentica e salva o token JWT
-      const res = await login(form.email, form.senha);
+      const res = await login(form.email, form.senha, terreiroId);
+      if (res.data.requires_terreiro) {
+        setTerreiros(res.data.terreiros || []);
+        setTerreiroId('');
+        return;
+      }
+      if (!res.data.access_token) {
+        setError('Não foi possível concluir o login. Tente novamente.');
+        return;
+      }
+      clearSession();
       localStorage.setItem('token', res.data.access_token);
 
       // 2. Busca dados do usuário para obter o terreiro_id
@@ -47,19 +66,24 @@ export default function Login() {
       } catch {
         // Falha silenciosa: a falta do terreiro_id apenas desativa
         // a navegação específica nas notificações push (vai para /giras)
-        console.warn('[Login] Não foi possível obter terreiro_id — push redirect será genérico.');
+        localStorage.removeItem('terreiro_id');
       }
 
-      // 3. 🔥 REGISTRAR DEVICE (FCM)
-      try {
-        await registerDevice();
-      } catch (err) {
-        console.warn('[Push] Falha ao registrar device:', err);
-      }
+      // O registro de notificações pode aguardar o service worker em segundo plano.
+      registerDevice().catch(() => {});
 
+      setForm(previous => ({ ...previous, senha: '' }));
       router.push('/dashboard'); // Redireciona para o dashboard após login bem-sucedido
     } catch (err) {
-      setError(handleApiError(err, 'Login'));
+      setTerreiros([]);
+      setTerreiroId('');
+      if (err?.response?.status === 429) {
+        setError('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.');
+      } else if (err?.response?.status === 401) {
+        setError('Email ou senha inválidos.');
+      } else {
+        setError('Não foi possível concluir o login. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -81,8 +105,11 @@ export default function Login() {
           </div>
 
           {/* ── Mensagem de erro ── */}
+          {router.query.senha === 'alterada' && (
+            <div role="status" className="alert-custom mb-3">Senha alterada. Faça login com sua nova senha.</div>
+          )}
           {error && (
-            <div className="alert-custom alert-danger-custom">
+            <div role="alert" className="alert-custom alert-danger-custom">
               <i className="bi bi-exclamation-circle me-2"></i>{error}
             </div>
           )}
@@ -96,7 +123,8 @@ export default function Login() {
                 type="email"
                 className="form-control-custom"
                 value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
+                onChange={e => alterarCredencial('email', e.target.value)}
+                disabled={loading}
                 placeholder="seu@email.com"
                 required
                 autoComplete="email"
@@ -126,7 +154,8 @@ export default function Login() {
                 id="login-senha" type="password"
                 className="form-control-custom"
                 value={form.senha}
-                onChange={e => setForm({ ...form, senha: e.target.value })}
+                onChange={e => alterarCredencial('senha', e.target.value)}
+                disabled={loading}
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
@@ -134,6 +163,16 @@ export default function Login() {
             </div>
 
             {/* Botão de login */}
+            {terreiros.length > 0 && (
+              <div className="mb-4">
+                <label htmlFor="login-terreiro" className="form-label-custom">Selecione o terreiro</label>
+                <select id="login-terreiro" className="form-control-custom" value={terreiroId}
+                  onChange={event => setTerreiroId(event.target.value)} required disabled={loading}>
+                  <option value="">Escolha uma conta</option>
+                  {terreiros.map(terreiro => <option key={terreiro.id} value={terreiro.id}>{terreiro.nome}</option>)}
+                </select>
+              </div>
+            )}
             <button
               type="submit"
               className="btn-gold w-100"

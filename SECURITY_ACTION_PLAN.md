@@ -4,8 +4,10 @@ Base da avaliação inicial em `2559790`, na branch `dev`.
 
 ## Fluxo de aprovação
 
-Cada etapa passa por requisitos, plano técnico, implementação e gates de QA,
-Reviewer e Security. DevOps e documentação participam conforme o impacto.
+O agente principal conduz a implementação e a validação final. Agentes
+especializados participam quando a análise independente ou uma atividade paralela
+delimitada justificar seu uso. As verificações acompanham o risco da mudança,
+com até dois subagentes simultâneos e sem revisões redundantes da mesma evidência.
 Após a validação, apresentar escopo, diff, comandos, resultados e pendências ao
 responsável pelo projeto para aprovação do commit e push em `dev`.
 O avanço à próxima etapa depende de autorização do responsável pelo projeto.
@@ -183,12 +185,122 @@ rotação e de tratamento das cópias históricas.
 
 ## Etapa 3 — Autenticação e recuperação de conta
 
-- Uniformizar a política de senhas e a proteção de login e registro contra abuso.
-- Revogar sessões após recuperação e conforme a política de troca de senha.
-- Impedir consulta pública à associação entre email e terreiro na recuperação.
-- Substituir o envio de senha por convite com token de uso único e expiração.
-- Validar seleção do tenant para emails presentes em mais de um terreiro.
-- Cobrir expiração, revogação, enumeração e tentativas automatizadas.
+### Critérios de aceite
+
+- **AC-001** — Dados os fluxos que definem uma senha, quando uma senha nova violar
+  a política comum, então rejeitar a entrada antes de gravar ou enviar email.
+  O login deve continuar verificando as senhas legadas de contas existentes.
+- **AC-002** — Dado um JWT emitido antes da troca, recuperação ou aceite de convite,
+  quando a senha for definida, então as sessões JWT anteriores daquele usuário
+  devem deixar de autorizar acessos, inclusive nas dependências mistas.
+- **AC-003** — Dados emails existentes, inexistentes ou vinculados a vários
+  terreiros, quando solicitarem recuperação, então a resposta pública deve manter
+  o mesmo status e corpo, sem listar nomes, IDs ou quantidades de contas.
+- **AC-004** — Dado um token de recuperação ou convite, quando houver consumo
+  válido, então senha, versão da sessão e invalidação dos links devem ser
+  atualizadas atomicamente. Expiração, repetição, finalidade errada, usuário
+  inativo ou tenant divergente devem impedir a atualização.
+- **AC-005** — Dado um convite autorizado de membro, quando o cadastro for criado,
+  então o email deve conter link de definição de senha com expiração e uso único.
+  Uma senha enviada por cliente legado deve ser ignorada como credencial inicial.
+- **AC-006** — Dados registros com o mesmo email em vários terreiros, quando uma
+  senha corresponder a uma conta, então permitir o acesso a essa conta. Se houver
+  várias correspondências, solicitar seleção apenas entre as contas autenticadas
+  e revalidar as credenciais na seleção antes de emitir o JWT.
+- **AC-007** — Dados os endpoints sensíveis de autenticação e convites, quando as
+  cotas de origem ou conta forem excedidas, então responder 429 com indicação de
+  espera antes de permitir mais tentativas ou envios.
+- **AC-008** — Dados os fluxos de interface afetados, quando recuperar, aceitar
+  convite, selecionar terreiro ou trocar senha, então apresentar o resultado
+  correto e limpar a sessão revogada, com validação equivalente de senha nova.
+
+### Decisões e compatibilidade
+
+A política escolhida para senhas novas exige pelo menos 15 caracteres e limita a
+entrada a 72 bytes UTF-8, preservando espaços e caracteres Unicode. A exigência
+mínima segue a orientação para autenticação por senha como único fator. O limite
+em bytes acompanha o bcrypt existente. As senhas legadas continuam verificáveis
+no login. [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html),
+[OWASP sobre bcrypt](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+O usuário passa a ter `token_version`, inicialmente zero. Os JWTs novos carregam
+a claim `ver`. Tokens antigos sem essa claim equivalem à versão zero e são
+aceitos somente enquanto a conta conservar essa versão. Definir uma senha aumenta
+a versão e invalida as sessões JWT anteriores. As API keys mantêm seu ciclo de
+revogação independente.
+
+A tabela de tokens existente recebe `purpose`, inicialmente `reset`. Convites
+usam `invite`. A senha inicial do membro é um valor aleatório que não é entregue
+ao administrador ou convidado. O destinatário define sua senha pelo link ou pode
+solicitar recuperação caso o convite expire ou o envio falhe.
+
+A recuperação usa email e aceita o filtro opcional de terreiro dos clientes
+antigos. Nomes de terreiros e links aparecem somente no email de recuperação.
+O endpoint legado `/auth/esqueci-senha/buscar` passa a retornar uma lista vazia
+constante. Os clientes devem usar `/auth/esqueci-senha/enviar`.
+
+Os novos links levam o token no fragmento do endereço, processado localmente pelo
+navegador. A página mantém a credencial em memória e limpa o endereço antes do
+envio por POST. Links antigos com token na query continuam aceitos durante sua
+validade. A página também utiliza a política de referrer `no-referrer`.
+
+O envio de recuperação ocorre após a resposta, em uma tarefa que abre sua própria
+sessão de banco. Essa entrega é best-effort e pode ser interrompida por reinício
+do processo. A fila durável e os limites compartilhados entre réplicas ficam como
+pendências operacionais para a etapa 5.
+
+### Migração e implantação
+
+A migration aditiva `0029_auth_credentials` acrescenta as duas colunas com valores
+iniciais compatíveis com os registros existentes. A aplicação atualizada depende
+dessa migration. Sua execução nos ambientes reais requer autorização de
+implantação. Validações locais devem usar banco isolado com dados sintéticos.
+
+As pendências operacionais de rotação e de cópias históricas da etapa 2 continuam
+registradas e independem desta implementação de autenticação.
+
+### Validação da etapa 3
+
+| Verificação | Resultado |
+| --- | --- |
+| QA backend | APROVADO, 35 testes, sendo 21 de autenticação e 14 de regressão P0 |
+| Regressões existentes de interface | APROVADO, 17 testes |
+| Security | APROVADO na revisão estática dos fluxos e do diff final de autenticação |
+| Migração PostgreSQL 18 isolado | APROVADO, upgrade, valores de registros antigos, defaults e ciclo de downgrade e novo upgrade |
+| Concorrência PostgreSQL 18 | APROVADO, duas requisições simultâneas por token de reset e de convite, com um sucesso e uma rejeição em cada disputa |
+| Sessão após consumo concorrente | APROVADO, incremento único de versão e rejeição do JWT anterior |
+| Build frontend | APROVADO, `npm run build`, 28 páginas estáticas geradas |
+| Playwright | APROVADO nos fluxos de recuperação, seleção de terreiro, aceite de convite, link legado, erro de expiração e troca de senha |
+
+Os testes HTTP do backend usam SQLite em memória, autenticação real e integrações
+de email e push simuladas. A validação PostgreSQL usou um cluster temporário
+restrito a loopback, com dados sintéticos e conexões independentes. Nenhum banco
+do projeto foi usado nessas verificações.
+
+Os testes Playwright usaram o build de produção local e respostas de API
+sintéticas. Foram conferidos o bloqueio de senha inválida antes do POST, limpeza
+do token no endereço, limpeza de sessão, confirmação neutra, erro 429, seleção de
+terreiro antes de emitir sessão, convite sem campo de senha e feedback de falha
+de entrega. O login também foi exercitado com service worker indisponível. O
+registro de notificações ocorre em segundo plano para permitir concluir o acesso.
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests -v
+node --test frontend/tests/ux-state.test.cjs frontend/tests/ux-ui.test.cjs
+# Executar no diretório frontend.
+npm run build
+```
+
+Os limites de autenticação usam contadores em memória por processo. Reinícios
+zeram os contadores e várias instâncias multiplicam as cotas. A origem deve ser
+resolvida apenas por proxies explicitamente confiáveis no servidor ASGI. A seleção
+multi-terreiro pode apresentar diferenças de tempo conforme a quantidade de
+contas verificadas, e o armazenamento de JWT no navegador mantém a sensibilidade
+a XSS já registrada para revisão posterior.
+
+Implantação, migração nos ambientes reais, entrega efetiva pelo provedor de email
+e validação dos proxies de produção permanecem pendentes. A aprovação desta etapa
+abrange a implementação e as verificações locais registradas.
 
 ## Etapa 4 — Proteção de dados e superfície da aplicação
 
@@ -222,11 +334,12 @@ rotação e de tratamento das cópias históricas.
 
 ## Situação de execução
 
-A etapa 1 foi implementada, validada e publicada em `origin/dev`, no commit
-`8e0c294`, com referência remota conferida. A implementação local da etapa 2 foi
-validada. Seu commit e push aguardam aprovação do responsável pelo projeto.
-A conclusão operacional depende da rotação e das decisões sobre cópias históricas.
-As etapas 3 a 6 dependem de autorização para início.
+A etapa 1 foi publicada em `origin/dev`, no commit `8e0c294`. A parte local da
+etapa 2 foi publicada no commit `83957c4`, com referência remota conferida.
+A conclusão operacional da etapa 2 depende da rotação e das decisões sobre cópias
+históricas. A implementação local da etapa 3 foi concluída e validada. Commit e
+push aguardam aprovação do responsável pelo projeto. As etapas 4 a 6 dependem de
+autorização para início.
 
 | Verificação | Resultado |
 | --- | --- |

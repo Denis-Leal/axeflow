@@ -1,120 +1,52 @@
-"""
-password_reset_router.py — AxeFlow
-Endpoints de recuperação de senha com fluxo multi-tenant em dois steps.
-
-Step 1 — POST /auth/esqueci-senha/buscar
-  Recebe: { email }
-  Retorna: lista de terreiros onde aquele email está cadastrado
-  (apenas id e nome — sem expor dados sensíveis)
-  Se nenhum terreiro for encontrado: retorna lista vazia silenciosamente
-
-Step 2 — POST /auth/esqueci-senha/enviar
-  Recebe: { email, terreiro_id }
-  Valida o par internamente, gera token, envia email com link
-  SEMPRE retorna mensagem genérica (anti-enumeração)
-
-Step 3 — POST /auth/redefinir-senha
-  Recebe: { token, nova_senha }
-  Valida token (hash + não expirado + não usado)
-  Atualiza senha e invalida token
-
-Rate limiting:
-  /buscar:           10/hora por IP — anti-enumeração de emails
-  /enviar:            5/hora por IP — anti-spam de envio de email
-  /redefinir-senha:  10/hora por IP — anti-bruteforce de tokens
-"""
-import hashlib
-import secrets
+"""Recuperação privada e definição de senha com tokens de uso único."""
 import logging
-from datetime import timedelta
-from app.utils.datetime_utils import utcnow
-from fastapi import APIRouter, Depends, HTTPException, Request
+from html import escape
+from typing import Literal, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.auth_rate_limit import check_account
+from app.core.auth_route import SensitiveRoute
 from app.core.config import settings
-from app.core.security import hash_password
-from app.models.usuario import Usuario
+from app.core.database import SessionLocal, get_db
+from app.core.password_policy import NewPassword
 from app.models.terreiro import Terreiro
-from app.models.password_reset_token import PasswordResetToken
-from app.services.email_service import _send
+from app.models.usuario import Usuario
 from app.services import audit_service
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-logger  = logging.getLogger(__name__)
-router  = APIRouter(prefix="/auth", tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
-
-# Janela de validade do token — curta para reduzir risco de abuso
-TOKEN_EXPIRA_HORAS = 1
-
-# Mensagem genérica retornada pelo step 2 (sucesso ou falha silenciosa)
-MSG_GENERICA = (
-    "Se o email estiver cadastrado neste terreiro, "
-    "você receberá um link de recuperação em breve."
+from app.services.email_service import _send
+from app.services.password_token_service import (
+    TOKEN_EXPIRA_HORAS, _gerar_token, _hash_token, consume_password_token,
+    issue_password_token,
 )
 
 
-# ── Schemas ────────────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/auth", tags=["auth"], route_class=SensitiveRoute)
+MSG_GENERICA = "Se o email estiver cadastrado, você receberá um link de recuperação em breve."
+
 
 class BuscarTerreiroRequest(BaseModel):
-    """Step 1: apenas o email — sem expor que o terreiro existe ou não."""
     email: EmailStr
 
 
 class EnviarResetRequest(BaseModel):
-    """Step 2: email + terreiro escolhido pelo usuário na tela."""
-    email:       EmailStr
-    terreiro_id: str = Field(..., description="UUID do terreiro selecionado")
+    email: EmailStr
+    terreiro_id: Optional[UUID] = None
 
 
 class RedefinirSenhaRequest(BaseModel):
-    """Step 3: token do link no email + nova senha escolhida pelo usuário."""
-    token:      str = Field(..., min_length=10)
-    nova_senha: str = Field(..., min_length=6, max_length=128)
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _hash_token(token: str) -> str:
-    """SHA-256 hexdigest — usado para armazenar e comparar tokens."""
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def _gerar_token() -> tuple[str, str]:
-    """
-    Gera token seguro com 256 bits de entropia.
-    Retorna: (token_raw, token_hash)
-      - token_raw:  incluso no link do email — nunca persiste no banco
-      - token_hash: SHA-256 armazenado no banco (irreversível)
-    """
-    token_raw  = secrets.token_urlsafe(32)
-    token_hash = _hash_token(token_raw)
-    return token_raw, token_hash
-
-
-def _invalidar_tokens_anteriores(db: Session, user_id) -> None:
-    """
-    Invalida todos os tokens ainda ativos do usuário antes de gerar novo.
-    Garante que só o link mais recente funcione.
-    """
-    agora = utcnow()
-    (
-        db.query(PasswordResetToken)
-        .filter(
-            PasswordResetToken.user_id   == user_id,
-            PasswordResetToken.used_at.is_(None),
-            PasswordResetToken.expires_at > agora,
-        )
-        .update({"used_at": agora})  # bulk update — mais eficiente que loop
-    )
+    token: str = Field(min_length=10, max_length=512)
+    nova_senha: NewPassword
+    purpose: Literal["reset", "invite"] = "reset"
 
 
 def _html_reset_email(nome: str, terreiro_nome: str, link: str) -> str:
     """Gera HTML do email de recuperação no padrão visual do AxeFlow."""
+    nome, terreiro_nome, link = escape(nome), escape(terreiro_nome), escape(link, quote=True)
     return f"""
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -174,192 +106,79 @@ def _html_reset_email(nome: str, terreiro_nome: str, link: str) -> str:
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@router.post("/esqueci-senha/buscar")
-@limiter.limit("10/hour")
-def buscar_terreiros(
-    data: BuscarTerreiroRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Step 1 — Retorna os terreiros onde o email está cadastrado.
 
-    Expõe APENAS id e nome do terreiro.
-    Retorna lista vazia se o email não existir (sem revelar ausência).
-    """
-    email_norm = data.email.strip().lower()
-
-    # Busca todos os usuários ativos com este email em qualquer terreiro
-    usuarios = (
-        db.query(Usuario)
-        .filter(
-            func.lower(Usuario.email) == email_norm,
-            Usuario.ativo == True,
+def _process_reset_request(email: str, terreiro_id: Optional[UUID]) -> None:
+    """Usa uma sessão própria depois que a resposta pública já foi produzida."""
+    db = SessionLocal()
+    try:
+        candidates = db.query(Usuario.id).filter(
+            func.lower(func.trim(Usuario.email)) == email,
+            Usuario.ativo.is_(True),
         )
-        .all()
-    )
+        if terreiro_id is not None:
+            candidates = candidates.filter(Usuario.terreiro_id == terreiro_id)
+        user_ids = [row[0] for row in candidates.all()]
+        for user_id in user_ids:
+            try:
+                user = db.query(Usuario).filter(
+                    Usuario.id == user_id,
+                    func.lower(func.trim(Usuario.email)) == email,
+                    Usuario.ativo.is_(True),
+                ).populate_existing().with_for_update().first()
+                if user is None:
+                    db.rollback()
+                    continue
+                tenant = db.query(Terreiro).filter(Terreiro.id == user.terreiro_id).first()
+                if tenant is None:
+                    db.rollback()
+                    continue
+                raw = issue_password_token(db, user, "reset")
+                link = f"{settings.app_url_resolved}/redefinir-senha#token={raw}&purpose=reset"
+                recipient, name, tenant_name = user.email.strip(), user.nome, tenant.nome
+                db.commit()
+                sent = _send(
+                    to=recipient,
+                    subject="[AxeFlow] Recuperação de senha",
+                    html=_html_reset_email(name, tenant_name, link),
+                )
+                if not sent:
+                    logger.warning("[PasswordReset] Envio de recuperação indisponível")
+            except Exception:
+                db.rollback()
+                logger.error("[PasswordReset] Falha no processamento da recuperação")
+    except Exception:
+        db.rollback()
+        logger.error("[PasswordReset] Recuperação temporariamente indisponível")
+    finally:
+        db.close()
 
-    if not usuarios:
-        logger.info("[PasswordReset] Email não encontrado: %s", data.email)
-        return {"terreiros": []}  # lista vazia — não revela que email não existe
 
-    # Busca os terreiros correspondentes, ordenados por nome para UX consistente
-    terreiro_ids = [u.terreiro_id for u in usuarios]
-    terreiros = (
-        db.query(Terreiro)
-        .filter(Terreiro.id.in_(terreiro_ids))
-        .order_by(Terreiro.nome)
-        .all()
-    )
-
-    # Expõe APENAS id e nome — sem vazar email, role, senha_hash, etc.
-    return {
-        "terreiros": [
-            {"id": str(t.id), "nome": t.nome}
-            for t in terreiros
-        ]
-    }
+@router.post("/esqueci-senha/buscar", deprecated=True)
+def buscar_terreiros(data: BuscarTerreiroRequest, request: Request):
+    """Mantém o contrato legado sem consultar ou divulgar associações religiosas."""
+    check_account("reset-search", str(data.email))
+    return {"terreiros": []}
 
 
 @router.post("/esqueci-senha/enviar")
-@limiter.limit("5/hour")
-def enviar_reset(
-    data: EnviarResetRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Step 2 — Valida o par email+terreiro e envia o link de recuperação.
-
-    Sempre retorna mensagem genérica (anti-enumeração).
-    """
-    email_norm = data.email.strip().lower()
-
-    usuario = (
-        db.query(Usuario)
-        .filter(
-            func.lower(Usuario.email) == email_norm,
-            Usuario.terreiro_id       == data.terreiro_id,
-            Usuario.ativo             == True,
-        )
-        .first()
+def enviar_reset(data: EnviarResetRequest, request: Request, background_tasks: BackgroundTasks):
+    check_account("reset-request", str(data.email))
+    background_tasks.add_task(
+        _process_reset_request, str(data.email).strip().lower(), data.terreiro_id,
     )
-
-    if not usuario:
-        # Par inválido — retorna mensagem genérica sem revelar o motivo
-        logger.warning(
-            "[PasswordReset] Par inválido: %s / terreiro=%s",
-            data.email, data.terreiro_id,
-        )
-        audit_service.log(
-            db, request,
-            context = "auth",
-            action  = "PASSWORD_RESET_INVALID_PAIR",
-            level   = "WARNING",
-            status  = 200,
-            message = f"Par não encontrado: {data.email} / terreiro={data.terreiro_id}",
-        )
-        return {"message": MSG_GENERICA}
-
-    terreiro = db.query(Terreiro).filter(Terreiro.id == usuario.terreiro_id).first()
-
-    # Invalida links anteriores antes de gerar novo
-    _invalidar_tokens_anteriores(db, usuario.id)
-
-    # Gera token e persiste apenas o hash
-    token_raw, token_hash = _gerar_token()
-    expires_at = utcnow() + timedelta(hours=TOKEN_EXPIRA_HORAS)
-
-    reset_token = PasswordResetToken(
-        user_id     = usuario.id,
-        terreiro_id = terreiro.id,
-        token_hash  = token_hash,
-        expires_at  = expires_at,
-    )
-    db.add(reset_token)
-    db.commit()
-
-    # Envia email — falha silenciosa para não revelar existência do usuário
-    link = f"{settings.app_url_resolved}/redefinir-senha?token={token_raw}"
-    try:
-        enviado = _send(
-            to      = usuario.email,
-            subject = "[AxeFlow] Recuperação de senha",
-            html    = _html_reset_email(usuario.nome, terreiro.nome, link),
-        )
-        if not enviado:
-            logger.error("[PasswordReset] Falha ao enviar email para %s", usuario.email)
-    except Exception as e:
-        logger.error("[PasswordReset] Erro ao enviar email: %s", e)
-
-    audit_service.log(
-        db, request,
-        context = "auth",
-        action  = "PASSWORD_RESET_REQUESTED",
-        level   = "INFO",
-        user_id = usuario.id,
-        status  = 200,
-        message = f"Token gerado: {usuario.email} (terreiro: {terreiro.nome})",
-    )
-
     return {"message": MSG_GENERICA}
 
 
 @router.post("/redefinir-senha")
-@limiter.limit("10/hour")
 def redefinir_senha(
     data: RedefinirSenhaRequest,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    Step 3 — Valida token e redefine a senha.
-
-    Token válido = hash confere + não expirou + não foi usado antes.
-    Após uso: token invalidado — não pode ser reutilizado.
-    """
-    token_hash  = _hash_token(data.token)
-    reset_token = (
-        db.query(PasswordResetToken)
-        .filter(PasswordResetToken.token_hash == token_hash)
-        .first()
-    )
-
-    if not reset_token or not reset_token.valido:
-        audit_service.log(
-            db, request,
-            context = "auth",
-            action  = "PASSWORD_RESET_INVALID_TOKEN",
-            level   = "WARNING",
-            status  = 400,
-            message = "Token inválido, expirado ou já utilizado",
-        )
-        raise HTTPException(
-            status_code=400,
-            detail="Link de recuperação inválido ou expirado. Solicite um novo.",
-        )
-
-    usuario = (
-        db.query(Usuario)
-        .filter(Usuario.id == reset_token.user_id, Usuario.ativo == True)
-        .first()
-    )
-    if not usuario:
-        raise HTTPException(status_code=400, detail="Usuário não encontrado ou inativo.")
-
-    # Atualiza senha e invalida token na mesma operação
-    usuario.senha_hash  = hash_password(data.nova_senha)
-    reset_token.used_at = utcnow()
-    db.commit()
-
+    check_account("password-token", data.token)
+    user = consume_password_token(db, data.token, data.nova_senha, data.purpose)
     audit_service.log(
-        db, request,
-        context = "auth",
-        action  = "PASSWORD_RESET_OK",
-        level   = "INFO",
-        user_id = usuario.id,
-        status  = 200,
-        message = f"Senha redefinida: {usuario.email}",
+        db, request, context="auth", action="PASSWORD_RESET_OK", level="INFO",
+        user_id=user.id, status=200, message="Senha definida e sessões revogadas",
     )
-
-    return {"ok": True, "message": "Senha redefinida com sucesso! Faça login com sua nova senha."}
+    return {"ok": True, "message": "Senha definida com sucesso! Faça login com sua nova senha."}

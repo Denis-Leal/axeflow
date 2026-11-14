@@ -12,26 +12,30 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user, hash_password, verify_password
-from app.schemas.auth_schema import LoginRequest, RegisterRequest, TokenResponse, UsuarioResponse
+from app.core.security import get_current_user
+from app.core.auth_rate_limit import check_account
+from app.core.auth_route import SensitiveRoute
+from app.core.password_policy import NewPassword
+from app.schemas.auth_schema import LoginRequest, RegisterRequest, TerreiroSelectionResponse, TokenResponse, UsuarioResponse
 from app.services import auth_service
 from app.services import audit_service
 from app.models.usuario import Usuario
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"], route_class=SensitiveRoute)
 
 
 class AlterarSenhaRequest(BaseModel):
-    senha_atual: str
-    nova_senha: str
+    senha_atual: str = Field(max_length=4096)
+    nova_senha: NewPassword
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse | TerreiroSelectionResponse)
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """
     Autentica o usuário e registra o resultado da tentativa no audit log.
     """
+    check_account("login", str(data.email))
     return auth_service.login(db=db, data=data, request=request)
 
 
@@ -40,6 +44,7 @@ def register(data: RegisterRequest, request: Request, db: Session = Depends(get_
     """
     Cria um novo terreiro e seu usuário administrador.
     """
+    check_account("register", str(data.email))
     return auth_service.register(db=db, data=data, request=request)
 
 
@@ -58,6 +63,7 @@ def alterar_senha(
     """
     Altera a senha do usuário autenticado.
     """
+    check_account("password-change", str(user.id))
     return auth_service.alterar_senha(
         db=db,
         user=user,

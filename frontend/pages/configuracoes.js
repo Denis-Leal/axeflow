@@ -14,8 +14,9 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
 import { getMe, changePassword } from '../services/api';
-import { handleApiError } from '../services/errorHandler';
-import { logout } from '../services/logout';
+import { getErrorMessage } from '../services/errorHandler';
+import { clearSession, logout } from '../services/logout';
+import { PASSWORD_POLICY_HINT, validateNewPassword } from '../utils/passwordPolicy';
 
 export default function Configuracoes() {
   const router   = useRouter();
@@ -47,6 +48,11 @@ export default function Configuracoes() {
       setMsg({ tipo: 'erro', texto: 'As senhas não coincidem' });
       return;
     }
+    const passwordError = validateNewPassword(formSenha.nova_senha);
+    if (passwordError) {
+      setMsg({ tipo: 'erro', texto: passwordError });
+      return;
+    }
     setSaving(true);
     setMsg({ tipo: '', texto: '' });
     try {
@@ -56,8 +62,11 @@ export default function Configuracoes() {
       });
       setMsg({ tipo: 'ok', texto: 'Senha alterada com sucesso!' });
       setFormSenha({ senha_atual: '', nova_senha: '', confirmar: '' });
+      clearSession();
+      window.location.replace('/login?senha=alterada');
     } catch (err) {
-      handleApiError(err, setMsg);
+      const message = getErrorMessage(err);
+      setMsg({ tipo: 'erro', texto: typeof message === 'string' ? message : 'Não foi possível alterar a senha. Tente novamente.' });
     } finally {
       setSaving(false);
     }
@@ -138,21 +147,22 @@ export default function Configuracoes() {
                         <input id="pages-configuracoes-js-1" type="password" className="form-control-custom"
                           value={formSenha.senha_atual}
                           onChange={e => setFormSenha({ ...formSenha, senha_atual: e.target.value })}
-                          required />
+                          required autoComplete="current-password" />
                       </div>
                       <div className="mb-3">
                         <label htmlFor="pages-configuracoes-js-2" className="form-label-custom">Nova senha</label>
                         <input id="pages-configuracoes-js-2" type="password" className="form-control-custom"
                           value={formSenha.nova_senha}
                           onChange={e => setFormSenha({ ...formSenha, nova_senha: e.target.value })}
-                          required minLength={6} />
+                          required autoComplete="new-password" aria-describedby="configuracoes-senha-ajuda" />
+                        <small id="configuracoes-senha-ajuda" style={{ color: 'var(--cor-texto-suave)' }}>{PASSWORD_POLICY_HINT}</small>
                       </div>
                       <div className="mb-4">
                         <label htmlFor="pages-configuracoes-js-3" className="form-label-custom">Confirmar nova senha</label>
                         <input id="pages-configuracoes-js-3" type="password" className="form-control-custom"
                           value={formSenha.confirmar}
                           onChange={e => setFormSenha({ ...formSenha, confirmar: e.target.value })}
-                          required minLength={6} />
+                          required autoComplete="new-password" />
                       </div>
                       <button type="submit" className="btn-gold w-100" disabled={saving}>
                         {saving ? <span className="spinner-border spinner-border-sm me-2"></span> : null}

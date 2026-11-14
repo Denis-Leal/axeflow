@@ -10,6 +10,7 @@
 // =====================================================
 
 import axios from 'axios';
+import { clearSession } from './logout';
 
 // Usa o proxy do Next.js (/api → backend:8000 internamente).
 // Assim o celular nunca precisa acessar a porta 8000 diretamente.
@@ -48,8 +49,7 @@ api.interceptors.response.use(
         // (ex: dashboard fazendo listGiras + getMe ao mesmo tempo)
         setTimeout(() => {
           // Remove token e terreiro_id para limpar contexto multi-tenant
-          localStorage.removeItem('token');
-          localStorage.removeItem('terreiro_id');
+          clearSession();
           window.location.href = '/login';
         }, 100);
       }
@@ -61,7 +61,9 @@ api.interceptors.response.use(
 export default api;
 
 // ── Auth ──────────────────────────────────────────────
-export const login    = (email, senha) => api.post('/auth/login', { email, senha });
+export const login    = (email, senha, terreiro_id) => api.post('/auth/login', {
+  email, senha, ...(terreiro_id ? { terreiro_id } : {}),
+});
 export const register = (data)         => api.post('/auth/register', data);
 export const getMe    = ()             => api.get('/auth/me');
 

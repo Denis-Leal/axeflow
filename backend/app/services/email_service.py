@@ -4,6 +4,7 @@ Envio de emails transacionais via Brevo (brevo.com).
 Plano free: 300 emails/dia, sem domínio próprio necessário.
 """
 import logging
+from html import escape
 import httpx
 from app.core.config import settings
 
@@ -43,10 +44,10 @@ def _send(to: str, subject: str, html: str) -> bool:
             logger.info("[Email] Enviado para %s — %s", to, subject)
             return True
         else:
-            logger.error("[Email] Falha ao enviar para %s: %s %s", to, response.status_code, response.text)
+            logger.error("[Email] Envio recusado pelo provedor: status=%s", response.status_code)
             return False
-    except Exception as e:
-        logger.error("[Email] Erro ao enviar para %s: %s", to, e)
+    except Exception:
+        logger.error("[Email] Falha de comunicação com o provedor")
         return False
 
 
@@ -109,57 +110,41 @@ def _base_template(titulo: str, corpo: str) -> str:
 def send_convite_membro(
     nome: str,
     email: str,
-    senha_provisoria: str,
+    link: str,
     terreiro_nome: str,
     convidado_por: str,
-    app_url: str,
 ) -> bool:
-    """Email de convite enviado quando um novo membro é adicionado ao terreiro."""
-
+    """Envia um link de uso único para o destinatário definir sua senha."""
+    nome = escape(nome)
+    terreiro_nome = escape(terreiro_nome)
+    convidado_por = escape(convidado_por)
+    link = escape(link, quote=True)
     corpo = f"""
-      <h2 style="color:#d4af37;font-family:Georgia,serif;margin:0 0 8px 0;font-size:20px;">
+      <h2 style="color:#d4af37;font-family:Georgia,serif;margin:0 0 8px;font-size:20px;">
         Você foi convidado!
       </h2>
-      <p style="color:#c4b5e8;font-size:15px;line-height:1.6;margin:0 0 24px 0;">
-        Olá, <strong style="color:#fff;">{nome}</strong>!<br><br>
-        <strong style="color:#d4af37;">{convidado_por}</strong> convidou você para fazer parte
-        do terreiro <strong style="color:#fff;">{terreiro_nome}</strong> no AxeFlow.
+      <p style="color:#c4b5e8;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        Olá, <strong>{nome}</strong>!<br><br>
+        <strong>{convidado_por}</strong> convidou você para fazer parte do terreiro
+        <strong>{terreiro_nome}</strong> no AxeFlow.
       </p>
-
-      <div style="background:#0f0720;border:1px solid #2d1b69;border-radius:10px;padding:20px;margin-bottom:28px;">
-        <p style="color:#8b7fb8;font-size:12px;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:1px;">
-          Suas credenciais de acesso
-        </p>
-        <table width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td style="color:#8b7fb8;font-size:14px;padding:4px 0;">Email:</td>
-            <td style="color:#fff;font-size:14px;padding:4px 0;text-align:right;">{email}</td>
-          </tr>
-          <tr>
-            <td style="color:#8b7fb8;font-size:14px;padding:4px 0;">Senha provisória:</td>
-            <td style="color:#d4af37;font-size:16px;font-weight:bold;padding:4px 0;text-align:right;letter-spacing:2px;">{senha_provisoria}</td>
-          </tr>
-        </table>
-      </div>
-
       <div style="text-align:center;margin-bottom:24px;">
-        <a href="{app_url}/login"
-           style="display:inline-block;background:#d4af37;color:#1a0a2e;text-decoration:none;
-                  font-weight:bold;font-size:15px;padding:14px 36px;border-radius:8px;
-                  letter-spacing:1px;">
-          Acessar o AxeFlow →
+        <a href="{link}" style="display:inline-block;background:#d4af37;color:#1a0a2e;
+           text-decoration:none;font-weight:bold;padding:14px 36px;border-radius:8px;">
+          Definir minha senha
         </a>
       </div>
-
-      <p style="color:#6b5b9a;font-size:13px;line-height:1.5;margin:0;text-align:center;">
-        ⚠️ Por segurança, troque sua senha após o primeiro acesso<br>
-        em <strong>Configurações → Alterar Senha</strong>.
+      <p style="color:#8b7fb8;font-size:13px;line-height:1.6;word-break:break-all;">
+        Ou copie o link para seu navegador.<br>{link}
+      </p>
+      <p style="color:#8b7fb8;font-size:13px;line-height:1.6;">
+        Este link expira em uma hora e pode ser usado uma única vez.
+        Se expirar, solicite um novo link em Esqueci minha senha.
       </p>
     """
-
     return _send(
         to=email,
-        subject=f"[AxeFlow] Convite para {terreiro_nome}",
+        subject="[AxeFlow] Convite para definir sua senha",
         html=_base_template("Convite AxeFlow", corpo),
     )
 
